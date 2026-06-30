@@ -22,6 +22,12 @@ chop_sensitivity_args() {
 }
 
 find_new_m4a() {
-  # $1 = directory, $2 = epoch seconds
-  find "$1" -name '*.m4a' -newermt "@$2" 2>/dev/null
+  # $1 = directory, $2 = epoch seconds.
+  # BSD find (/usr/bin/find on macOS) can't parse -newermt "@epoch", so compare
+  # against the mtime of a reference file stamped at the target time instead.
+  local ref
+  ref=$(mktemp)
+  touch -t "$(date -r "$2" '+%Y%m%d%H%M.%S')" "$ref"
+  find "$1" -name '*.m4a' -newer "$ref" 2>/dev/null
+  rm -f "$ref"
 }
