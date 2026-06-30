@@ -27,3 +27,8 @@ Samples/**/*.aiff
 
 # Logic project bundles (large)
 Projects/**/*.logicx
+
+# SDD scratch / editor
+.superpowers/
+.vscode/
+*.code-workspace
