@@ -1,65 +1,23 @@
 #!/usr/bin/env zsh
 set -e
-
 SCRIPT_DIR="${0:A:h}"
-OUTPUT="$SCRIPT_DIR/Stems"
+source "$SCRIPT_DIR/lib/music-core.sh"
 
 echo "Stem Separator"
 echo "--------------"
 echo "Drag a file or folder here, then press Enter:"
-echo -n "> "
-read INPUT
-INPUT="${INPUT//\\ / }"   # unescape spaces from drag-and-drop
-INPUT="${INPUT%"${INPUT##*[! ]}"}"  # trim trailing whitespace
+read "INPUT?> "
+INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+[[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 
-if [[ -z "$INPUT" || (! -f "$INPUT" && ! -d "$INPUT") ]]; then
-  echo "Invalid path. Exiting."
-  exit 1
-fi
-
-echo ""
-echo "Separation mode:"
-echo "  1) Instrumental only (vocals out) — fastest"
-echo "  2) 4 stems: vocals, drums, bass, other"
-echo "  3) 6 stems: vocals, drums, bass, guitar, piano, other"
-echo -n "> "
-read MODE
-
-case "$MODE" in
-  1)
-    ARGS=(--two-stems=vocals)
-    LABEL="instrumental"
-    ;;
-  2)
-    ARGS=()
-    LABEL="4-stem"
-    ;;
-  3)
-    ARGS=(-n htdemucs_6s)
-    LABEL="6-stem"
-    ;;
-  *)
-    echo "Invalid choice. Exiting."
-    exit 1
-    ;;
-esac
-
-mkdir -p "$OUTPUT"
-
-echo ""
-echo "→ Running $LABEL separation..."
-echo "   Output: $OUTPUT"
-echo ""
+echo "Mode: 1) instrumental  2) 4stem  3) 6stem"; read "m?> "
+case "$m" in 1) MODE=instrumental;; 2) MODE=4stem;; 3) MODE=6stem;; *) echo "Invalid."; exit 1;; esac
 
 if [[ -f "$INPUT" ]]; then
-  demucs "${ARGS[@]}" --out "$OUTPUT" "$INPUT"
+  separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
 else
-  # Directory — process all audio files
-  find "$INPUT" -type f \( -name "*.m4a" -o -name "*.mp3" -o -name "*.flac" -o -name "*.wav" \) | while read -r f; do
-    echo "Processing: ${f:t}"
-    demucs "${ARGS[@]}" --out "$OUTPUT" "$f"
+  find "$INPUT" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \) | while read -r f; do
+    echo "Processing: ${f:t}"; separate_stems "$f" "$MODE" "$SCRIPT_DIR/Stems"
   done
 fi
-
-echo ""
-echo "Done. Stems saved to: $OUTPUT"
+echo "Done. Stems saved to: $SCRIPT_DIR/Stems"
