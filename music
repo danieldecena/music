@@ -48,7 +48,24 @@ while true; do
       chop_vocals "$INPUT" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
       ;;
     4)
-      echo "(pipeline added in next task)"
+      read "url?Paste URL> "
+      [[ -z "$url" ]] && { echo "No URL."; continue; }
+      STAMP=$(date +%s)
+      download_url "$url" "$SCRIPT_DIR/Apple Music"
+      new_files=$(find_new_m4a "$SCRIPT_DIR/Apple Music" "$STAMP")
+      if [[ -z "$new_files" ]]; then
+        echo "Nothing downloaded — aborting pipeline."; continue
+      fi
+      echo "$new_files" | while read -r track; do
+        echo "→ Stems: ${track:t}"
+        vocals=$(separate_stems "$track" instrumental "$SCRIPT_DIR/Stems" | tail -1)
+        if [[ ! -f "$vocals" ]]; then
+          echo "  no vocals.wav for ${track:t} — skipping chop."; continue
+        fi
+        echo "→ Chop: ${vocals:h:t}"
+        chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" loose
+      done
+      echo "Pipeline complete."
       ;;
     5) echo "Bye."; exit 0 ;;
     *) echo "Invalid choice." ;;
