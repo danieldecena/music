@@ -1,0 +1,29 @@
+# Python
+.venv/
+.ruff_cache/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Secrets
+cookies.txt
+
+# Downloaded media (copyrighted source audio)
+Apple Music/
+SoundCloud/
+Downloads/
+
+# Derived audio (large binaries)
+Stems/
+Exports/
+References/
+Samples/**/*.wav
+Samples/**/*.mp3
+Samples/**/*.m4a
+Samples/**/*.aif
+Samples/**/*.aiff
+
+# Logic project bundles (large)
+Projects/**/*.logicx
