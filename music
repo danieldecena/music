@@ -1,0 +1,73 @@
+#!/usr/bin/env zsh
+set -e
+SCRIPT_DIR="${0:A:h}"
+source "$SCRIPT_DIR/lib/music-core.sh"
+
+read_path() {  # prints a cleaned drag-and-drop path
+  local p; read "p?> "
+  p="${p//\\ / }"
+  print -- "${p%"${p##*[! ]}"}"
+}
+
+while true; do
+  echo ""
+  echo "Music Toolkit"
+  echo "-------------"
+  echo "1) Download"
+  echo "2) Separate stems"
+  echo "3) Chop vocals"
+  echo "4) Full pipeline (download → stems → chop)"
+  echo "5) Quit"
+  read "choice?> "
+
+  case "$choice" in
+    1)
+      read "url?Paste URL> "
+      [[ -z "$url" ]] && { echo "No URL."; continue; }
+      download_url "$url" "$SCRIPT_DIR/Apple Music"
+      ;;
+    2)
+      echo "Drag a file or folder:"; INPUT=$(read_path)
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      echo "Mode: 1) instrumental  2) 4stem  3) 6stem"; read "m?> "
+      case "$m" in 1) MODE=instrumental;; 2) MODE=4stem;; 3) MODE=6stem;; *) echo "Invalid."; continue;; esac
+      if [[ -f "$INPUT" ]]; then
+        separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
+      else
+        find "$INPUT" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \) | while read -r f; do
+          echo "Processing: ${f:t}"; separate_stems "$f" "$MODE" "$SCRIPT_DIR/Stems"
+        done
+      fi
+      ;;
+    3)
+      echo "Drag a vocals.wav or Stems folder:"; INPUT=$(read_path)
+      [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      echo "Sensitivity: 1) tight  2) loose"; read "s?> "
+      case "$s" in 1) SENS=tight;; 2) SENS=loose;; *) SENS=loose;; esac
+      chop_vocals "$INPUT" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
+      ;;
+    4)
+      read "url?Paste URL> "
+      [[ -z "$url" ]] && { echo "No URL."; continue; }
+      STAMP=$(date +%s)
+      download_url "$url" "$SCRIPT_DIR/Apple Music"
+      new_files=$(find_new_m4a "$SCRIPT_DIR/Apple Music" "$STAMP")
+      if [[ -z "$new_files" ]]; then
+        echo "Nothing downloaded — aborting pipeline."; continue
+      fi
+      echo "$new_files" | while read -r track; do
+        echo "→ Stems: ${track:t}"
+        vocals=$(separate_stems "$track" instrumental "$SCRIPT_DIR/Stems" | tail -1)
+        if [[ ! -f "$vocals" ]]; then
+          echo "  no vocals.wav for ${track:t} — skipping chop."; continue
+        fi
+        echo "→ Chop: ${vocals:h:t}"
+        chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" loose
+      done
+      echo "Pipeline complete."
+      ;;
+    5) echo "Bye."; exit 0 ;;
+    *) echo "Invalid choice."; continue ;;
+  esac
+done
