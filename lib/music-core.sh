@@ -31,3 +31,57 @@ find_new_m4a() {
   find "$1" -name '*.m4a' -newer "$ref" 2>/dev/null
   rm -f "$ref"
 }
+
+download_url() {
+  # $1 = url, $2 = apple-music output dir (other types derive siblings)
+  local url="$1" am_out="$2"
+  local cookies="$MUSIC_DIR/cookies.txt"
+
+  if [[ "$url" == *"music.apple.com"* ]]; then
+    if [[ ! -f "$cookies" ]]; then
+      /opt/homebrew/bin/python3 "$MUSIC_DIR/get-cookies.py" "$cookies" || {
+        echo "Cookie extraction failed. Sign into music.apple.com in Safari + grant Full Disk Access." >&2
+        return 1
+      }
+    fi
+    expect -c "
+      set timeout -1
+      spawn gamdl --cookies-path [list ${cookies}] --output-path [list ${am_out}] [list ${url}]
+      expect -re {[?>]}
+      send \"\x01\"
+      send \"\r\"
+      interact
+    "
+  elif [[ "$url" == *"soundcloud.com"* ]]; then
+    local sc_out="$MUSIC_DIR/SoundCloud"; mkdir -p "$sc_out"
+    yt-dlp --format "bestaudio[ext=m4a]/bestaudio/best" --extract-audio \
+      --audio-format mp3 --audio-quality 0 --embed-thumbnail --add-metadata \
+      --output "$sc_out/%(uploader)s/%(title)s.%(ext)s" "$url"
+  else
+    local other="$MUSIC_DIR/Downloads"; mkdir -p "$other"
+    yt-dlp --format "bestaudio[ext=m4a]/bestaudio/best" --extract-audio \
+      --audio-format mp3 --audio-quality 0 --embed-thumbnail --add-metadata \
+      --output "$other/%(uploader)s/%(title)s.%(ext)s" "$url"
+  fi
+}
+
+separate_stems() {
+  # $1 = file, $2 = mode, $3 = out_dir ; echoes vocals.wav path
+  local file="$1" mode="$2" out="$3"
+  local args
+  args=$(stem_mode_args "$mode") || { echo "bad mode: $mode" >&2; return 1; }
+  mkdir -p "$out"
+  demucs ${=args} --out "$out" "$file"
+  local model_dir=htdemucs
+  [[ "$mode" == 6stem ]] && model_dir=htdemucs_6s
+  print -- "$out/$model_dir/${file:t:r}/vocals.wav"
+}
+
+chop_vocals() {
+  # $1 = vocals.wav, $2 = out_dir, $3 = sensitivity
+  local vocals="$1" out="$2" sens="$3"
+  local args
+  args=$(chop_sensitivity_args "$sens") || { echo "bad sensitivity: $sens" >&2; return 1; }
+  source "$MUSIC_DIR/.venv/bin/activate"
+  /opt/homebrew/bin/python3 "$MUSIC_DIR/Scripts/chop.py" "$vocals" "$out" ${=args}
+}
