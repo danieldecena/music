@@ -23,11 +23,5 @@ chop_sensitivity_args() {
 
 find_new_m4a() {
   # $1 = directory, $2 = epoch seconds
-  local ref_file ref_dir
-  ref_dir=$(mktemp -d)
-  ref_file="$ref_dir/.ref_time"
-  # Create a reference file with the target timestamp
-  touch -t "$(date -r "$2" '+%Y%m%d%H%M.%S')" "$ref_file" 2>/dev/null || touch -t "$(date -r "$2" '+%Y%m%d%H%M')" "$ref_file"
-  find "$1" -name '*.m4a' -newer "$ref_file" 2>/dev/null
-  rm -rf "$ref_dir"
+  find "$1" -name '*.m4a' -newermt "@$2" 2>/dev/null
 }
