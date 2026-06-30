@@ -44,6 +44,9 @@ download_url() {
         return 1
       }
     fi
+    # NOTE: url/cookies/am_out are interpolated into this expect heredoc. Safe
+    # because url reaches this branch only via trusted interactive paste of an
+    # Apple Music URL. Do NOT route untrusted URLs here without escaping.
     expect -c "
       set timeout -1
       spawn gamdl --cookies-path [list ${cookies}] --output-path [list ${am_out}] [list ${url}]
@@ -71,7 +74,7 @@ separate_stems() {
   local args
   args=$(stem_mode_args "$mode") || { echo "bad mode: $mode" >&2; return 1; }
   mkdir -p "$out"
-  demucs ${=args} --out "$out" "$file"
+  demucs ${=args} --out "$out" "$file" || return 1
   local model_dir=htdemucs
   [[ "$mode" == 6stem ]] && model_dir=htdemucs_6s
   print -- "$out/$model_dir/${file:t:r}/vocals.wav"

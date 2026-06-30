@@ -68,6 +68,6 @@ while true; do
       echo "Pipeline complete."
       ;;
     5) echo "Bye."; exit 0 ;;
-    *) echo "Invalid choice." ;;
+    *) echo "Invalid choice."; continue ;;
   esac
 done
