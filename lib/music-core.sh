@@ -21,6 +21,15 @@ chop_sensitivity_args() {
   esac
 }
 
+drum_split_args() {
+  # Density knob for slice_drums.py onset detection. tight = more, shorter hits.
+  case "$1" in
+    tight) print -- "--delta 0.04 --wait 0.05" ;;
+    loose) print -- "--delta 0.09 --wait 0.12" ;;
+    *)     return 1 ;;
+  esac
+}
+
 find_new_m4a() {
   # $1 = directory, $2 = epoch seconds.
   # BSD find (/usr/bin/find on macOS) can't parse -newermt "@epoch", so compare
@@ -37,7 +46,11 @@ download_url() {
   local url="$1" am_out="$2"
   local cookies="$MUSIC_DIR/cookies.txt"
 
+  [[ -z "$url" ]] && { echo "download_url: no URL given." >&2; return 2; }
+
   if [[ "$url" == *"music.apple.com"* ]]; then
+    command -v gamdl >/dev/null || { echo "gamdl not found on PATH — install it (pipx install gamdl)." >&2; return 3; }
+    command -v expect >/dev/null || { echo "expect not found on PATH — install it (brew install expect)." >&2; return 3; }
     if [[ ! -f "$cookies" ]]; then
       /opt/homebrew/bin/python3 "$MUSIC_DIR/get-cookies.py" "$cookies" || {
         echo "Cookie extraction failed. Sign into music.apple.com in Safari + grant Full Disk Access." >&2
@@ -56,14 +69,16 @@ download_url() {
       interact
     "
   elif [[ "$url" == *"soundcloud.com"* ]]; then
+    command -v yt-dlp >/dev/null || { echo "yt-dlp not found on PATH — install it (brew install yt-dlp)." >&2; return 3; }
     local sc_out="$MUSIC_DIR/SoundCloud"; mkdir -p "$sc_out"
     yt-dlp --format "bestaudio[ext=m4a]/bestaudio/best" --extract-audio \
-      --audio-format mp3 --audio-quality 0 --embed-thumbnail --add-metadata \
+      --audio-format m4a --audio-quality 0 --embed-thumbnail --add-metadata \
       --output "$sc_out/%(uploader)s/%(title)s.%(ext)s" "$url"
   else
+    command -v yt-dlp >/dev/null || { echo "yt-dlp not found on PATH — install it (brew install yt-dlp)." >&2; return 3; }
     local other="$MUSIC_DIR/Downloads"; mkdir -p "$other"
     yt-dlp --format "bestaudio[ext=m4a]/bestaudio/best" --extract-audio \
-      --audio-format mp3 --audio-quality 0 --embed-thumbnail --add-metadata \
+      --audio-format m4a --audio-quality 0 --embed-thumbnail --add-metadata \
       --output "$other/%(uploader)s/%(title)s.%(ext)s" "$url"
   fi
 }
@@ -73,6 +88,10 @@ separate_stems() {
   local file="$1" mode="$2" out="$3"
   local args
   args=$(stem_mode_args "$mode") || { echo "bad mode: $mode" >&2; return 1; }
+  # demucs lives in the venv, not on the global PATH — activate it here so this
+  # works standalone (via ./stems.sh or the menu), matching chop_vocals.
+  [[ -z "${VIRTUAL_ENV:-}" ]] && source "$MUSIC_DIR/.venv/bin/activate"
+  command -v demucs >/dev/null || { echo "demucs not found even after venv activate — run: pip install -r requirements? (see .venv)" >&2; return 1; }
   mkdir -p "$out"
   demucs ${=args} --out "$out" "$file" || return 1
   local model_dir=htdemucs
@@ -87,4 +106,49 @@ chop_vocals() {
   args=$(chop_sensitivity_args "$sens") || { echo "bad sensitivity: $sens" >&2; return 1; }
   source "$MUSIC_DIR/.venv/bin/activate"
   /opt/homebrew/bin/python3 "$MUSIC_DIR/Scripts/chop.py" "$vocals" "$out" ${=args}
+}
+
+chop_drums() {
+  # $1 = drums.wav (or Stems folder), $2 = out_dir, $3 = density (tight|loose)
+  # Splits a drum stem into one-shot hits via onset detection. Uses the venv's
+  # python directly because slice_drums.py needs numpy (chop.py is stdlib-only).
+  local input="$1" out="$2" sens="$3"
+  local args
+  args=$(drum_split_args "$sens") || { echo "bad density: $sens" >&2; return 1; }
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/slice_drums.py" "$input" "$out" ${=args}
+}
+
+chop_stems() {
+  # $1 = a Stems/<model>/<track> folder (or a single stem .wav), $2 = out_root,
+  # $3 = snippet seconds (default 8). Fixed-length chops per stem into
+  # <out_root>/<track>/<stem>/<stem>_NNN.wav — the auditioning layout.
+  local input="$1" out="$2" secs="${3:-8}"
+  local -a stems
+  local track
+  if [[ -d "$input" ]]; then
+    track="${input:t}"
+    stems=("$input"/*.wav(N))
+  else
+    track="${input:h:t}"
+    stems=("$input")
+  fi
+  [[ ${#stems} -eq 0 ]] && { echo "No stem .wav files in $input" >&2; return 1; }
+  local stem name dest
+  for stem in $stems; do
+    name="${stem:t:r}"
+    dest="$out/$track/$name"; mkdir -p "$dest"
+    ffmpeg -nostdin -y -v error -i "$stem" -f segment -segment_time "$secs" \
+      -segment_start_number 1 -c copy -reset_timestamps 1 "$dest/${name}_%03d.wav" \
+      && echo "  $name -> $dest"
+  done
+}
+
+sort_kit() {
+  # $1 = a One-Shots folder of drum hits. Classifies into kick/snare/hat subdirs.
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/sort_drums.py" "$1"
+}
+
+analyze_track() {
+  # $1 = an audio file (or folder). Prints estimated BPM + key per file.
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/analyze_track.py" "$1"
 }

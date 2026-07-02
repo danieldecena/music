@@ -15,6 +15,8 @@ assert_eq "$(stem_mode_args 4stem)" "" "4stem mode"
 assert_eq "$(stem_mode_args 6stem)" "-n htdemucs_6s" "6stem mode"
 assert_eq "$(chop_sensitivity_args tight)" "--min-silence 0.15 --min-clip 0.3" "tight sensitivity"
 assert_eq "$(chop_sensitivity_args loose)" "--min-silence 0.35 --min-clip 0.8" "loose sensitivity"
+assert_eq "$(drum_split_args tight)" "--delta 0.04 --wait 0.05" "tight drum density"
+assert_eq "$(drum_split_args loose)" "--delta 0.09 --wait 0.12" "loose drum density"
 
 # find_new_m4a: 2020 file is old, 2099 file is new, stamp is 2050 (epoch 2524608000)
 tmp=$(mktemp -d)

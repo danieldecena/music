@@ -24,6 +24,7 @@ Samples/**/*.mp3
 Samples/**/*.m4a
 Samples/**/*.aif
 Samples/**/*.aiff
+Samples/**/*.mid
 
 # Logic project bundles (large)
 Projects/**/*.logicx

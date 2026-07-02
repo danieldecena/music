@@ -16,8 +16,12 @@ while true; do
   echo "1) Download"
   echo "2) Separate stems"
   echo "3) Chop vocals"
-  echo "4) Full pipeline (download → stems → chop)"
-  echo "5) Quit"
+  echo "4) Split drums (one-shots)"
+  echo "5) Chop stems into snippets"
+  echo "6) Sort drum kit (kick/snare/hat)"
+  echo "7) Analyze tempo & key"
+  echo "8) Full pipeline (download → stems → chop)"
+  echo "9) Quit"
   read "choice?> "
 
   case "$choice" in
@@ -48,6 +52,30 @@ while true; do
       chop_vocals "$INPUT" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
       ;;
     4)
+      echo "Drag a drums.wav or Stems folder:"; INPUT=$(read_path)
+      [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      echo "Density: 1) tight  2) loose"; read "d?> "
+      case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
+      chop_drums "$INPUT" "$SCRIPT_DIR/Samples/One-Shots" "$DENS"
+      ;;
+    5)
+      echo "Drag a Stems track folder (or a stem .wav):"; INPUT=$(read_path)
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      read "secs?Snippet length in seconds [8]> "; [[ -z "$secs" ]] && secs=8
+      chop_stems "$INPUT" "$SCRIPT_DIR/Samples/Chops" "$secs"
+      ;;
+    6)
+      echo "Drag a One-Shots folder to sort:"; INPUT=$(read_path)
+      [[ ! -d "$INPUT" ]] && { echo "Invalid folder."; continue; }
+      sort_kit "$INPUT"
+      ;;
+    7)
+      echo "Drag an audio file or folder:"; INPUT=$(read_path)
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      analyze_track "$INPUT"
+      ;;
+    8)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
       STAMP=$(date +%s)
@@ -67,7 +95,7 @@ while true; do
       done
       echo "Pipeline complete."
       ;;
-    5) echo "Bye."; exit 0 ;;
+    9) echo "Bye."; exit 0 ;;
     *) echo "Invalid choice."; continue ;;
   esac
 done
