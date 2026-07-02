@@ -33,3 +33,6 @@ Projects/**/*.logicx
 .superpowers/
 .vscode/
 *.code-workspace
+
+# Nested MCP repo (has its own .git — keep out of music tracking)
+logic-pro-mcp/
