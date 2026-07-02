@@ -36,6 +36,12 @@ def decode_mono(path: Path) -> np.ndarray:
 
 
 def classify(audio: np.ndarray) -> str:
+    """Classify a drum one-shot as kick / snare / hat from spectral bands.
+
+    Heuristic, tuned to avoid the common failure where bright snares/claps get
+    swept into 'hat'. Decision order: sub-heavy -> kick; bright with no body ->
+    hat; anything with real mid-band energy (snare/clap noise) -> snare.
+    """
     if audio.size < 256:
         return "snare"
     seg = audio[: int(SR * 0.12)] if audio.size > int(SR * 0.12) else audio
@@ -44,13 +50,17 @@ def classify(audio: np.ndarray) -> str:
     freqs = np.fft.rfftfreq(len(win), 1.0 / SR)
     total = mag.sum() + 1e-9
     centroid = float((freqs * mag).sum() / total)
-    low = mag[freqs < 200].sum() / total       # kick body
-    high = mag[freqs > 6000].sum() / total      # hat sizzle
-    if low > 0.30 and centroid < 1500:
-        return "kick"
-    if high > 0.25 or centroid > 4500:
-        return "hat"
-    return "snare"
+    low = mag[freqs < 150].sum() / total                       # kick sub/body
+    # Primary split on spectral centroid (timbre brightness), with a sub-heavy
+    # override for kicks. Tuned so hi-hats (bright, plentiful in trap) don't get
+    # miscounted as snares and vice-versa. Still a heuristic — expect ~10% slop.
+    if low > 0.40 and centroid < 1600:
+        return "kick"          # dominant sub/body => kick regardless of brightness
+    if centroid >= 5000:
+        return "hat"           # bright sizzle
+    if centroid >= 1900:
+        return "snare"         # mid-bright noise burst
+    return "kick"              # dark/low-centroid one-shots
 
 
 def main() -> None:
