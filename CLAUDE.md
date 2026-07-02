@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- Run the toolkit: `./music` — interactive menu (Download / Separate stems / Chop vocals / Split drums / Chop stems / Sort kit / Analyze tempo+key / Full pipeline / Quit)
-- Or run a single step directly: `./download.sh`, `./stems.sh`, `./chop.sh`, `./chop-drums.sh`, `./chop-stems.sh`, `./sort-kit.sh`, `./analyze.sh` — each prompts for input then calls the matching `music-core.sh` function
+- Run the toolkit: `./music` — interactive menu (Download / Separate stems / Chop vocals / Split drums / Chop stems / Sort kit / Analyze tempo+key / Deconstruct / Full pipeline / Quit)
+- Or run a single step directly: `./download.sh`, `./stems.sh`, `./chop.sh`, `./chop-drums.sh`, `./chop-stems.sh`, `./sort-kit.sh`, `./analyze.sh`, `./deconstruct.sh` — each prompts for input then calls the matching `music-core.sh` function
 - Run tests: `zsh tests/test-core.sh` — hand-rolled assertions (no framework) covering `stem_mode_args`, `chop_sensitivity_args`, `drum_split_args`, `find_new_m4a`
 - Python steps need the venv: `source .venv/bin/activate` before invoking `Scripts/chop.py` directly. `chop_vocals()` in music-core already does this itself, so `./chop.sh` and pipeline runs don't need manual activation.
 - No lint/build config exists in this repo (no ruff config, no package manifest) — don't invent commands for these.
@@ -22,6 +22,7 @@ Core functions and what they shell out to:
 - `chop_stems(track_folder, out_root, seconds)` — pure-ffmpeg fixed-length chops of every stem in a `Stems/<model>/<track>` folder into `Samples/Chops/<track>/<stem>/<stem>_NNN.wav` (auditioning layout; default 8s)
 - `sort_kit(oneshots_folder)` — runs `Scripts/sort_drums.py` to classify drum one-shots into `kick/`, `snare/`, `hat/` subfolders by spectral centroid + band energy (heuristic)
 - `analyze_track(file_or_folder)` — runs `Scripts/analyze_track.py` to estimate BPM (onset-autocorrelation) and key (Krumhansl-Schmuckler chroma). Estimates only
+- `deconstruct(file, density)` — one-command flip prep chaining the reliable steps: `analyze_track` → `separate_stems` (4stem) → `chop_drums` → `sort_kit` → `chop_stems`. Menu option 8 / `./deconstruct.sh`
 - `Scripts/bass_to_midi.py` (not yet wired into a menu step) — monophonic bass→MIDI via autocorrelation pitch detection + a hand-written MIDI writer. Best-effort; single-note lines only
 
 All `Scripts/*.py` except `chop.py` (stdlib-only) require the venv's numpy and are invoked via `.venv/bin/python` directly rather than `source activate`.

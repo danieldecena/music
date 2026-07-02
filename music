@@ -20,8 +20,9 @@ while true; do
   echo "5) Chop stems into snippets"
   echo "6) Sort drum kit (kick/snare/hat)"
   echo "7) Analyze tempo & key"
-  echo "8) Full pipeline (download → stems → chop)"
-  echo "9) Quit"
+  echo "8) Deconstruct a track (stems → one-shots → kit → snippets)"
+  echo "9) Full pipeline (download → stems → chop)"
+  echo "10) Quit"
   read "choice?> "
 
   case "$choice" in
@@ -76,6 +77,13 @@ while true; do
       analyze_track "$INPUT"
       ;;
     8)
+      echo "Drag an audio file to deconstruct:"; INPUT=$(read_path)
+      [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
+      echo "Drum density: 1) tight  2) loose"; read "d?> "
+      case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
+      deconstruct "$INPUT" "$DENS"
+      ;;
+    9)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
       STAMP=$(date +%s)
@@ -95,7 +103,7 @@ while true; do
       done
       echo "Pipeline complete."
       ;;
-    9) echo "Bye."; exit 0 ;;
+    10) echo "Bye."; exit 0 ;;
     *) echo "Invalid choice."; continue ;;
   esac
 done

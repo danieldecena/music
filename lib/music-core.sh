@@ -152,3 +152,27 @@ analyze_track() {
   # $1 = an audio file (or folder). Prints estimated BPM + key per file.
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/analyze_track.py" "$1"
 }
+
+deconstruct() {
+  # $1 = audio file, $2 = drum density (tight|loose, default loose).
+  # One-command flip prep: tempo/key -> 4-stem split -> drum one-shots ->
+  # sort kit (kick/snare/hat) -> 8s stem snippets. Chains the reliable steps.
+  local file="$1" dens="${2:-loose}"
+  [[ ! -f "$file" ]] && { echo "deconstruct: need an audio file, got '$file'" >&2; return 2; }
+  local track="${file:t:r}"
+  local stemdir="$MUSIC_DIR/Stems/htdemucs/$track"
+  echo "→ Tempo & key:"
+  analyze_track "$file"
+  echo "→ Separating 4 stems (drums/bass/other/vocals)…"
+  separate_stems "$file" 4stem "$MUSIC_DIR/Stems" >/dev/null || return 1
+  echo "→ Drum one-shots…"
+  chop_drums "$stemdir/drums.wav" "$MUSIC_DIR/Samples/One-Shots" "$dens" | tail -1
+  echo "→ Sorting kit (kick/snare/hat)…"
+  sort_kit "$MUSIC_DIR/Samples/One-Shots/$track"
+  echo "→ 8s stem snippets…"
+  chop_stems "$stemdir" "$MUSIC_DIR/Samples/Chops" 8 >/dev/null
+  echo "✓ Deconstruct complete: $track"
+  echo "  Stems: $stemdir"
+  echo "  One-shots + kit: Samples/One-Shots/$track"
+  echo "  Snippets: Samples/Chops/$track"
+}
