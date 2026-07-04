@@ -162,8 +162,11 @@ bass_to_midi() {
 
 build_logic_project() {
   # $1 = a Stems/<model>/<track> folder, $2 = tempo (optional), $3 = key (optional).
-  # Shells out to the logic-pro-mcp CLI, which drives Logic Pro (best-effort UI
-  # scripting; Logic is launched if not already open).
+  # Loads the stems as audio tracks in a new Logic project. If a bass.wav is
+  # present it is transcribed to MIDI and imported as a software-instrument
+  # track too (so the bass can be re-voiced). Shells out to the logic-pro-mcp
+  # CLI, which drives Logic Pro (best-effort UI scripting; Logic is launched if
+  # not already open).
   local stems="$1" tempo="$2" key="$3"
   local mcp="$MUSIC_DIR/logic-pro-mcp"
   local py="$mcp/.venv/bin/python"
@@ -171,6 +174,15 @@ build_logic_project() {
   local -a args=("$mcp/build_project.py" "$stems")
   [[ -n "$tempo" ]] && args+=(--tempo "$tempo")
   [[ -n "$key" ]] && args+=(--key "$key")
+  # Transcribe the bass to MIDI so the build can add it as an instrument track.
+  local bass="$stems/bass.wav" midi=""
+  if [[ -f "$bass" ]]; then
+    midi="$MUSIC_DIR/Samples/MIDI/${stems:t}_bass.mid"
+    mkdir -p "${midi:h}"
+    if bass_to_midi "$bass" "$midi" "${tempo:-120}" >/dev/null 2>&1 && [[ -f "$midi" ]]; then
+      args+=(--midi "$midi")
+    fi
+  fi
   "$py" "${args[@]}"
 }
 
