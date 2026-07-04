@@ -42,12 +42,15 @@ Utilities & shortcuts:
                           track folder inside it.
   M) Bass -> MIDI ........ transcribe a mono bass line to MIDI. Samples/MIDI/
   O) Open outputs ........ reveal the Samples/ folder in Finder
-  P) Build Logic project   open a new Logic Pro project with the 4 stems loaded
-                          as tracks. Needs Logic open + Accessibility granted.
-                          Pass the track's Stems folder (or the model folder).
-  R) Re-voice a melody ... transcribe a mono line and render it as another
-                          instrument (guitar/piano/strings/bells/synth/...).
-                          Output: Samples/Resynth/<track>/<stem>_<instrument>.wav
+  P) Build Logic project   new Logic project: 4 stems as audio tracks + the bass
+                          transcribed to an editable MIDI instrument track (swap
+                          its sound). The bass .mid is also saved to Samples/MIDI/.
+                          Needs Logic open + Accessibility granted. Pass the
+                          track's Stems folder (or the model folder).
+  R) Re-voice a melody ... transcribe a mono line and render it as one of 35
+                          instruments (guitar, piano, sitar, cello, sax, ...).
+                          Type the name; if you have several soundfonts it asks
+                          which. Output: Samples/Resynth/<track>/<stem>_<instr>.wav
   0) Guide ............... prints this walkthrough in the terminal
  10) Quit
 
