@@ -13,6 +13,11 @@ while true; do
   echo ""
   echo "Music Toolkit"
   echo "-------------"
+  echo "Turn songs into stems, one-shots & samples for flipping. Pick a step:"
+  echo "0) Guide / how it works"
+  echo "L) Browse music library (pick a file, then a step)"
+  echo "M) Bass stem -> MIDI"
+  echo "O) Open outputs in Finder"
   echo "1) Download"
   echo "2) Separate stems"
   echo "3) Chop vocals"
@@ -26,6 +31,96 @@ while true; do
   read "choice?> "
 
   case "$choice" in
+    0)
+      cat <<'GUIDE'
+
+Guide — how to flip a track
+---------------------------
+Fastest path (recommended):
+  1) Download      paste a URL; saves .m4a into Apple Music/
+  8) Deconstruct   drag that file, pick "loose" — chains everything:
+                   analyze (BPM+key) -> 4-stem split -> drum one-shots ->
+                   sort kit (kick/snare/hat) -> fixed-length stem snippets.
+  Everything lands under Samples/, ready to drag into Logic.
+
+Manual path (control at each step):
+  1 Download -> 7 Analyze (set project tempo/key first) -> 2 Separate stems
+  then branch by what you need:
+    3 Chop vocals       phrase-length vocal clips  (Samples/Vocals/)
+    4 Split drums       one-shot hits, then 6 Sort kit -> kick/snare/hat
+    5 Chop stems        fixed 8s chunks of every stem (Samples/Chops/)
+
+Pick what you need:
+  Sample-flip fast ....... 8
+  Acapella / instrumental  2 (instrumental) -> 3
+  Build a drum kit ....... 2 -> 4 -> 6
+
+Density / sensitivity: "loose" = more, longer clips; "tight" = fewer, cleaner.
+Start loose, tighten if you get too much noise.
+
+Input: Download/Full pipeline take a pasted URL; everything else takes a
+file/folder dragged from Finder into the terminal.
+GUIDE
+      ;;
+    L|l)
+      files=("${(@f)$(find "$SCRIPT_DIR/Apple Music" "$SCRIPT_DIR/SoundCloud" "$SCRIPT_DIR/Downloads" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \) 2>/dev/null | sort)}")
+      [[ ${#files} -eq 0 ]] && { echo "No audio files found in Apple Music/, SoundCloud/, or Downloads/."; continue; }
+      read "q?Filter by name (blank = all)> "
+      if [[ -n "$q" ]]; then
+        filtered=(); for f in "${files[@]}"; do [[ "${f:l}" == *"${q:l}"* ]] && filtered+=("$f"); done
+        files=("${filtered[@]}")
+        [[ ${#files} -eq 0 ]] && { echo "No matches for '$q'."; continue; }
+      fi
+      echo "Music library:"
+      i=1; for f in "${files[@]}"; do printf " %2d) %s / %s\n" "$i" "${f:h:t}" "${f:t}"; ((i++)); done
+      read "n?Pick a file #> "
+      if [[ -z "$n" || ! "$n" == <-> || "$n" -lt 1 || "$n" -gt ${#files} ]]; then echo "Invalid."; continue; fi
+      INPUT="${files[$n]}"
+      echo "Selected: ${INPUT:t}"
+      echo "Run: 1) Deconstruct [recommended]  2) Separate stems  3) Analyze  4) Chop vocals"; read "act?> "
+      case "$act" in
+        1|"")
+          echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
+          case "$d" in 1) DENS=tight;; *) DENS=loose;; esac
+          deconstruct "$INPUT" "$DENS"
+          ;;
+        2)
+          echo "Mode: 1) instrumental  2) 4stem [recommended]  3) 6stem"; read "m?> "
+          case "$m" in 1) MODE=instrumental;; 3) MODE=6stem;; *) MODE=4stem;; esac
+          separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
+          ;;
+        3) analyze_track "$INPUT" ;;
+        4)
+          track="${INPUT:t:r}"
+          vocals=""
+          for m in htdemucs htdemucs_6s; do
+            [[ -f "$SCRIPT_DIR/Stems/$m/$track/vocals.wav" ]] && vocals="$SCRIPT_DIR/Stems/$m/$track/vocals.wav" && break
+          done
+          [[ -z "$vocals" ]] && { echo "No stems for '$track' yet — run Separate stems or Deconstruct first."; continue; }
+          echo "Sensitivity: 1) tight  2) loose [recommended]"; read "s?> "
+          case "$s" in 1) SENS=tight;; *) SENS=loose;; esac
+          chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
+          ;;
+        *) echo "Invalid."; continue ;;
+      esac
+      ;;
+    M|m)
+      echo "Drag a bass.wav or a Stems track folder:"; INPUT=$(read_path)
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      if [[ -d "$INPUT" ]]; then
+        BASS=$(find "$INPUT" -type f -name 'bass.wav' | head -1)
+        [[ -z "$BASS" ]] && { echo "No bass.wav under that folder."; continue; }
+      else
+        BASS="$INPUT"
+      fi
+      read "tempo?Tempo BPM [120]> "; [[ -z "$tempo" ]] && tempo=120
+      OUT="$SCRIPT_DIR/Samples/MIDI/${BASS:h:t}_bass.mid"
+      mkdir -p "${OUT:h}"
+      bass_to_midi "$BASS" "$OUT" "$tempo"
+      ;;
+    O|o)
+      open "$SCRIPT_DIR/Samples" 2>/dev/null || echo "Samples/ not found — run a step first."
+      ;;
     1)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
@@ -34,8 +129,8 @@ while true; do
     2)
       echo "Drag a file or folder:"; INPUT=$(read_path)
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
-      echo "Mode: 1) instrumental  2) 4stem  3) 6stem"; read "m?> "
-      case "$m" in 1) MODE=instrumental;; 2) MODE=4stem;; 3) MODE=6stem;; *) echo "Invalid."; continue;; esac
+      echo "Mode: 1) instrumental  2) 4stem [recommended]  3) 6stem"; read "m?> "
+      case "$m" in 1) MODE=instrumental;; 3) MODE=6stem;; 2|"") MODE=4stem;; *) echo "Invalid."; continue;; esac
       if [[ -f "$INPUT" ]]; then
         separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
       else
@@ -48,7 +143,7 @@ while true; do
       echo "Drag a vocals.wav or Stems folder:"; INPUT=$(read_path)
       [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
-      echo "Sensitivity: 1) tight  2) loose"; read "s?> "
+      echo "Sensitivity: 1) tight  2) loose [recommended]"; read "s?> "
       case "$s" in 1) SENS=tight;; 2) SENS=loose;; *) SENS=loose;; esac
       chop_vocals "$INPUT" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
       ;;
@@ -56,7 +151,7 @@ while true; do
       echo "Drag a drums.wav or Stems folder:"; INPUT=$(read_path)
       [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
-      echo "Density: 1) tight  2) loose"; read "d?> "
+      echo "Density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       chop_drums "$INPUT" "$SCRIPT_DIR/Samples/One-Shots" "$DENS"
       ;;
@@ -79,7 +174,7 @@ while true; do
     8)
       echo "Drag an audio file to deconstruct:"; INPUT=$(read_path)
       [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
-      echo "Drum density: 1) tight  2) loose"; read "d?> "
+      echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       deconstruct "$INPUT" "$DENS"
       ;;

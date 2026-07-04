@@ -153,10 +153,18 @@ analyze_track() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/analyze_track.py" "$1"
 }
 
+bass_to_midi() {
+  # $1 = bass.wav (monophonic stem), $2 = out .mid, $3 = tempo BPM (default 120).
+  # Best-effort: reliable only for clean single-note lines; polyphony won't transcribe.
+  local input="$1" out="$2" tempo="${3:-120}"
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/bass_to_midi.py" "$input" "$out" --tempo "$tempo"
+}
+
 deconstruct() {
   # $1 = audio file, $2 = drum density (tight|loose, default loose).
   # One-command flip prep: tempo/key -> 4-stem split -> drum one-shots ->
-  # sort kit (kick/snare/hat) -> 8s stem snippets. Chains the reliable steps.
+  # sort kit (kick/snare/hat) -> 8s stem snippets -> vocal phrase chops.
+  # Chains the reliable steps.
   local file="$1" dens="${2:-loose}"
   [[ ! -f "$file" ]] && { echo "deconstruct: need an audio file, got '$file'" >&2; return 2; }
   local track="${file:t:r}"
@@ -171,8 +179,11 @@ deconstruct() {
   sort_kit "$MUSIC_DIR/Samples/One-Shots/$track"
   echo "→ 8s stem snippets…"
   chop_stems "$stemdir" "$MUSIC_DIR/Samples/Chops" 8 >/dev/null
+  echo "→ Vocal phrase chops…"
+  chop_vocals "$stemdir/vocals.wav" "$MUSIC_DIR/Samples/Vocals" loose >/dev/null
   echo "✓ Deconstruct complete: $track"
   echo "  Stems: $stemdir"
   echo "  One-shots + kit: Samples/One-Shots/$track"
   echo "  Snippets: Samples/Chops/$track"
+  echo "  Vocal chops: Samples/Vocals/$track"
 }
