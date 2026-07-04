@@ -134,17 +134,24 @@ GUIDE
     R|r)
       echo "Drag a monophonic melodic stem (.wav — a lead/bass/vocal line):"; INPUT=$(read_path)
       [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
-      echo "Target instrument:"
-      echo "  1) guitar  2) guitar-steel  3) piano  4) epiano  5) strings"
-      echo "  6) bells   7) flute         8) synth  9) organ  10) brass"
-      read "ins?> "
-      case "$ins" in
-        1|"") INSTR=guitar;; 2) INSTR=guitar-steel;; 3) INSTR=piano;; 4) INSTR=epiano;;
-        5) INSTR=strings;; 6) INSTR=bells;; 7) INSTR=flute;; 8) INSTR=synth;;
-        9) INSTR=organ;; 10) INSTR=brass;; *) echo "Invalid."; continue;;
-      esac
+      echo "Target instrument (type a name):"
+      echo "  keys:    piano epiano harpsichord clav music-box vibraphone marimba bells organ accordion"
+      echo "  guitars: guitar guitar-steel guitar-jazz guitar-clean guitar-muted"
+      echo "  bass:    bass-finger bass-pick bass-synth"
+      echo "  strings: violin cello harp strings choir"
+      echo "  wind:    trumpet brass sax clarinet flute"
+      echo "  synth:   synth synth-square synth-pad"
+      echo "  world:   sitar banjo kalimba steel-drum"
+      read "INSTR?Instrument [guitar]> "; [[ -z "$INSTR" ]] && INSTR=guitar
+      SF=""
+      fonts=("$SCRIPT_DIR"/soundfonts/*.sf2(N) "$SCRIPT_DIR"/soundfonts/*.sf3(N))
+      if [[ ${#fonts} -gt 1 ]]; then
+        echo "Soundfonts:"; i=1; for f in "${fonts[@]}"; do printf "  %d) %s\n" "$i" "${f:t}"; ((i++)); done
+        read "sfn?Soundfont # [1]> "; [[ -z "$sfn" ]] && sfn=1
+        [[ "$sfn" == <-> && "$sfn" -ge 1 && "$sfn" -le ${#fonts} ]] && SF="${fonts[$sfn]}"
+      fi
       read "tempo?Tempo BPM [120]> "; [[ -z "$tempo" ]] && tempo=120
-      resynth_instrument "$INPUT" "$SCRIPT_DIR/Samples/Resynth/${INPUT:t:r}" "$INSTR" "$tempo"
+      resynth_instrument "$INPUT" "$SCRIPT_DIR/Samples/Resynth/${INPUT:t:r}" "$INSTR" "$tempo" "$SF"
       ;;
     1)
       read "url?Paste URL> "

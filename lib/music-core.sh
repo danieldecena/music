@@ -188,11 +188,13 @@ build_logic_project() {
 
 resynth_instrument() {
   # $1 = input .wav (monophonic melodic stem), $2 = out_dir, $3 = instrument,
-  # $4 = tempo BPM (default 120). Transcribes the line then renders it as the
-  # chosen instrument via Scripts/resynth.py (needs the venv's numpy).
-  local input="$1" out="$2" instrument="$3" tempo="${4:-120}"
-  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/resynth.py" "$input" "$out" \
-    --instrument "$instrument" --tempo "$tempo"
+  # $4 = tempo BPM (default 120), $5 = soundfont name/path (optional). Transcribes
+  # the line then renders it as the chosen instrument via Scripts/resynth.py.
+  local input="$1" out="$2" instrument="$3" tempo="${4:-120}" soundfont="$5"
+  local -a args=("$MUSIC_DIR/Scripts/resynth.py" "$input" "$out"
+    --instrument "$instrument" --tempo "$tempo")
+  [[ -n "$soundfont" ]] && args+=(--soundfont "$soundfont")
+  "$MUSIC_DIR/.venv/bin/python" "${args[@]}"
 }
 
 deconstruct() {

@@ -28,35 +28,77 @@ HI_HZ = 2000.0
 
 # Friendly name -> General MIDI program number (0-indexed).
 INSTRUMENTS = {
+    # keys
     "piano": 0,
     "epiano": 4,
+    "harpsichord": 6,
+    "clav": 7,
+    "music-box": 10,
+    "vibraphone": 11,
+    "marimba": 12,
+    "bells": 14,
+    "organ": 16,
+    "accordion": 21,
+    # guitars
     "guitar": 24,  # nylon
     "guitar-steel": 25,
+    "guitar-jazz": 26,
     "guitar-clean": 27,
-    "organ": 16,
-    "bells": 14,
+    "guitar-muted": 28,
+    # bass
+    "bass-finger": 33,
+    "bass-pick": 34,
+    "bass-synth": 38,
+    # strings
+    "violin": 40,
+    "cello": 42,
+    "harp": 46,
     "strings": 48,
+    "choir": 52,
+    # brass / wind
+    "trumpet": 56,
     "brass": 61,
+    "sax": 65,
+    "clarinet": 71,
     "flute": 73,
+    # synth
     "synth": 81,  # sawtooth lead
+    "synth-square": 80,
+    "synth-pad": 89,
+    # world / misc
+    "sitar": 104,
+    "banjo": 105,
+    "kalimba": 108,
+    "steel-drum": 114,
 }
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+SF_DIR = REPO_ROOT / "soundfonts"
 
 
-def resolve_soundfont() -> Path | None:
-    """The soundfont to render with: $MUSIC_SOUNDFONT, else first sf2/sf3 in soundfonts/."""
+def list_soundfonts() -> list[Path]:
+    """All .sf2/.sf3 soundfonts in the soundfonts/ folder, sorted by name."""
+    if not SF_DIR.is_dir():
+        return []
+    return sorted(p for p in SF_DIR.iterdir() if p.suffix.lower() in (".sf2", ".sf3"))
+
+
+def resolve_soundfont(pref: str | None = None) -> Path | None:
+    """Pick a soundfont. `pref` may be a path or a name substring of a file in
+    soundfonts/. Falls back to $MUSIC_SOUNDFONT, then the first soundfont found.
+    """
+    if pref:
+        p = Path(pref).expanduser()
+        if p.is_file():
+            return p
+        matches = [f for f in list_soundfonts() if pref.lower() in f.stem.lower()]
+        if matches:
+            return matches[0]
     env = os.environ.get("MUSIC_SOUNDFONT")
     if env and Path(env).is_file():
         return Path(env)
-    sf_dir = REPO_ROOT / "soundfonts"
-    if sf_dir.is_dir():
-        fonts = sorted(
-            p for p in sf_dir.iterdir() if p.suffix.lower() in (".sf2", ".sf3")
-        )
-        if fonts:
-            return fonts[0]
-    return None
+    fonts = list_soundfonts()
+    return fonts[0] if fonts else None
 
 
 def build_fluidsynth_cmd(soundfont: Path, midi: Path, wav: Path) -> list[str]:
@@ -86,6 +128,9 @@ def main() -> int:
     ap.add_argument("out_dir")
     ap.add_argument("--instrument", default="guitar")
     ap.add_argument("--tempo", type=float, default=120.0)
+    ap.add_argument(
+        "--soundfont", default=None, help="path or name substring of a .sf2/.sf3"
+    )
     args = ap.parse_args()
 
     if args.instrument not in INSTRUMENTS:
@@ -113,7 +158,7 @@ def main() -> int:
     write_midi(events, midi_path, args.tempo, program)
     print(f"[ok] {len(events)} notes -> {midi_path}")
 
-    soundfont = resolve_soundfont()
+    soundfont = resolve_soundfont(args.soundfont)
     if not soundfont:
         print(
             "No soundfont found — wrote MIDI only. Install a GM soundfont in "
@@ -144,7 +189,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    print(f"[ok] rendered {args.instrument} -> {wav_path}")
+    print(f"[ok] rendered {args.instrument} ({soundfont.name}) -> {wav_path}")
     return 0
 
 
