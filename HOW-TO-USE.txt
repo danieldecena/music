@@ -82,6 +82,30 @@ Feed R short MONOPHONIC loops (a lead/bass/vocal line) — a whole song is slow,
 and chords/strumming will not transcribe.
 
 
+PLAY CHORDS IN LOGIC (compose, not deconstruct)
+-----------------------------------------------
+Inputting piano/guitar chords is Logic's job, not the toolkit's. The toolkit
+gives you the KEY and loops to build around; you play the chords in Logic.
+
+Fastest (Musical Typing, no MIDI keyboard):
+  1. Select a Software Instrument track (e.g. a piano or guitar patch).
+  2. Press Cmd+K — your computer keys become a piano.
+     White keys A S D F G H J K = C D E F G A B C. Hold three for a chord
+     (C major = A + D + G). Z/X shift octave, C/V change velocity.
+  3. Set a count-in, press Record (R), hold chords in time, spacebar to stop.
+
+More control (draw them):
+  - Pencil an empty MIDI region on bar 1, double-click to open the Piano Roll,
+    then stack notes vertically (three stacked = a chord) along the grid.
+    Select all + Q to quantize.
+
+Tips:
+  - Run  7 Analyze  on a reference song first so you know the key, then build
+    the progression from in-key chords. The Chord track shows the progression.
+  - Many guitar/piano patches have an Autoplay Smart Control that strums or
+    arpeggiates a held chord for you.
+
+
 RUN A SINGLE STEP DIRECTLY (skips the menu)
 -------------------------------------------
     ./download.sh      ./stems.sh       ./chop.sh
