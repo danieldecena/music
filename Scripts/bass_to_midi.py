@@ -26,8 +26,20 @@ HOP = 512
 
 def decode_mono(path: Path) -> np.ndarray:
     proc = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path),
-         "-ac", "1", "-ar", str(SR), "-f", "s16le", "-"],
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-ac",
+            "1",
+            "-ar",
+            str(SR),
+            "-f",
+            "s16le",
+            "-",
+        ],
         capture_output=True,
     )
     if proc.returncode != 0:
@@ -35,14 +47,14 @@ def decode_mono(path: Path) -> np.ndarray:
     return np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
 
 
-def pitch_hz(seg: np.ndarray) -> float:
-    """Fundamental via autocorrelation, restricted to a bass range (40-400 Hz)."""
+def pitch_hz(seg: np.ndarray, lo_hz: float = 40.0, hi_hz: float = 400.0) -> float:
+    """Fundamental via autocorrelation, restricted to [lo_hz, hi_hz]."""
     seg = seg - seg.mean()
-    if np.sqrt((seg ** 2).mean()) < 0.005:  # silence gate
+    if np.sqrt((seg**2).mean()) < 0.005:  # silence gate
         return 0.0
-    ac = np.correlate(seg, seg, mode="full")[len(seg) - 1:]
-    lo = int(SR / 400)
-    hi = int(SR / 40)
+    ac = np.correlate(seg, seg, mode="full")[len(seg) - 1 :]
+    lo = int(SR / hi_hz)
+    hi = int(SR / lo_hz)
     if hi >= len(ac):
         hi = len(ac) - 1
     if lo < 1 or hi <= lo:
@@ -55,13 +67,15 @@ def hz_to_midi(hz: float) -> int:
     return int(round(69 + 12 * np.log2(hz / 440.0))) if hz > 0 else 0
 
 
-def transcribe(audio: np.ndarray) -> list[tuple[int, int, int]]:
+def transcribe(
+    audio: np.ndarray, lo_hz: float = 40.0, hi_hz: float = 400.0
+) -> list[tuple[int, int, int]]:
     """Return list of (midi_note, start_frame, end_frame) merging equal pitches."""
     n = 1 + (len(audio) - FRAME) // HOP
     notes = []
     for i in range(max(n, 0)):
         s = i * HOP
-        note = hz_to_midi(pitch_hz(audio[s:s + FRAME]))
+        note = hz_to_midi(pitch_hz(audio[s : s + FRAME], lo_hz, hi_hz))
         notes.append(note)
     # Merge consecutive identical notes into sustained events.
     events, i = [], 0
@@ -87,7 +101,9 @@ def _var_len(n: int) -> bytes:
     return bytes(out)
 
 
-def write_midi(events, path: Path, tempo_bpm: float) -> None:
+def write_midi(
+    events, path: Path, tempo_bpm: float, program: int | None = None
+) -> None:
     tpqn = 480
     sec_per_frame = HOP / SR
     sec_per_beat = 60.0 / (tempo_bpm or 120.0)
@@ -96,6 +112,8 @@ def write_midi(events, path: Path, tempo_bpm: float) -> None:
     track = bytearray()
     us_per_beat = int(60_000_000 / (tempo_bpm or 120.0))
     track += b"\x00\xff\x51\x03" + us_per_beat.to_bytes(3, "big")  # set tempo
+    if program is not None:  # GM program change on channel 0, delta 0
+        track += bytes([0x00, 0xC0, program & 0x7F])
 
     cursor = 0.0
     last_tick = 0
@@ -113,7 +131,9 @@ def write_midi(events, path: Path, tempo_bpm: float) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Transcribe a monophonic bass stem to MIDI")
+    ap = argparse.ArgumentParser(
+        description="Transcribe a monophonic bass stem to MIDI"
+    )
     ap.add_argument("input")
     ap.add_argument("output")
     ap.add_argument("--tempo", type=float, default=120.0)

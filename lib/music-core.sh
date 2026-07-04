@@ -174,6 +174,15 @@ build_logic_project() {
   "$py" "${args[@]}"
 }
 
+resynth_instrument() {
+  # $1 = input .wav (monophonic melodic stem), $2 = out_dir, $3 = instrument,
+  # $4 = tempo BPM (default 120). Transcribes the line then renders it as the
+  # chosen instrument via Scripts/resynth.py (needs the venv's numpy).
+  local input="$1" out="$2" instrument="$3" tempo="${4:-120}"
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/resynth.py" "$input" "$out" \
+    --instrument "$instrument" --tempo "$tempo"
+}
+
 deconstruct() {
   # $1 = audio file, $2 = drum density (tight|loose, default loose).
   # One-command flip prep: tempo/key -> 4-stem split -> drum one-shots ->

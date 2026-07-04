@@ -20,6 +20,7 @@ while true; do
   echo "M) Bass stem -> MIDI"
   echo "O) Open outputs in Finder"
   echo "P) Build Logic project from stems"
+  echo "R) Re-voice a melody as another instrument"
   echo "1) Download"
   echo "2) Separate stems"
   echo "3) Chop vocals"
@@ -129,6 +130,21 @@ GUIDE
       echo "Analyzing for tempo/key…"
       analyze_track "$INPUT"
       build_logic_project "$INPUT"
+      ;;
+    R|r)
+      echo "Drag a monophonic melodic stem (.wav — a lead/bass/vocal line):"; INPUT=$(read_path)
+      [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
+      echo "Target instrument:"
+      echo "  1) guitar  2) guitar-steel  3) piano  4) epiano  5) strings"
+      echo "  6) bells   7) flute         8) synth  9) organ  10) brass"
+      read "ins?> "
+      case "$ins" in
+        1|"") INSTR=guitar;; 2) INSTR=guitar-steel;; 3) INSTR=piano;; 4) INSTR=epiano;;
+        5) INSTR=strings;; 6) INSTR=bells;; 7) INSTR=flute;; 8) INSTR=synth;;
+        9) INSTR=organ;; 10) INSTR=brass;; *) echo "Invalid."; continue;;
+      esac
+      read "tempo?Tempo BPM [120]> "; [[ -z "$tempo" ]] && tempo=120
+      resynth_instrument "$INPUT" "$SCRIPT_DIR/Samples/Resynth/${INPUT:t:r}" "$INSTR" "$tempo"
       ;;
     1)
       read "url?Paste URL> "

@@ -36,3 +36,5 @@ Projects/**/*.logicx
 
 # Nested MCP repo (has its own .git — keep out of music tracking)
 logic-pro-mcp/
+soundfonts/
+Samples/Resynth/
