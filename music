@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
-set -e
+# No `set -e`: this is a long-running interactive loop — a failed step should
+# print its error and return to the menu, not exit the whole program.
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/music-core.sh"
 
@@ -18,6 +19,7 @@ while true; do
   echo "L) Browse music library (pick a file, then a step)"
   echo "M) Bass stem -> MIDI"
   echo "O) Open outputs in Finder"
+  echo "P) Build Logic project from stems"
   echo "1) Download"
   echo "2) Separate stems"
   echo "3) Chop vocals"
@@ -121,6 +123,13 @@ GUIDE
     O|o)
       open "$SCRIPT_DIR/Samples" 2>/dev/null || echo "Samples/ not found — run a step first."
       ;;
+    P|p)
+      echo "Drag a Stems track folder (with drums/bass/other/vocals.wav):"; INPUT=$(read_path)
+      [[ ! -d "$INPUT" ]] && { echo "Need a Stems track folder."; continue; }
+      echo "Analyzing for tempo/key…"
+      analyze_track "$INPUT"
+      build_logic_project "$INPUT"
+      ;;
     1)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
@@ -177,6 +186,10 @@ GUIDE
       echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       deconstruct "$INPUT" "$DENS"
+      read "yn?Build Logic project from these stems now? [y/N]> "
+      if [[ "$yn" == (y|Y|yes) ]]; then
+        build_logic_project "$SCRIPT_DIR/Stems/htdemucs/${INPUT:t:r}"
+      fi
       ;;
     9)
       read "url?Paste URL> "

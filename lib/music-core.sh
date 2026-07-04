@@ -160,6 +160,20 @@ bass_to_midi() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/bass_to_midi.py" "$input" "$out" --tempo "$tempo"
 }
 
+build_logic_project() {
+  # $1 = a Stems/<model>/<track> folder, $2 = tempo (optional), $3 = key (optional).
+  # Shells out to the logic-pro-mcp CLI, which drives Logic Pro (best-effort UI
+  # scripting; Logic is launched if not already open).
+  local stems="$1" tempo="$2" key="$3"
+  local mcp="$MUSIC_DIR/logic-pro-mcp"
+  local py="$mcp/.venv/bin/python"
+  [[ ! -x "$py" ]] && { echo "logic-pro-mcp venv not found at $py — set it up first." >&2; return 1; }
+  local -a args=("$mcp/build_project.py" "$stems")
+  [[ -n "$tempo" ]] && args+=(--tempo "$tempo")
+  [[ -n "$key" ]] && args+=(--key "$key")
+  "$py" "${args[@]}"
+}
+
 deconstruct() {
   # $1 = audio file, $2 = drum density (tight|loose, default loose).
   # One-command flip prep: tempo/key -> 4-stem split -> drum one-shots ->
