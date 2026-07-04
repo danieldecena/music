@@ -1,0 +1,115 @@
+MUSIC TOOLKIT — HOW TO USE
+==========================
+
+Everything runs from the repo root:
+
+    cd ~/Developer/music
+    ./music
+
+That opens the interactive menu. Press a key and follow the prompts. Most
+choice prompts default to the [recommended] option if you just press Return.
+
+THE CORE LOOP
+-------------
+    deconstruct -> listen -> loop -> layer -> mangle
+
+Take a song apart, hear its pieces, loop a chunk, add drums, then flip and
+re-voice. Running key 8 on a track you love is the fastest way in.
+
+
+THE MENU
+--------
+Pipeline (roughly in order):
+
+  1) Download ............ paste a URL (Apple Music, SoundCloud, YouTube,
+                          Bandcamp). Saves .m4a into  Apple Music/
+  2) Separate stems ...... pick instrumental / 4stem / 6stem.
+                          Output:  Stems/htdemucs[_6s]/<track>/
+  3) Chop vocals ......... phrase-length vocal clips. Output: Samples/Vocals/
+  4) Split drums ......... one-shot hits. Output: Samples/One-Shots/<track>/
+  5) Chop stems .......... fixed-length (8s) snippets. Output: Samples/Chops/
+  6) Sort drum kit ....... sorts one-shots into kick/ snare/ hat/
+  7) Analyze tempo & key   prints BPM + key estimates
+  8) Deconstruct ......... all-in-one: analyze -> 4 stems -> one-shots ->
+                          sort kit -> 8s snippets -> vocal phrase chops
+  9) Full pipeline ....... URL -> download -> stems -> chop vocals
+
+Utilities & shortcuts:
+
+  L) Browse library ...... list downloaded audio (with a name filter), pick a
+                          file, then a step (deconstruct / stems / analyze /
+                          chop vocals). Handed a model folder, it finds the
+                          track folder inside it.
+  M) Bass -> MIDI ........ transcribe a mono bass line to MIDI. Samples/MIDI/
+  O) Open outputs ........ reveal the Samples/ folder in Finder
+  P) Build Logic project   open a new Logic Pro project with the 4 stems loaded
+                          as tracks. Needs Logic open + Accessibility granted.
+                          Pass the track's Stems folder (or the model folder).
+  R) Re-voice a melody ... transcribe a mono line and render it as another
+                          instrument (guitar/piano/strings/bells/synth/...).
+                          Output: Samples/Resynth/<track>/<stem>_<instrument>.wav
+  0) Guide ............... prints this walkthrough in the terminal
+ 10) Quit
+
+
+HOW INPUT WORKS
+---------------
+- Download / Full pipeline: paste a URL at the prompt.
+- Everything else: drag the file or folder from Finder into the terminal
+  (it fills in the path) and press Return. The script cleans the path for you.
+
+
+TWO WAYS IN
+-----------
+Make a beat:
+    1 Download -> 8 Deconstruct (loose) -> P Build Logic project
+    -> loop a chop, drop in kick/snare/hat, tap a pattern, then flip it.
+
+Design / discover sounds:
+    5 Chop stems (short loop) -> R Re-voice to a new instrument
+    -> play Samples/Resynth/... or layer it under the original.
+    (M turns a bassline into MIDI you can replay with any patch.)
+
+
+HEARING A RE-VOICED SOUND (key R)
+---------------------------------
+The output WAV already has the instrument baked in — just play it (double-click
+in Finder, or key O). To use it in Logic:
+  - drag the ..._<instrument>.wav onto an AUDIO track, or
+  - drag the ..._<instrument>.mid onto a SOFTWARE-INSTRUMENT track (Logic plays
+    the notes with its own patch).
+Feed R short MONOPHONIC loops (a lead/bass/vocal line) — a whole song is slow,
+and chords/strumming will not transcribe.
+
+
+RUN A SINGLE STEP DIRECTLY (skips the menu)
+-------------------------------------------
+    ./download.sh      ./stems.sh       ./chop.sh
+    ./chop-drums.sh    ./chop-stems.sh  ./sort-kit.sh
+    ./analyze.sh       ./deconstruct.sh
+
+deconstruct.sh also accepts arguments (skips its prompts):
+
+    ./deconstruct.sh "/path/to/song.m4a" loose      # density is tight or loose
+
+
+DATA FLOW
+---------
+Apple Music/ (downloads, .m4a)
+  -> Stems/htdemucs[_6s]/<track>/{drums,bass,other,vocals}.wav
+       -> Samples/Vocals/<track>/          (chop vocals, by silence)
+       -> Samples/One-Shots/<track>/       (split drums -> kick/snare/hat)
+       -> Samples/Chops/<track>/<stem>/    (chop stems, fixed length)
+       -> Samples/Resynth/<track>/         (re-voiced WAV + MIDI, key R)
+       -> Samples/MIDI/                    (bass -> MIDI, key M)
+
+
+REQUIREMENTS
+------------
+- demucs, gamdl (Apple Music) / yt-dlp (everything else), and ffmpeg on PATH.
+  First Apple Music download extracts Safari cookies automatically.
+- Re-voice (key R): brew install fluid-synth, plus a GM soundfont in
+  soundfonts/ (or point $MUSIC_SOUNDFONT at one).
+- Build Logic project (key P): Logic Pro open, Accessibility granted to the
+  terminal in System Settings > Privacy & Security > Accessibility.
+- Python steps use the repo venv and activate themselves — no manual step.
