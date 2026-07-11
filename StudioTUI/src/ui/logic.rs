@@ -86,11 +86,14 @@ impl<'a> Widget for LogicTab<'a> {
 }
 
 fn render_status(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
-    let (status_str, status_style) = if app.logic_ok {
+    let (status_str, mut status_style) = if app.logic_ok {
         ("● online",  t.success().add_modifier(Modifier::BOLD))
     } else {
         ("○ offline", t.error().add_modifier(Modifier::BOLD))
     };
+    if app.logic_status_pending {
+        status_style = status_style.add_modifier(Modifier::SLOW_BLINK);
+    }
 
     let line = Line::from(vec![
         Span::styled("Logic Pro  ", Style::new().fg(t.fg).add_modifier(Modifier::BOLD)),
@@ -108,6 +111,7 @@ fn render_status(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
     let block = Block::new()
         .title(Span::styled(" STATUS ", Style::new().fg(t.accent)))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(if app.logic_ok { t.success() } else { t.border() })
         .style(Style::new().bg(t.surface));
     let inner = block.inner(area);
