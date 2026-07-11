@@ -87,20 +87,30 @@ fn render_header(app: &App, t: &crate::theme::Theme, area: Rect, buf: &mut Buffe
         String::new()
     };
     let worker_info = if app.worker_rx.is_some() { "  ⏳ running…" } else { "" };
+    let worker_style = if app.worker_rx.is_some() {
+        Style::new().fg(t.warning).bg(t.surface_dark).add_modifier(Modifier::SLOW_BLINK)
+    } else {
+        Style::new().fg(t.warning).bg(t.surface_dark)
+    };
     let queue_info = if !app.job_queue.is_empty() {
         format!("  ⧗ {} queued", app.job_queue.len())
     } else {
         String::new()
     };
     let watch_info = if app.watch_on { "  ◉ watch" } else { "" };
+    let watch_style = if app.watch_on {
+        Style::new().fg(t.success).bg(t.surface_dark).add_modifier(Modifier::BOLD | Modifier::SLOW_BLINK)
+    } else {
+        Style::new().fg(t.success).bg(t.surface_dark).add_modifier(Modifier::BOLD)
+    };
 
     let line = Line::from(vec![
-        Span::styled(" ♪ Music Studio ", Style::new().fg(t.accent_fg).bg(t.accent).add_modifier(Modifier::BOLD)),
+        Span::styled(" ▓▓ M U S I C   S T U D I O ▓▓ ", Style::new().fg(t.accent_fg).bg(t.accent).add_modifier(Modifier::BOLD)),
         Span::styled(format!("  {}  ", t.name), Style::new().fg(t.fg_muted).bg(t.surface_dark)),
         Span::styled(&seq_info,    Style::new().fg(t.success).bg(t.surface_dark).add_modifier(Modifier::BOLD)),
-        Span::styled(worker_info,  Style::new().fg(t.warning).bg(t.surface_dark)),
+        Span::styled(worker_info,  worker_style),
         Span::styled(queue_info,   Style::new().fg(t.warning).bg(t.surface_dark)),
-        Span::styled(watch_info,   Style::new().fg(t.success).bg(t.surface_dark).add_modifier(Modifier::BOLD)),
+        Span::styled(watch_info,   watch_style),
     ]);
     Paragraph::new(line)
         .style(Style::new().bg(t.surface_dark))
@@ -128,6 +138,7 @@ fn render_help_overlay(app: &App, t: &crate::theme::Theme, area: Rect, buf: &mut
     let block = Block::new()
         .title(Span::styled(" HELP — ? or Esc to close ", Style::new().fg(t.accent).add_modifier(Modifier::BOLD)))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(t.border_hi())
         .style(Style::new().bg(t.bg));
     let inner = block.inner(popup);
