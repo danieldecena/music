@@ -82,7 +82,8 @@ pub fn run_python(
 /// Reveal a file in Finder (macOS `open -R`). Fire-and-forget.
 pub fn reveal_in_finder(path: PathBuf) {
     thread::spawn(move || {
-        let _ = std::process::Command::new("open").arg("-R").arg(&path).status();
+        let _ = std::process::Command::new("open").arg("-R").arg(&path)
+            .stdout(Stdio::null()).stderr(Stdio::null()).status();
     });
 }
 
@@ -90,7 +91,8 @@ pub fn preview_file(path: PathBuf) {
     thread::spawn(move || {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
         if path.exists() && !matches!(ext.as_str(), "mid" | "midi") {
-            let _ = std::process::Command::new("afplay").arg(&path).status();
+            let _ = std::process::Command::new("afplay").arg(&path)
+                .stdout(Stdio::null()).stderr(Stdio::null()).status();
         } else {
             beep();
         }
@@ -98,10 +100,15 @@ pub fn preview_file(path: PathBuf) {
 }
 
 pub fn beep() {
-    // afplay with a built-in system sound is ~10x faster than osascript beep
+    // afplay with a built-in system sound is ~10x faster than osascript beep.
+    // stdout/stderr are nulled: afplay inherits the TUI's real terminal fds
+    // (ratatui's alternate screen doesn't isolate them), so any error text it
+    // prints — e.g. no CoreAudio route available — writes directly onto the
+    // screen and corrupts rendering until a full repaint.
     thread::spawn(|| {
         let _ = std::process::Command::new("afplay")
             .arg("/System/Library/Sounds/Tock.aiff")
+            .stdout(Stdio::null()).stderr(Stdio::null())
             .status();
     });
 }
