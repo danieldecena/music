@@ -417,7 +417,7 @@ impl App {
     }
 
     fn toggle_theme(&mut self) {
-        self.theme = if self.theme.name == "Atom One Light" { Theme::dark() } else { Theme::light() };
+        self.theme = if self.theme.name == "LCD Green" { Theme::dark() } else { Theme::light() };
         self.log(format!("Theme → {}", self.theme.name), LogLevel::Info);
     }
 
