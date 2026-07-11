@@ -54,6 +54,7 @@ fn render_params(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
     let block = Block::new()
         .title(Span::styled(" PARAMETERS ", Style::new().fg(t.accent).add_modifier(Modifier::BOLD)))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(t.border())
         .style(Style::new().bg(t.surface));
     let inner = block.inner(area);
@@ -169,6 +170,7 @@ fn render_actions(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
     let block = Block::new()
         .title(Line::from(title_spans))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(t.border())
         .style(Style::new().bg(t.surface));
     let inner = block.inner(area);
@@ -251,6 +253,7 @@ impl<'a> Widget for ConsoleLog<'a> {
         let block = Block::new()
             .title(Span::styled(title_str, Style::new().fg(t.accent).add_modifier(Modifier::BOLD)))
             .borders(Borders::ALL)
+            .border_type(t.border_type)
             .border_style(if self.app.worker_rx.is_some() { t.border_hi() } else { t.border() })
             .style(Style::new().bg(t.surface));
 
