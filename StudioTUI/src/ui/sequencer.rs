@@ -56,6 +56,7 @@ fn render_seq_grid(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
             Style::new().fg(t.accent).add_modifier(Modifier::BOLD),
         ))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(t.border())
         .style(Style::new().bg(t.bg));
     let inner = block.inner(area);
