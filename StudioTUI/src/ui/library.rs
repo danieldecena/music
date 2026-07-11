@@ -59,6 +59,7 @@ fn render_categories(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
     let block = Block::new()
         .title(Span::styled(" CATEGORIES ", Style::new().fg(t.accent).add_modifier(Modifier::BOLD)))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(t.border())
         .style(Style::new().bg(t.surface));
 
@@ -140,6 +141,7 @@ fn render_files(app: &App, t: &Theme, area: Rect, buf: &mut Buffer) {
             Style::new().fg(t.accent).add_modifier(Modifier::BOLD),
         ))
         .borders(Borders::ALL)
+        .border_type(t.border_type)
         .border_style(t.border_hi())
         .style(Style::new().bg(t.bg));
 
