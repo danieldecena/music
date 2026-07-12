@@ -42,3 +42,4 @@ Samples/Resynth/
 # SQLite catalog (generated)
 catalog.sqlite
 catalog.sqlite-*
+.mcp.json
