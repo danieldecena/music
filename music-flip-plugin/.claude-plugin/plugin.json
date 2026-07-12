@@ -1,0 +1,14 @@
+{
+  "name": "music-flip",
+  "version": "0.1.0",
+  "description": "Sample-flip studio: download tracks, split stems, chop one-shots, sort drum kits, sequence beats, and drive Logic Pro Creator Studio.",
+  "author": { "name": "Daniel" },
+  "keywords": ["music", "sampling", "stems", "demucs", "logic-pro", "beatmaking"],
+  "mcpServers": {
+    "logic-pro": {
+      "command": "/Users/home/Developer/music/logic-pro-mcp/.venv/bin/python",
+      "args": ["/Users/home/Developer/music/logic-pro-mcp/server.py"],
+      "env": { "PYTHONPATH": "/Users/home/Developer/music/logic-pro-mcp" }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "daniel-music",
+  "owner": { "name": "Daniel" },
+  "metadata": {
+    "description": "Daniel's music production plugins."
+  },
+  "plugins": [
+    {
+      "name": "music-flip",
+      "source": ".",
+      "description": "Sample-flip studio: download, stems, one-shots, kits, step sequencer, and Logic Pro control."
+    }
+  ]
+}
