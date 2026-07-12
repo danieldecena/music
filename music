@@ -10,8 +10,14 @@ read_path() {  # prints a cleaned drag-and-drop path
   print -- "${p%"${p##*[! ]}"}"
 }
 
+CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
+
 while true; do
   echo ""
+  if [[ -n "$CUR_NAME" ]]; then
+    echo "Current: $CUR_LABEL"
+    echo "------------------------------------------------------------"
+  fi
   echo "Music Toolkit"
   echo "-------------"
   echo "Turn songs into stems, one-shots & samples for flipping."
@@ -27,7 +33,7 @@ while true; do
   echo "  L) Browse music library     M) Bass stem → MIDI"
   echo "  O) Open outputs in Finder   R) Re-voice a melody as another instrument"
   echo "  P) Build Logic project      G) Guide / how it works"
-  echo "                              Q) Quit"
+  echo "                              C) Clear current track   Q) Quit"
   read "choice?> "
 
   case "$choice" in
@@ -63,46 +69,29 @@ file/folder dragged from Finder into the terminal.
 GUIDE
       ;;
     L|l)
-      files=("${(@f)$(find "$SCRIPT_DIR/Apple Music" "$SCRIPT_DIR/SoundCloud" "$SCRIPT_DIR/Downloads" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \) 2>/dev/null | sort)}")
-      [[ ${#files} -eq 0 ]] && { echo "No audio files found in Apple Music/, SoundCloud/, or Downloads/."; continue; }
-      read "q?Filter by name (blank = all)> "
-      if [[ -n "$q" ]]; then
-        filtered=(); for f in "${files[@]}"; do [[ "${f:l}" == *"${q:l}"* ]] && filtered+=("$f"); done
-        files=("${filtered[@]}")
-        [[ ${#files} -eq 0 ]] && { echo "No matches for '$q'."; continue; }
-      fi
+      "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" scan >/dev/null 2>&1
+      read "q?Search (blank = all, name/artist)> "
+      lines=("${(@f)$("$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" search "$q" --menu 2>/dev/null)}")
+      lines=("${(@)lines:#}")
+      [[ ${#lines} -eq 0 ]] && { echo "No matches. (Download or Scan first if the library is new.)"; continue; }
+      total=${#lines}
+      shown=$(( total > 40 ? 40 : total ))
       echo "Music library:"
-      i=1; for f in "${files[@]}"; do printf " %2d) %s / %s\n" "$i" "${f:h:t}" "${f:t}"; ((i++)); done
+      for i in {1..$shown}; do
+        printf " %2d) %s\n" "$i" "${${(s:	:)lines[$i]}[3]}"
+      done
+      (( total > shown )) && echo "  ... +$(( total - shown )) more — refine your search."
       read "n?Pick a file #> "
-      if [[ -z "$n" || ! "$n" == <-> || "$n" -lt 1 || "$n" -gt ${#files} ]]; then echo "Invalid."; continue; fi
-      INPUT="${files[$n]}"
-      echo "Selected: ${INPUT:t}"
-      echo "Run: 1) Deconstruct [recommended]  2) Separate stems  3) Analyze  4) Chop vocals"; read "act?> "
-      case "$act" in
-        1|"")
-          echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
-          case "$d" in 1) DENS=tight;; *) DENS=loose;; esac
-          deconstruct "$INPUT" "$DENS"
-          ;;
-        2)
-          echo "Mode: 1) instrumental  2) 4stem [recommended]  3) 6stem"; read "m?> "
-          case "$m" in 1) MODE=instrumental;; 3) MODE=6stem;; *) MODE=4stem;; esac
-          separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
-          ;;
-        3) analyze_track "$INPUT" ;;
-        4)
-          track="${INPUT:t:r}"
-          vocals=""
-          for m in htdemucs htdemucs_6s; do
-            [[ -f "$SCRIPT_DIR/Stems/$m/$track/vocals.wav" ]] && vocals="$SCRIPT_DIR/Stems/$m/$track/vocals.wav" && break
-          done
-          [[ -z "$vocals" ]] && { echo "No stems for '$track' yet — run Separate stems or Deconstruct first."; continue; }
-          echo "Sensitivity: 1) tight  2) loose [recommended]"; read "s?> "
-          case "$s" in 1) SENS=tight;; *) SENS=loose;; esac
-          chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
-          ;;
-        *) echo "Invalid."; continue ;;
-      esac
+      if [[ -z "$n" || ! "$n" == <-> || "$n" -lt 1 || "$n" -gt $shown ]]; then echo "Cancelled."; continue; fi
+      picked=("${(s:	:)lines[$n]}")
+      CUR_NAME="${picked[1]}"
+      CUR_SRC="$SCRIPT_DIR/${picked[2]}"
+      CUR_LABEL="${picked[3]}"
+      echo "Selected: $CUR_LABEL"
+      ;;
+    C|c)
+      CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
+      echo "Current track cleared."
       ;;
     M|m)
       echo "Drag a bass.wav or a Stems track folder:"; INPUT=$(read_path)
