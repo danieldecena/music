@@ -10,8 +10,39 @@ read_path() {  # prints a cleaned drag-and-drop path
   print -- "${p%"${p##*[! ]}"}"
 }
 
+resolve_input() {  # mode=source: current track's source, else a dragged path
+  if [[ -n "$CUR_SRC" ]]; then
+    local p; read "p?Input: [Enter] = $CUR_LABEL  (or drag a different file)> "
+    if [[ -z "$p" ]]; then print -- "$CUR_SRC"; return; fi
+    p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
+  else
+    echo "Drag a file or folder:"; read_path
+  fi
+}
+
+resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty if unavailable
+  if [[ -n "$CUR_NAME" ]]; then
+    local d; d="$(stems_dir_for "$CUR_NAME")"
+    if [[ -n "$d" ]]; then
+      local p; read "p?Stems: [Enter] = $CUR_NAME  (or drag a folder/stem)> "
+      if [[ -z "$p" ]]; then print -- "$d"; return; fi
+      p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
+      return
+    fi
+    echo "No stems for $CUR_NAME yet — run Separate (2) or Deconstruct (8) first." >&2
+    return
+  fi
+  read_path
+}
+
+CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
+
 while true; do
   echo ""
+  if [[ -n "$CUR_NAME" ]]; then
+    echo "Current: $CUR_LABEL"
+    echo "------------------------------------------------------------"
+  fi
   echo "Music Toolkit"
   echo "-------------"
   echo "Turn songs into stems, one-shots & samples for flipping."
@@ -27,7 +58,7 @@ while true; do
   echo "  L) Browse music library     M) Bass stem → MIDI"
   echo "  O) Open outputs in Finder   R) Re-voice a melody as another instrument"
   echo "  P) Build Logic project      G) Guide / how it works"
-  echo "                              Q) Quit"
+  echo "                              C) Clear current track   Q) Quit"
   read "choice?> "
 
   case "$choice" in
@@ -63,49 +94,35 @@ file/folder dragged from Finder into the terminal.
 GUIDE
       ;;
     L|l)
-      files=("${(@f)$(find "$SCRIPT_DIR/Apple Music" "$SCRIPT_DIR/SoundCloud" "$SCRIPT_DIR/Downloads" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \) 2>/dev/null | sort)}")
-      [[ ${#files} -eq 0 ]] && { echo "No audio files found in Apple Music/, SoundCloud/, or Downloads/."; continue; }
-      read "q?Filter by name (blank = all)> "
-      if [[ -n "$q" ]]; then
-        filtered=(); for f in "${files[@]}"; do [[ "${f:l}" == *"${q:l}"* ]] && filtered+=("$f"); done
-        files=("${filtered[@]}")
-        [[ ${#files} -eq 0 ]] && { echo "No matches for '$q'."; continue; }
-      fi
+      "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" scan >/dev/null 2>&1
+      read "q?Search (blank = all, name/artist)> "
+      lines=("${(@f)$("$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" search "$q" --menu 2>/dev/null)}")
+      lines=("${(@)lines:#}")
+      [[ ${#lines} -eq 0 ]] && { echo "No matches. (Download or Scan first if the library is new.)"; continue; }
+      total=${#lines}
+      shown=$(( total > 40 ? 40 : total ))
       echo "Music library:"
-      i=1; for f in "${files[@]}"; do printf " %2d) %s / %s\n" "$i" "${f:h:t}" "${f:t}"; ((i++)); done
+      for i in {1..$shown}; do
+        printf " %2d) %s\n" "$i" "${lines[$i]##*$'\t'}"
+      done
+      (( total > shown )) && echo "  ... +$(( total - shown )) more — refine your search."
       read "n?Pick a file #> "
-      if [[ -z "$n" || ! "$n" == <-> || "$n" -lt 1 || "$n" -gt ${#files} ]]; then echo "Invalid."; continue; fi
-      INPUT="${files[$n]}"
-      echo "Selected: ${INPUT:t}"
-      echo "Run: 1) Deconstruct [recommended]  2) Separate stems  3) Analyze  4) Chop vocals"; read "act?> "
-      case "$act" in
-        1|"")
-          echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
-          case "$d" in 1) DENS=tight;; *) DENS=loose;; esac
-          deconstruct "$INPUT" "$DENS"
-          ;;
-        2)
-          echo "Mode: 1) instrumental  2) 4stem [recommended]  3) 6stem"; read "m?> "
-          case "$m" in 1) MODE=instrumental;; 3) MODE=6stem;; *) MODE=4stem;; esac
-          separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
-          ;;
-        3) analyze_track "$INPUT" ;;
-        4)
-          track="${INPUT:t:r}"
-          vocals=""
-          for m in htdemucs htdemucs_6s; do
-            [[ -f "$SCRIPT_DIR/Stems/$m/$track/vocals.wav" ]] && vocals="$SCRIPT_DIR/Stems/$m/$track/vocals.wav" && break
-          done
-          [[ -z "$vocals" ]] && { echo "No stems for '$track' yet — run Separate stems or Deconstruct first."; continue; }
-          echo "Sensitivity: 1) tight  2) loose [recommended]"; read "s?> "
-          case "$s" in 1) SENS=tight;; *) SENS=loose;; esac
-          chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
-          ;;
-        *) echo "Invalid."; continue ;;
-      esac
+      if [[ -z "$n" || ! "$n" == <-> || "$n" -lt 1 || "$n" -gt $shown ]]; then echo "Cancelled."; continue; fi
+      line="${lines[$n]}"
+      CUR_NAME="${line%%$'\t'*}"
+      rest="${line#*$'\t'}"
+      src="${rest%%$'\t'*}"
+      CUR_LABEL="${rest#*$'\t'}"
+      if [[ -n "$src" ]]; then CUR_SRC="$SCRIPT_DIR/$src"; else CUR_SRC=""; fi
+      echo "Selected: $CUR_LABEL"
+      ;;
+    C|c)
+      CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
+      echo "Current track cleared."
       ;;
     M|m)
-      echo "Drag a bass.wav or a Stems track folder:"; INPUT=$(read_path)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       if [[ -d "$INPUT" ]]; then
         BASS=$(find "$INPUT" -type f -name 'bass.wav' | head -1)
@@ -122,7 +139,8 @@ GUIDE
       open "$SCRIPT_DIR/Samples" 2>/dev/null || echo "Samples/ not found — run a step first."
       ;;
     P|p)
-      echo "Drag a Stems track folder (with drums/bass/other/vocals.wav):"; INPUT=$(read_path)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -d "$INPUT" ]] && { echo "Need a Stems track folder."; continue; }
       echo "Analyzing for tempo/key…"
       analyze_track "$INPUT"
@@ -156,8 +174,12 @@ GUIDE
       download_url "$url" "$SCRIPT_DIR/Apple Music"
       ;;
     2)
-      echo "Drag a file or folder:"; INPUT=$(read_path)
+      INPUT=$(resolve_input source)
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      if [[ "$INPUT" == "$CUR_SRC" && -n "$CUR_NAME" ]] && [[ -n "$(stems_dir_for "$CUR_NAME")" ]]; then
+        read "yn?$CUR_NAME already has stems. Re-run? [y/N]> "
+        [[ "$yn" == (y|Y|yes) ]] || continue
+      fi
       echo "Mode: 1) instrumental  2) 4stem [recommended]  3) 6stem"; read "m?> "
       case "$m" in 1) MODE=instrumental;; 3) MODE=6stem;; 2|"") MODE=4stem;; *) echo "Invalid."; continue;; esac
       if [[ -f "$INPUT" ]]; then
@@ -169,23 +191,24 @@ GUIDE
       fi
       ;;
     3)
-      echo "Drag a vocals.wav or Stems folder:"; INPUT=$(read_path)
-      [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       echo "Sensitivity: 1) tight  2) loose [recommended]"; read "s?> "
       case "$s" in 1) SENS=tight;; 2) SENS=loose;; *) SENS=loose;; esac
       chop_vocals "$INPUT" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
       ;;
     4)
-      echo "Drag a drums.wav or Stems folder:"; INPUT=$(read_path)
-      [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       echo "Density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       chop_drums "$INPUT" "$SCRIPT_DIR/Samples/One-Shots" "$DENS"
       ;;
     5)
-      echo "Drag a Stems track folder (or a stem .wav):"; INPUT=$(read_path)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       read "secs?Snippet length in seconds [8]> "; [[ -z "$secs" ]] && secs=8
       chop_stems "$INPUT" "$SCRIPT_DIR/Samples/Chops" "$secs"
@@ -196,13 +219,17 @@ GUIDE
       sort_kit "$INPUT"
       ;;
     7)
-      echo "Drag an audio file or folder:"; INPUT=$(read_path)
+      INPUT=$(resolve_input source)
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       analyze_track "$INPUT"
       ;;
     8)
-      echo "Drag an audio file to deconstruct:"; INPUT=$(read_path)
+      INPUT=$(resolve_input source)
       [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
+      if [[ "$INPUT" == "$CUR_SRC" && -n "$CUR_NAME" ]] && [[ -n "$(stems_dir_for "$CUR_NAME")" ]]; then
+        read "yn?$CUR_NAME already has stems. Re-run? [y/N]> "
+        [[ "$yn" == (y|Y|yes) ]] || continue
+      fi
       echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       deconstruct "$INPUT" "$DENS"
