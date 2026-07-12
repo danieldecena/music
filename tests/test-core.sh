@@ -24,6 +24,10 @@ assert_eq "$(chop_sensitivity_args tight)" "--min-silence 0.15 --min-clip 0.3" "
 assert_eq "$(chop_sensitivity_args loose)" "--min-silence 0.35 --min-clip 0.8" "loose sensitivity"
 assert_eq "$(drum_split_args tight)" "--delta 0.04 --wait 0.05" "tight drum density"
 assert_eq "$(drum_split_args loose)" "--delta 0.09 --wait 0.12" "loose drum density"
+assert_eq "$(stem_presence_label -30 -2)" "present" "present loudness"
+assert_eq "$(stem_presence_label -77.3 -26.2)" "faint" "faint loudness"
+assert_eq "$(stem_presence_label -60 -55)" "silent" "silent loudness"
+assert_eq "$(stem_presence_label -46 -50)" "faint" "peak -50 is not silent (boundary)"
 
 # find_new_m4a: 2020 file is old, 2099 file is new, stamp is 2050 (epoch 2524608000)
 tmp=$(mktemp -d)
