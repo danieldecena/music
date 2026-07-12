@@ -180,12 +180,12 @@ analyze_stems() {
   # <folder>/analysis.txt. Read-only; never modifies the stems.
   local input="$1"
   local -a stems
-  local track dir
+  local dir
   if [[ -d "$input" ]]; then
-    track="${input:t}"; dir="$input"
+    dir="$input"
     stems=("$input"/*.wav(N))
   else
-    track="${input:h:t}"; dir="${input:h}"
+    dir="${input:h}"
     stems=("$input")
   fi
   [[ ${#stems} -eq 0 ]] && { echo "No stem .wav files in $input" >&2; return 1; }
