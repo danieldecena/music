@@ -27,7 +27,9 @@
   hq is the clean 6-stem path that isolates guitar/piano and is the Separate
   default. Menu `2)` and `stems.sh` prompt Quality (empty = hq); the full
   pipeline uses `acapella`; `deconstruct` stays `fast`. 18/18 test-core assertions
-  pass. Runtime only (no live demucs run in this env) — hq is ~3-4x slower.
+  pass. Live-verified against demucs 4.0.1 / torch 2.12.1 (MPS) on Jordana
+  "01 Summer's Over": hq produced all 6 stems; guitar came out `present`
+  (mean -24.2 / peak -1.6 dB), piano `faint`. hq is ~3-4x slower.
 - **Per-stem analysis** (merged `feat/per-stem-analysis`, commit 409b918).
   `analyze_stems <folder|stem.wav>` runs ffmpeg `volumedetect` per stem and
   `stem_presence_label` classifies each `silent`/`faint`/`present` from mean+peak
