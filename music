@@ -20,6 +20,20 @@ resolve_input() {  # mode=source: current track's source, else a dragged path
   fi
 }
 
+resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty if unavailable
+  if [[ -n "$CUR_NAME" ]]; then
+    local d; d="$(stems_dir_for "$CUR_NAME")"
+    if [[ -n "$d" ]]; then
+      local p; read "p?Stems: [Enter] = $CUR_NAME  (or drag a folder/stem)> "
+      if [[ -z "$p" ]]; then print -- "$d"; return; fi
+      p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
+      return
+    fi
+    echo "No stems for $CUR_NAME yet — run Separate (2) or Deconstruct (8) first." >&2
+  fi
+  read_path
+}
+
 CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
 
 while true; do
@@ -104,7 +118,8 @@ GUIDE
       echo "Current track cleared."
       ;;
     M|m)
-      echo "Drag a bass.wav or a Stems track folder:"; INPUT=$(read_path)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       if [[ -d "$INPUT" ]]; then
         BASS=$(find "$INPUT" -type f -name 'bass.wav' | head -1)
@@ -121,7 +136,8 @@ GUIDE
       open "$SCRIPT_DIR/Samples" 2>/dev/null || echo "Samples/ not found — run a step first."
       ;;
     P|p)
-      echo "Drag a Stems track folder (with drums/bass/other/vocals.wav):"; INPUT=$(read_path)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -d "$INPUT" ]] && { echo "Need a Stems track folder."; continue; }
       echo "Analyzing for tempo/key…"
       analyze_track "$INPUT"
@@ -172,23 +188,24 @@ GUIDE
       fi
       ;;
     3)
-      echo "Drag a vocals.wav or Stems folder:"; INPUT=$(read_path)
-      [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       echo "Sensitivity: 1) tight  2) loose [recommended]"; read "s?> "
       case "$s" in 1) SENS=tight;; 2) SENS=loose;; *) SENS=loose;; esac
       chop_vocals "$INPUT" "$SCRIPT_DIR/Samples/Vocals" "$SENS"
       ;;
     4)
-      echo "Drag a drums.wav or Stems folder:"; INPUT=$(read_path)
-      [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       echo "Density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       chop_drums "$INPUT" "$SCRIPT_DIR/Samples/One-Shots" "$DENS"
       ;;
     5)
-      echo "Drag a Stems track folder (or a stem .wav):"; INPUT=$(read_path)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       read "secs?Snippet length in seconds [8]> "; [[ -z "$secs" ]] && secs=8
       chop_stems "$INPUT" "$SCRIPT_DIR/Samples/Chops" "$secs"
