@@ -164,6 +164,47 @@ chop_stems() {
   done
 }
 
+stem_presence_label() {
+  # $1 = mean dBFS, $2 = max dBFS -> silent | faint | present.
+  # zsh has no native float <, so compare in awk.
+  awk -v m="$1" -v x="$2" 'BEGIN{
+    if (x < -50) print "silent";
+    else if (m < -45) print "faint";
+    else print "present";
+  }'
+}
+
+analyze_stems() {
+  # $1 = a Stems/<model>/<track> folder (or a single stem .wav). Prints a
+  # presence/loudness table per stem (ffmpeg volumedetect) and writes it to
+  # <folder>/analysis.txt. Read-only; never modifies the stems.
+  local input="$1"
+  local -a stems
+  local dir
+  if [[ -d "$input" ]]; then
+    dir="$input"
+    stems=("$input"/*.wav(N))
+  else
+    dir="${input:h}"
+    stems=("$input")
+  fi
+  [[ ${#stems} -eq 0 ]] && { echo "No stem .wav files in $input" >&2; return 1; }
+  local report="$dir/analysis.txt"
+  local stem name vd mean max label
+  {
+    printf "%-10s %9s %9s  %s\n" "stem" "mean" "peak" "presence"
+    for stem in $stems; do
+      name="${stem:t:r}"
+      vd=$(ffmpeg -nostdin -i "$stem" -af volumedetect -f null - 2>&1)
+      mean=$(print -r -- "$vd" | awk -F': ' '/mean_volume:/{print $2+0}')
+      max=$(print -r -- "$vd" | awk -F': ' '/max_volume:/{print $2+0}')
+      label=$(stem_presence_label "$mean" "$max")
+      printf "%-10s %6s dB %6s dB  %s\n" "$name" "$mean" "$max" "$label"
+    done
+  } | tee "$report"
+  echo "  Report: $report" >&2
+}
+
 sort_kit() {
   # $1 = a One-Shots folder of drum hits. Classifies into kick/snare/hat subdirs.
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/sort_drums.py" "$1"
@@ -257,6 +298,8 @@ deconstruct() {
   chop_drums "$stemdir/drums.wav" "$MUSIC_DIR/Samples/One-Shots" "$dens" | tail -1
   echo "→ Sorting kit (kick/snare/hat)…"
   sort_kit "$MUSIC_DIR/Samples/One-Shots/$track"
+  echo "→ Stem presence & loudness…"
+  analyze_stems "$stemdir" >/dev/null
   echo "→ 8s stem snippets…"
   chop_stems "$stemdir" "$MUSIC_DIR/Samples/Chops" 8 >/dev/null
   echo "→ Vocal phrase chops…"

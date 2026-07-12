@@ -57,7 +57,8 @@ while true; do
   echo "Tools & shortcuts"
   echo "  L) Browse music library     M) Bass stem → MIDI"
   echo "  O) Open outputs in Finder   R) Re-voice a melody as another instrument"
-  echo "  P) Build Logic project      G) Guide / how it works"
+  echo "  P) Build Logic project      A) Analyze stems (loudness/presence)"
+  echo "                              G) Guide / how it works"
   echo "                              C) Clear current track   Q) Quit"
   read "choice?> "
 
@@ -119,6 +120,12 @@ GUIDE
     C|c)
       CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
       echo "Current track cleared."
+      ;;
+    A|a)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      analyze_stems "$INPUT"
       ;;
     M|m)
       INPUT=$(resolve_stems)
