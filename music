@@ -10,6 +10,16 @@ read_path() {  # prints a cleaned drag-and-drop path
   print -- "${p%"${p##*[! ]}"}"
 }
 
+resolve_input() {  # mode=source: current track's source, else a dragged path
+  if [[ -n "$CUR_SRC" ]]; then
+    local p; read "p?Input: [Enter] = $CUR_LABEL  (or drag a different file)> "
+    if [[ -z "$p" ]]; then print -- "$CUR_SRC"; return; fi
+    p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
+  else
+    echo "Drag a file or folder:"; read_path
+  fi
+}
+
 CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
 
 while true; do
@@ -145,8 +155,12 @@ GUIDE
       download_url "$url" "$SCRIPT_DIR/Apple Music"
       ;;
     2)
-      echo "Drag a file or folder:"; INPUT=$(read_path)
+      INPUT=$(resolve_input source)
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      if [[ "$INPUT" == "$CUR_SRC" && -n "$CUR_NAME" ]] && [[ -n "$(stems_dir_for "$CUR_NAME")" ]]; then
+        read "yn?$CUR_NAME already has stems. Re-run? [y/N]> "
+        [[ "$yn" == (y|Y|yes) ]] || continue
+      fi
       echo "Mode: 1) instrumental  2) 4stem [recommended]  3) 6stem"; read "m?> "
       case "$m" in 1) MODE=instrumental;; 3) MODE=6stem;; 2|"") MODE=4stem;; *) echo "Invalid."; continue;; esac
       if [[ -f "$INPUT" ]]; then
@@ -185,13 +199,17 @@ GUIDE
       sort_kit "$INPUT"
       ;;
     7)
-      echo "Drag an audio file or folder:"; INPUT=$(read_path)
+      INPUT=$(resolve_input source)
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       analyze_track "$INPUT"
       ;;
     8)
-      echo "Drag an audio file to deconstruct:"; INPUT=$(read_path)
+      INPUT=$(resolve_input source)
       [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
+      if [[ "$INPUT" == "$CUR_SRC" && -n "$CUR_NAME" ]] && [[ -n "$(stems_dir_for "$CUR_NAME")" ]]; then
+        read "yn?$CUR_NAME already has stems. Re-run? [y/N]> "
+        [[ "$yn" == (y|Y|yes) ]] || continue
+      fi
       echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
       deconstruct "$INPUT" "$DENS"

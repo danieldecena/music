@@ -30,6 +30,16 @@ drum_split_args() {
   esac
 }
 
+stems_dir_for() {  # echoes existing Stems/<model>/<name> dir, htdemucs preferred
+  local name="$1" m
+  for m in htdemucs htdemucs_6s; do
+    if [[ -d "$MUSIC_DIR/Stems/$m/$name" ]]; then
+      print -- "$MUSIC_DIR/Stems/$m/$name"; return 0
+    fi
+  done
+  return 0
+}
+
 find_new_m4a() {
   # $1 = directory, $2 = epoch seconds.
   # BSD find (/usr/bin/find on macOS) can't parse -newermt "@epoch", so compare

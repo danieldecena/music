@@ -26,4 +26,13 @@ result=$(find_new_m4a "$tmp" 2524608000)
 assert_eq "${result:t}" "new.m4a" "find_new_m4a returns only files after stamp"
 rm -rf "$tmp"
 
+# stems_dir_for: prefers htdemucs, falls back to htdemucs_6s, empty when none
+MUSIC_DIR=$(mktemp -d)
+mkdir -p "$MUSIC_DIR/Stems/htdemucs_6s/Song"
+assert_eq "$(stems_dir_for Song)" "$MUSIC_DIR/Stems/htdemucs_6s/Song" "stems_dir_for falls back to 6s"
+mkdir -p "$MUSIC_DIR/Stems/htdemucs/Song"
+assert_eq "$(stems_dir_for Song)" "$MUSIC_DIR/Stems/htdemucs/Song" "stems_dir_for prefers htdemucs"
+assert_eq "$(stems_dir_for Missing)" "" "stems_dir_for empty when none"
+rm -rf "$MUSIC_DIR"
+
 exit $fail
