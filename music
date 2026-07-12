@@ -30,6 +30,7 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
       return
     fi
     echo "No stems for $CUR_NAME yet — run Separate (2) or Deconstruct (8) first." >&2
+    return
   fi
   read_path
 }
@@ -102,15 +103,17 @@ GUIDE
       shown=$(( total > 40 ? 40 : total ))
       echo "Music library:"
       for i in {1..$shown}; do
-        printf " %2d) %s\n" "$i" "${${(s:	:)lines[$i]}[3]}"
+        printf " %2d) %s\n" "$i" "${lines[$i]##*$'\t'}"
       done
       (( total > shown )) && echo "  ... +$(( total - shown )) more — refine your search."
       read "n?Pick a file #> "
       if [[ -z "$n" || ! "$n" == <-> || "$n" -lt 1 || "$n" -gt $shown ]]; then echo "Cancelled."; continue; fi
-      picked=("${(s:	:)lines[$n]}")
-      CUR_NAME="${picked[1]}"
-      CUR_SRC="$SCRIPT_DIR/${picked[2]}"
-      CUR_LABEL="${picked[3]}"
+      line="${lines[$n]}"
+      CUR_NAME="${line%%$'\t'*}"
+      rest="${line#*$'\t'}"
+      src="${rest%%$'\t'*}"
+      CUR_LABEL="${rest#*$'\t'}"
+      if [[ -n "$src" ]]; then CUR_SRC="$SCRIPT_DIR/$src"; else CUR_SRC=""; fi
       echo "Selected: $CUR_LABEL"
       ;;
     C|c)
