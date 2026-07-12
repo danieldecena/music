@@ -19,6 +19,15 @@
 - `Scripts/analyze_track.py`: added `estimate_boundaries()` (spectral-flux
   section/transition detection). Verified via `build-logic-project.sh` run —
   prints `transitions [...]` per stem alongside BPM/key.
+- **Stem quality profiles** (merged `feat/stem-quality-profiles`, commit 014bad9).
+  `separate_stems` now takes a profile, not a mode: `stem_profile_args` +
+  `stem_profile_model` replace `stem_mode_args`. Profiles: `acapella`
+  (`--two-stems=vocals`, htdemucs), `fast` (4-stem, htdemucs), `6stem`
+  (htdemucs_6s), `hq` (`-n htdemucs_6s --shifts 2 --overlap 0.5`, htdemucs_6s) —
+  hq is the clean 6-stem path that isolates guitar/piano and is the Separate
+  default. Menu `2)` and `stems.sh` prompt Quality (empty = hq); the full
+  pipeline uses `acapella`; `deconstruct` stays `fast`. 18/18 test-core assertions
+  pass. Runtime only (no live demucs run in this env) — hq is ~3-4x slower.
 - **`StudioTUI/` (Rust/ratatui)** — chosen over two other exploratory ports
   (`studio_tui.py`/Textual — deleted; `StudioUI/` HTML mockup — kept as the
   design reference `music-studio.pdf` was rendered from). Builds warning-free
@@ -57,5 +66,17 @@
 - StudioTUI: `cargo build` still emits 4 pre-existing dead-code warnings
   (unused `Focus::SeqBpm`, `fs::skip_dir`, `Theme.seq_pad_off`, unused `Theme`
   style helpers) — harmless, not touched by the TUI-wiring work.
-- Two design specs still pending a plan->build: none outstanding (resynth shipped;
-  build-logic-project shipped).
+- Announced follow-on, NOT yet scoped: per-stem analysis (presence/silence +
+  loudness report beside stems and into the catalog). Needs a brainstorming
+  session (metrics, thresholds, output format, catalog columns) before build —
+  design-approval gate, not an autonomous item.
+- Two design specs still pending a plan->build: none outstanding (resynth,
+  build-logic-project, stem-quality-profiles all shipped).
+
+### 2026-07-12
+- Decided: bundle stem quality as four named profiles (acapella/fast/6stem/hq)
+  instead of exposing raw demucs model names. htdemucs_ft excluded — it is
+  4-stem only and cannot produce guitar/piano, which is the user's goal; the
+  only path to those is htdemucs_6s, cleaned up with --shifts 2 --overlap 0.5
+  (the `hq` default). deconstruct kept on `fast` so the quick-prep path stays
+  fast-by-default; keeper-track quality lives in Separate.
