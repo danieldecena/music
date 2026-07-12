@@ -28,6 +28,15 @@
   default. Menu `2)` and `stems.sh` prompt Quality (empty = hq); the full
   pipeline uses `acapella`; `deconstruct` stays `fast`. 18/18 test-core assertions
   pass. Runtime only (no live demucs run in this env) — hq is ~3-4x slower.
+- **Per-stem analysis** (merged `feat/per-stem-analysis`, commit 409b918).
+  `analyze_stems <folder|stem.wav>` runs ffmpeg `volumedetect` per stem and
+  `stem_presence_label` classifies each `silent`/`faint`/`present` from mean+peak
+  dBFS (`max < -50` silent; else `mean < -45` faint; else present). Prints an
+  aligned table and writes `analysis.txt` beside the stems (read-only, no
+  re-encode). Wired into `deconstruct`, an `A) Analyze stems` menu entry
+  (current-track aware via `resolve_stems`), and `analyze-stems.sh`. Verified on
+  a real `Stems/htdemucs_6s/02 Let Em' Know` folder — guitar/piano correctly
+  flagged `faint`, bass/drums/vocals `present`. 20/20 test-core assertions pass.
 - **`StudioTUI/` (Rust/ratatui)** — chosen over two other exploratory ports
   (`studio_tui.py`/Textual — deleted; `StudioUI/` HTML mockup — kept as the
   design reference `music-studio.pdf` was rendered from). Builds warning-free
@@ -66,12 +75,11 @@
 - StudioTUI: `cargo build` still emits 4 pre-existing dead-code warnings
   (unused `Focus::SeqBpm`, `fs::skip_dir`, `Theme.seq_pad_off`, unused `Theme`
   style helpers) — harmless, not touched by the TUI-wiring work.
-- Announced follow-on, NOT yet scoped: per-stem analysis (presence/silence +
-  loudness report beside stems and into the catalog). Needs a brainstorming
-  session (metrics, thresholds, output format, catalog columns) before build —
-  design-approval gate, not an autonomous item.
+- Optional (deferred from per-stem-analysis spec, YAGNI): per-stem loudness into
+  the catalog. `catalog.py scan` rebuilds `assets` every run, so per-asset
+  loudness would be recomputed/lost each scan — revisit only if a digest needs it.
 - Two design specs still pending a plan->build: none outstanding (resynth,
-  build-logic-project, stem-quality-profiles all shipped).
+  build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-12
 - Decided: bundle stem quality as four named profiles (acapella/fast/6stem/hq)
@@ -80,3 +88,7 @@
   only path to those is htdemucs_6s, cleaned up with --shifts 2 --overlap 0.5
   (the `hq` default). deconstruct kept on `fast` so the quick-prep path stays
   fast-by-default; keeper-track quality lives in Separate.
+- Decided: per-stem analysis uses ffmpeg volumedetect (no new Python deps) and
+  writes a human-readable analysis.txt beside the stems rather than into the
+  catalog — the beside-stems report delivers the "which stems have audio" value
+  without fighting the catalog's rebuild-on-scan model.
