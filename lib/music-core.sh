@@ -197,6 +197,28 @@ resynth_instrument() {
   "$MUSIC_DIR/.venv/bin/python" "${args[@]}"
 }
 
+revoice_melody() {
+  # $1 = input .wav (monophonic melodic stem), $2 = instrument (default guitar),
+  # $3 = tempo BPM (default 120), $4 = soundfont name/path (optional).
+  # Wraps resynth_instrument with the Samples/Resynth/<name> output convention
+  # used by the `music` menu's Re-voice step.
+  local input="$1" instrument="${2:-guitar}" tempo="${3:-120}" soundfont="$4"
+  local out="$MUSIC_DIR/Samples/Resynth/${input:t:r}"
+  resynth_instrument "$input" "$out" "$instrument" "$tempo" "$soundfont"
+}
+
+mangle() {
+  # $1 = a sample .wav OR a folder of samples (e.g. Samples/Chops/<track>/other),
+  # $2 = comma-separated transforms (optional; default = all),
+  # $3 = max files when $1 is a folder (default 8).
+  # Fans each sample out into transformed variants under Samples/Mangled/<track>/.
+  local input="$1" only="$2" maxn="${3:-8}"
+  [[ ! -e "$input" ]] && { echo "mangle: need a .wav or folder, got '$input'" >&2; return 2; }
+  local -a args=("$MUSIC_DIR/Scripts/mangle.py" "$input" --max "$maxn")
+  [[ -n "$only" ]] && args+=(--only "$only")
+  "$MUSIC_DIR/.venv/bin/python" "${args[@]}"
+}
+
 deconstruct() {
   # $1 = audio file, $2 = drum density (tight|loose, default loose).
   # One-command flip prep: tempo/key -> 4-stem split -> drum one-shots ->
@@ -207,7 +229,7 @@ deconstruct() {
   local track="${file:t:r}"
   local stemdir="$MUSIC_DIR/Stems/htdemucs/$track"
   echo "→ Tempo & key:"
-  analyze_track "$file"
+  local _analysis; _analysis=$(analyze_track "$file"); print -r -- "$_analysis"
   echo "→ Separating 4 stems (drums/bass/other/vocals)…"
   separate_stems "$file" 4stem "$MUSIC_DIR/Stems" >/dev/null || return 1
   echo "→ Drum one-shots…"
@@ -223,4 +245,11 @@ deconstruct() {
   echo "  One-shots + kit: Samples/One-Shots/$track"
   echo "  Snippets: Samples/Chops/$track"
   echo "  Vocal chops: Samples/Vocals/$track"
+  # Catalog (best-effort): parse BPM/key from the analysis and index this track.
+  local _bpm _key
+  _bpm=$(print -r -- "$_analysis" | sed -nE 's/.*[^0-9]([0-9]{2,3})(\.[0-9]+)?[[:space:]]*BPM.*/\1/p' | head -1)
+  _key=$(print -r -- "$_analysis" | sed -nE 's/.*[Kk]ey[[:space:]]+([A-Ga-g][b#]?m?).*/\1/p' | head -1)
+  if [[ -x "$MUSIC_DIR/.venv/bin/python" ]]; then
+    "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" index-track "$track" ${_bpm:+--bpm $_bpm} ${_key:+--key $_key} >/dev/null 2>&1
+  fi
 }

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Studio</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-main">
+      <h1>Music Studio</h1>
+      <p class="subtitle">Runs your <code>music-core.sh</code> toolkit on this Mac and browses Stems/ & Samples/ . <a href="#" onclick="runAction('Guide', 'help')">Guide</a></p>
+    </div>
+  </header>
+
+  <!-- Orange Warning Banner matching PDF layout -->
+  <div id="desktop-commander-alert" class="alert-banner">
+    <div class="alert-content">
+      <span class="alert-text">Desktop Commander isn't responding — make sure it's connected (and Logic/Finder access granted). The panel can't run steps or list files until it is.</span>
+    </div>
+    <div class="alert-actions">
+      <button class="btn btn-outline-alert" onclick="retryConnection()">Retry</button>
+    </div>
+  </div>
+
+  <main class="dashboard-grid">
+
+    <!-- Card 1: CONTROL PANEL -->
+    <section class="card control-panel-card span-columns">
+      <div class="card-header">
+        <h2>CONTROL PANEL</h2>
+      </div>
+      
+      <div class="card-body">
+        <!-- Source Track Input Group -->
+        <div class="input-group">
+          <label>SOURCE TRACK — download · analyze · stems · deconstruct · pipeline</label>
+          <div class="input-with-action">
+            <select id="select-source-track">
+              <option value="">— no source files —</option>
+              <option value="song1">06 Open Interlude</option>
+              <option value="song2">07 Skyline Drift</option>
+            </select>
+            <button class="btn btn-icon" title="Refresh source list" onclick="refreshSources()">🔄</button>
+          </div>
+        </div>
+
+        <!-- Stem Folder Input Group -->
+        <div class="input-group">
+          <label>STEM FOLDER — chop · sort · bass→MIDI · build Logic</label>
+          <select id="select-stem-folder">
+            <option value="">— no stems yet —</option>
+            <option value="stems1">Stems/htdemucs/06 Open Interlude</option>
+            <option value="stems2">Stems/htdemucs/07 Skyline Drift</option>
+          </select>
+        </div>
+
+        <!-- Download URL Input Group -->
+        <div class="input-group">
+          <label>DOWNLOAD URL — Apple Music / SoundCloud / other</label>
+          <input type="url" id="input-download-url" placeholder="https://music.apple.com/… or https://soundcloud.com/…">
+        </div>
+
+        <!-- Manual Path Override Group -->
+        <div class="input-group">
+          <label>MANUAL PATH OVERRIDE — optional, wins over dropdowns · the Re-voice input</label>
+          <input type="text" id="input-manual-path" placeholder="e.g. Stems/htdemucs/02 Ivy/bass.wav">
+        </div>
+
+        <!-- Horizontal parameter selectors -->
+        <div class="parameters-row">
+          <div class="param-item">
+            <label>STEM MODE</label>
+            <select id="select-stem-mode">
+              <option value="6-stem">6-stem</option>
+              <option value="4-stem">4-stem</option>
+              <option value="instrumental">instrumental</option>
+            </select>
+          </div>
+          <div class="param-item">
+            <label>DENSITY</label>
+            <select id="select-density">
+              <option value="loose">loose</option>
+              <option value="tight">tight</option>
+            </select>
+          </div>
+          <div class="param-item">
+            <label>CHOP S</label>
+            <select id="select-chop-s">
+              <option value="8">8</option>
+              <option value="4">4</option>
+              <option value="16">16</option>
+            </select>
+          </div>
+          <div class="param-item">
+            <label>TEMPO</label>
+            <input type="number" id="input-tempo" value="120" min="40" max="250">
+          </div>
+        </div>
+
+        <!-- Re-voice Instrument parameter -->
+        <div class="input-group">
+          <label>RE-VOICE INSTRUMENT</label>
+          <select id="select-revoice-inst">
+            <option value="guitar">guitar</option>
+            <option value="piano">piano</option>
+            <option value="synth_lead">synthesizer lead</option>
+            <option value="sitar">sitar</option>
+          </select>
+        </div>
+
+        <!-- Deconstruct button -->
+        <div class="action-block-single">
+          <button class="btn btn-action-accent" onclick="runAction('Deconstruct', 'deconstruct')">
+            <span class="btn-main-text">⚡ Deconstruct — full flip prep</span>
+            <span class="btn-subtext">analyze → 4 stems → one-shots → sort kit → snippets → vocal chops</span>
+          </button>
+        </div>
+
+        <!-- Action Grid of 8 Buttons -->
+        <div class="action-buttons-grid">
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Download', 'download')">
+            <span class="action-title">Download</span>
+            <span class="action-desc">from URL box</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Analyze BPM + key', 'source')">
+            <span class="action-title">Analyze BPM + key</span>
+            <span class="action-desc">source / stem folder</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Separate stems', 'source')">
+            <span class="action-title">Separate stems</span>
+            <span class="action-desc">source + mode</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Full pipeline', 'source')">
+            <span class="action-title">Full pipeline</span>
+            <span class="action-desc">download → stems → chop</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Chop drums -> one-shots', 'stems')">
+            <span class="action-title">Chop drums → one-shots</span>
+            <span class="action-desc">stem folder + density</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Sort kit', 'stems')">
+            <span class="action-title">Sort kit</span>
+            <span class="action-desc">kick / snare / hat</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Chop vocals', 'stems')">
+            <span class="action-title">Chop vocals</span>
+            <span class="action-desc">stem folder + density</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Chop stems -> snippets', 'stems')">
+            <span class="action-title">Chop stems → snippets</span>
+            <span class="action-desc">stem folder + secs</span>
+          </button>
+        </div>
+
+        <!-- Additional Actions Row -->
+        <div class="additional-actions-grid margin-top-lg">
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Bass -> MIDI', 'bass-midi')">
+            <span class="action-title">Bass → MIDI</span>
+            <span class="action-desc">stem folder + tempo</span>
+          </button>
+          <button class="btn btn-secondary btn-action-card" onclick="runAction('Re-voice melody', 'revoice')">
+            <span class="action-title">Re-voice melody</span>
+            <span class="action-desc">mono line (path) + instrument</span>
+          </button>
+        </div>
+
+        <!-- Build Logic project from stems -->
+        <div class="action-block-single margin-top-sm">
+          <button class="btn btn-secondary btn-action-card full-width" onclick="runAction('Build Logic project from stems', 'build-logic')">
+            <span class="action-title">🎛️ Build Logic project from stems</span>
+            <span class="action-desc">stem folder — analyze then load into Logic Pro (best-effort)</span>
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Card 2: OUTPUT -->
+    <section class="card output-card span-columns">
+      <div class="card-header">
+        <h2>OUTPUT</h2>
+        <div class="header-actions">
+          <span id="output-status" class="status-indicator-dot idle"></span>
+          <span id="output-status-text" class="status-label">idle</span>
+          <button id="btn-stop-task" class="btn btn-sm btn-danger disabled" onclick="stopTask()">Stop</button>
+          <button class="btn btn-sm btn-secondary" onclick="clearOutput()">Clear</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="output-console" class="console-box">Ready. Pick a track and run a step — output streams here.
+Long steps (demucs, deconstruct, pipeline) take a few minutes; output streams as it runs.</div>
+      </div>
+    </section>
+
+    <!-- Card 3: LIBRARY -->
+    <section class="card library-card span-columns">
+      <div class="card-header">
+        <h2>LIBRARY</h2>
+        <div class="header-actions">
+          <button class="btn btn-sm btn-secondary" onclick="openFinderFolder('Samples')">📂 Samples</button>
+          <button class="btn btn-sm btn-secondary" onclick="openFinderFolder('Stems')">📂 Stems</button>
+          <button class="btn btn-sm btn-icon" title="Reload library" onclick="reloadLibrary()">🔄</button>
+        </div>
+      </div>
+      
+      <div class="library-tabs">
+        <button class="tab-btn active" onclick="switchLibraryTab('stems')">Stems</button>
+        <button class="tab-btn" onclick="switchLibraryTab('one-shots')">One-Shots</button>
+        <button class="tab-btn" onclick="switchLibraryTab('vocals')">Vocals</button>
+        <button class="tab-btn" onclick="switchLibraryTab('chops')">Chops</button>
+        <button class="tab-btn" onclick="switchLibraryTab('loops')">Loops</button>
+        <button class="tab-btn" onclick="switchLibraryTab('kits')">Kits</button>
+        <button class="tab-btn" onclick="switchLibraryTab('midi')">MIDI</button>
+        <button class="tab-btn" onclick="switchLibraryTab('resynth')">Resynth</button>
+      </div>
+
+      <div class="card-body library-content-area">
+        <div id="library-list" class="library-list">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="library-footer-subtext">
+          <span>▶ plays on your Mac (afplay)</span>
+          <span>⧉ reveals in Finder</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Card 4: STEP SEQUENCER -->
+    <section class="card sequencer-card span-columns">
+      <div class="card-header">
+        <h2>STEP SEQUENCER</h2>
+        <div class="header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="randomizeSequencer()">Random</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearSequencer()">Clear</button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="sequencer-grid-container">
+          <!-- Playhead indicator overlay line -->
+          <div id="playhead" class="sequencer-playhead"></div>
+          
+          <div class="sequencer-rows" id="sequencer-rows-container">
+            <!-- Grid rows populated dynamically in Javascript -->
+          </div>
+        </div>
+
+        <!-- Bottom Controls Row (restored from PDF page 3) -->
+        <div class="sequencer-footer-controls">
+          <button id="btn-seq-play" class="btn btn-primary btn-seq-play" onclick="toggleSequencer()">▶ Play</button>
+          
+          <div class="control-item">
+            <label>BPM</label>
+            <input type="number" id="seq-bpm" value="120" min="40" max="300" onchange="updateSequencerTempo()">
+          </div>
+
+          <div class="control-item">
+            <label>BARS</label>
+            <select id="seq-bars" onchange="updateSequencerBars()">
+              <option value="1">1</option>
+              <option value="2" selected>2</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+
+          <div class="control-item seq-kit-select-box">
+            <label>KIT</label>
+            <select id="seq-kit">
+              <option value="— sort a kit first —">— sort a kit first —</option>
+              <option value="909">TR-909 Kit (Synth)</option>
+              <option value="808">TR-808 Kit (Synth)</option>
+            </select>
+          </div>
+
+          <div class="control-item seq-name-input-box">
+            <label>NAME</label>
+            <input type="text" id="seq-name" value="beat">
+          </div>
+        </div>
+
+        <div class="sequencer-export-buttons-row">
+          <button class="btn btn-secondary" onclick="exportMidi()">Export MIDI → Samples/MIDI</button>
+          <button class="btn btn-secondary" onclick="renderWavLoop()">Render WAV loop → Samples/Loops</button>
+          <button class="btn btn-secondary" onclick="openFinderFolder('Samples/Loops')">Reveal</button>
+        </div>
+
+        <p class="sequencer-legend">
+          Preview is synth. Per row, pick a one-shot from the kit for the WAV render (or leave "synth only" to skip it in the audio). MIDI uses a GM drum map (kick 36 · snare 38 · hat 42 · open-hat 46 · clap 39 · 808 35).
+        </p>
+      </div>
+    </section>
+
+    <!-- Card 5: LOGIC PRO -->
+    <section class="card logic-card span-columns">
+      <div class="card-header">
+        <h2>LOGIC PRO</h2>
+        <button class="btn btn-sm btn-secondary btn-refresh-status" onclick="refreshLogicStatus()">
+          <span>🔄</span> Status
+        </button>
+      </div>
+
+      <div class="card-body">
+        
+        <!-- Status readouts row -->
+        <div class="logic-status-strip">
+          <div id="logic-connection-badge" class="badge badge-offline">unknown</div>
+          <div class="status-box-inline">
+            <span class="status-label">project:</span>
+            <span id="logic-project-name" class="status-value">—</span>
+          </div>
+          <div class="status-box-inline">
+            <span class="status-label">tempo:</span>
+            <span id="logic-tempo" class="status-value">—</span>
+          </div>
+          <div class="status-box-inline">
+            <span class="status-label">key:</span>
+            <span id="logic-key" class="status-value">—</span>
+          </div>
+          <div class="status-box-inline">
+            <span class="status-label">bar:</span>
+            <span id="logic-position" class="status-value">—</span>
+          </div>
+        </div>
+
+        <!-- Section: TRANSPORT -->
+        <div class="logic-sub-section">
+          <h3>TRANSPORT</h3>
+          <div class="transport-buttons">
+            <button class="btn btn-transport" onclick="runLogicCommand('go_to_start')" title="Go to Start">⏮</button>
+            <button class="btn btn-transport" onclick="runLogicCommand('rewind')" title="Rewind">⏪</button>
+            <button id="btn-logic-play" class="btn btn-transport" onclick="runLogicCommand('play')" title="Play">▶</button>
+            <button class="btn btn-transport" onclick="runLogicCommand('stop')" title="Stop">⏹</button>
+            <button class="btn btn-transport" onclick="runLogicCommand('fast_forward')" title="Fast Forward">⏩</button>
+            <button class="btn btn-transport btn-highlight-red" onclick="runLogicCommand('record')" title="Record">🔴</button>
+          </div>
+        </div>
+
+        <!-- Section: TRACKS (SELECTED) -->
+        <div class="logic-sub-section">
+          <h3>TRACKS (SELECTED)</h3>
+          <div class="action-buttons-row">
+            <button class="btn btn-secondary" onclick="runLogicCommand('list_tracks')">📋 List</button>
+            <button class="btn btn-secondary" onclick="runLogicCommand('mute')" title="Mute track">🔇</button>
+            <button class="btn btn-secondary" onclick="runLogicCommand('solo')" title="Solo track">🎧</button>
+          </div>
+        </div>
+
+        <!-- Section: PROJECT -->
+        <div class="logic-sub-section">
+          <h3>PROJECT</h3>
+          <div class="action-buttons-row">
+            <button class="btn btn-secondary" onclick="runLogicCommand('save')">💾 Save</button>
+            <button class="btn btn-secondary" onclick="runLogicCommand('new')">📄 New</button>
+            <button class="btn btn-secondary" onclick="runLogicCommand('bounce')">🎛️ Bounce</button>
+            <button class="btn btn-secondary" onclick="runLogicCommand('export_midi')">🎹 Export MIDI</button>
+            <button class="btn btn-secondary" onclick="runLogicCommand('bounce')">🎛️ Bounce ✓</button>
+          </div>
+        </div>
+
+        <!-- Full-width create button -->
+        <div class="logic-footer-button-container">
+          <button class="btn btn-lg btn-action-accent" onclick="runAction('Build Logic project from stems', 'build-logic')">
+            <span>🎛️ New Logic project from selected stem folder @ <span id="btn-logic-bpm-lbl">120</span> BPM</span>
+          </button>
+        </div>
+
+        <p class="logic-legend-text">
+          Needs Logic Pro open + Accessibility/Automation granted. UI-scripting is best-effort (see STATUS.md). Play/Stop are the same Space toggle.
+        </p>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JS Logic script -->
+  <script src="app.js"></script>
+</body>
+</html>

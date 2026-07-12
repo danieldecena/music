@@ -16,6 +16,27 @@
   track; bass `.mid` always saved to `Samples/MIDI/` as a fallback.
 - Fixed `session.py` `_get_fields` empty-return bug (AppleScript `result` clobber);
   `logic_get_bar_position` works again.
+- `Scripts/analyze_track.py`: added `estimate_boundaries()` (spectral-flux
+  section/transition detection). Verified via `build-logic-project.sh` run —
+  prints `transitions [...]` per stem alongside BPM/key.
+- **`StudioTUI/` (Rust/ratatui)** — chosen over two other exploratory ports
+  (`studio_tui.py`/Textual — deleted; `StudioUI/` HTML mockup — kept as the
+  design reference `music-studio.pdf` was rendered from). Builds warning-free
+  beyond pre-existing dead-code lints. Pipeline tab's Bass->MIDI, Re-voice
+  Melody, and Build Logic Proj actions now call real new wrapper scripts
+  (`bass-to-midi.sh`, `revoice.sh`, `build-logic-project.sh` — thin shells
+  over `lib/music-core.sh` functions, matching `download.sh`'s pattern).
+  Sequencer Export MIDI (`m`) / Render WAV (`w`) now shell out to
+  `Scripts/beat_export.py`, best-effort matching WAV rows to real
+  `Samples/One-Shots/<track>/{kick,snare,hat}/*.wav` samples where sort_kit
+  has classified them. Logic Pro tab (`c` connect, `s` status, `p` play/stop,
+  `w` save) now calls `logic-pro-mcp/logic_cli.py` for real instead of faking
+  connection state. All three wrapper scripts + `beat_export.py` +
+  `logic_cli.py status` verified directly against real repo data (a real
+  `Stems/htdemucs_6s/02 Let Em' Know` track); the compiled binary was smoke-
+  tested under a pty (clean start/quit, no panic). The Logic-tab/Build-Logic-
+  Proj live-Logic-session behavior itself is unverified here (no Logic Pro
+  in this environment) — same caveat as the existing `P` build path below.
 
 ## Known broken / unverified
 - The entire Logic-side UI-scripting path (`P` build: new project + import audio +
@@ -27,10 +48,14 @@
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
 
 ## Next Up
-- Live-verify the `P` Logic build with Logic open + Accessibility granted; fix any
-  moved selectors.
-- Optional: song-map / structure + chord-progression analyzer (spec-scoped, not
-  built; would need librosa + matplotlib).
+- Live-verify the `P` Logic build (and StudioTUI's Logic tab / Build Logic Proj
+  action, same underlying `logic_cli.py`/`build_project.py`) with Logic open +
+  Accessibility granted; fix any moved selectors.
+- Optional: chord-progression analyzer on top of the now-working section-
+  boundary detection in `analyze_track.py`.
 - Optional: one-shot -> Logic Quick Sampler instrument loader.
+- StudioTUI: `cargo build` still emits 4 pre-existing dead-code warnings
+  (unused `Focus::SeqBpm`, `fs::skip_dir`, `Theme.seq_pad_off`, unused `Theme`
+  style helpers) — harmless, not touched by the TUI-wiring work.
 - Two design specs still pending a plan->build: none outstanding (resynth shipped;
   build-logic-project shipped).

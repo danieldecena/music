@@ -25,7 +25,9 @@ Core functions and what they shell out to:
 - `deconstruct(file, density)` — one-command flip prep chaining the reliable steps: `analyze_track` → `separate_stems` (4stem) → `chop_drums` → `sort_kit` → `chop_stems`. Menu option 8 / `./deconstruct.sh`
 - `Scripts/bass_to_midi.py` (not yet wired into a menu step) — monophonic bass→MIDI via autocorrelation pitch detection + a hand-written MIDI writer. Best-effort; single-note lines only
 
-All `Scripts/*.py` except `chop.py` (stdlib-only) require the venv's numpy and are invoked via `.venv/bin/python` directly rather than `source activate`.
+All `Scripts/*.py` except `chop.py` and `catalog.py` (both stdlib-only) require the venv's numpy and are invoked via `.venv/bin/python` directly rather than `source activate`.
+
+**Catalog (`Scripts/catalog.py`, sqlite3 stdlib).** Maintains `catalog.sqlite` (gitignored) — a `tracks` table (source path, artist/album, bpm, key, model, deconstructed_at), an `assets` table (every stem/one-shot/kit/loop/chop/vocal/midi/resynth file), and a `runs` log. `deconstruct()` calls `catalog.py index-track <track> --bpm --key` on completion (parsed from its own `analyze_track` output), so the DB stays current without a separate scan. CLI: `scan` (full rebuild of assets; tracks keep bpm/key), `ready`/`pending`/`recent`/`stats` (with `--json`) power the scheduled `auto-deconstruct-new-tracks` and `ready-to-flip-digest` tasks and can back the Music Studio artifact. Assets are rebuilt every scan; `tracks` rows persist.
 
 **Full-pipeline chaining.** `music` option 4 (download → stems → chop) stamps `$(date +%s)` before downloading, then calls `find_new_m4a(dir, stamp)` to discover which files the download step produced — neither `gamdl` nor `yt-dlp` return paths directly. `find_new_m4a` works around BSD `find` not supporting `-newermt "@epoch"` on macOS by `touch -t`-ing a reference file at the target timestamp and diffing against that.
 

@@ -14,27 +14,24 @@ while true; do
   echo ""
   echo "Music Toolkit"
   echo "-------------"
-  echo "Turn songs into stems, one-shots & samples for flipping. Pick a step:"
-  echo "0) Guide / how it works"
-  echo "L) Browse music library (pick a file, then a step)"
-  echo "M) Bass stem -> MIDI"
-  echo "O) Open outputs in Finder"
-  echo "P) Build Logic project from stems"
-  echo "R) Re-voice a melody as another instrument"
-  echo "1) Download"
-  echo "2) Separate stems"
-  echo "3) Chop vocals"
-  echo "4) Split drums (one-shots)"
-  echo "5) Chop stems into snippets"
-  echo "6) Sort drum kit (kick/snare/hat)"
-  echo "7) Analyze tempo & key"
-  echo "8) Deconstruct a track (stems → one-shots → kit → snippets)"
-  echo "9) Full pipeline (download → stems → chop)"
-  echo "10) Quit"
+  echo "Turn songs into stems, one-shots & samples for flipping."
+  echo ""
+  echo "Pipeline"
+  echo "  1) Download                 5) Chop stems into snippets"
+  echo "  2) Separate stems           6) Sort drum kit (kick/snare/hat)"
+  echo "  3) Chop vocals              7) Analyze tempo & key"
+  echo "  4) Split drums (one-shots)  8) Deconstruct a track (stems → kit → snippets)"
+  echo "                              9) Full pipeline (download → stems → chop)"
+  echo ""
+  echo "Tools & shortcuts"
+  echo "  L) Browse music library     M) Bass stem → MIDI"
+  echo "  O) Open outputs in Finder   R) Re-voice a melody as another instrument"
+  echo "  P) Build Logic project      G) Guide / how it works"
+  echo "                              Q) Quit"
   read "choice?> "
 
   case "$choice" in
-    0)
+    G|g|0)
       cat <<'GUIDE'
 
 Guide — how to flip a track
@@ -151,7 +148,7 @@ GUIDE
         [[ "$sfn" == <-> && "$sfn" -ge 1 && "$sfn" -le ${#fonts} ]] && SF="${fonts[$sfn]}"
       fi
       read "tempo?Tempo BPM [120]> "; [[ -z "$tempo" ]] && tempo=120
-      resynth_instrument "$INPUT" "$SCRIPT_DIR/Samples/Resynth/${INPUT:t:r}" "$INSTR" "$tempo" "$SF"
+      revoice_melody "$INPUT" "$INSTR" "$tempo" "$SF"
       ;;
     1)
       read "url?Paste URL> "
@@ -234,7 +231,7 @@ GUIDE
       done
       echo "Pipeline complete."
       ;;
-    10) echo "Bye."; exit 0 ;;
+    Q|q|10) echo "Bye."; exit 0 ;;
     *) echo "Invalid choice."; continue ;;
   esac
 done

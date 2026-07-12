@@ -91,9 +91,42 @@ def detect_key(audio: np.ndarray) -> str:
     return best
 
 
-def analyze(path: Path) -> tuple[float, str]:
+def estimate_boundaries(audio: np.ndarray) -> list[float]:
+    """Estimate section boundaries (in seconds) by analyzing spectral flux novelty."""
+    frames = _frames(audio)
+    if frames.shape[0] < 10:
+        return []
+    mag = np.abs(np.fft.rfft(frames, axis=1))
+    flux = np.sqrt((np.maximum(np.diff(mag, axis=0), 0.0) ** 2).sum(axis=1))
+    
+    # Smooth flux using a moving average window
+    window_len = int(SR / HOP * 2.0)  # 2-second window
+    if len(flux) < window_len:
+        return []
+    smoothed = np.convolve(flux, np.ones(window_len)/window_len, mode='same')
+    novelty = flux - smoothed
+    
+    # Peak-picking: local maxima above threshold
+    threshold = novelty.mean() + novelty.std() * 0.8
+    peaks = []
+    fps = SR / HOP
+    for i in range(1, len(novelty) - 1):
+        if novelty[i] > novelty[i-1] and novelty[i] > novelty[i+1] and novelty[i] > threshold:
+            time_sec = round(i / fps, 1)
+            peaks.append(time_sec)
+            
+    # Filter peaks closer than 8 seconds
+    filtered = []
+    for p in peaks:
+        if not filtered or (p - filtered[-1]) >= 8.0:
+            filtered.append(p)
+            
+    return filtered
+
+
+def analyze(path: Path) -> tuple[float, str, list[float]]:
     audio = decode_mono(path, SR)
-    return detect_tempo(audio), detect_key(audio)
+    return detect_tempo(audio), detect_key(audio), estimate_boundaries(audio)
 
 
 def main() -> None:
@@ -111,8 +144,8 @@ def main() -> None:
         sys.exit(1)
     for f in files:
         try:
-            bpm, key = analyze(f)
-            print(f"{f.name}:  {bpm} BPM   key {key}")
+            bpm, key, bounds = analyze(f)
+            print(f"{f.name}:  {bpm} BPM   key {key}   transitions {bounds}")
         except Exception as exc:  # noqa: BLE001
             print(f"{f.name}:  analysis failed — {exc}")
 
