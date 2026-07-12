@@ -4,12 +4,23 @@
 LIB_DIR="${${(%):-%x}:A:h}"
 MUSIC_DIR="${LIB_DIR:h}"
 
-stem_mode_args() {
+stem_profile_args() {
+  # Quality profile -> demucs args. hq is the cleanest 6-stem (guitar/piano).
   case "$1" in
-    instrumental) print -- "--two-stems=vocals" ;;
-    4stem)        print -- "" ;;
-    6stem)        print -- "-n htdemucs_6s" ;;
-    *)            return 1 ;;
+    acapella) print -- "--two-stems=vocals" ;;
+    fast)     print -- "" ;;
+    6stem)    print -- "-n htdemucs_6s" ;;
+    hq)       print -- "-n htdemucs_6s --shifts 2 --overlap 0.5" ;;
+    *)        return 1 ;;
+  esac
+}
+
+stem_profile_model() {
+  # Quality profile -> output model directory under Stems/.
+  case "$1" in
+    acapella|fast) print -- "htdemucs" ;;
+    6stem|hq)      print -- "htdemucs_6s" ;;
+    *)             return 1 ;;
   esac
 }
 
@@ -94,18 +105,18 @@ download_url() {
 }
 
 separate_stems() {
-  # $1 = file, $2 = mode, $3 = out_dir ; echoes vocals.wav path
-  local file="$1" mode="$2" out="$3"
+  # $1 = file, $2 = profile, $3 = out_dir ; echoes vocals.wav path
+  local file="$1" profile="$2" out="$3"
   local args
-  args=$(stem_mode_args "$mode") || { echo "bad mode: $mode" >&2; return 1; }
+  args=$(stem_profile_args "$profile") || { echo "bad profile: $profile" >&2; return 1; }
   # demucs lives in the venv, not on the global PATH — activate it here so this
   # works standalone (via ./stems.sh or the menu), matching chop_vocals.
   [[ -z "${VIRTUAL_ENV:-}" ]] && source "$MUSIC_DIR/.venv/bin/activate"
   command -v demucs >/dev/null || { echo "demucs not found even after venv activate — run: pip install -r requirements? (see .venv)" >&2; return 1; }
   mkdir -p "$out"
   demucs ${=args} --out "$out" "$file" || return 1
-  local model_dir=htdemucs
-  [[ "$mode" == 6stem ]] && model_dir=htdemucs_6s
+  local model_dir
+  model_dir=$(stem_profile_model "$profile")
   print -- "$out/$model_dir/${file:t:r}/vocals.wav"
 }
 
@@ -241,7 +252,7 @@ deconstruct() {
   echo "→ Tempo & key:"
   local _analysis; _analysis=$(analyze_track "$file"); print -r -- "$_analysis"
   echo "→ Separating 4 stems (drums/bass/other/vocals)…"
-  separate_stems "$file" 4stem "$MUSIC_DIR/Stems" >/dev/null || return 1
+  separate_stems "$file" fast "$MUSIC_DIR/Stems" >/dev/null || return 1
   echo "→ Drum one-shots…"
   chop_drums "$stemdir/drums.wav" "$MUSIC_DIR/Samples/One-Shots" "$dens" | tail -1
   echo "→ Sorting kit (kick/snare/hat)…"

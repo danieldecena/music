@@ -10,9 +10,16 @@ assert_eq() {
   fi
 }
 
-assert_eq "$(stem_mode_args instrumental)" "--two-stems=vocals" "instrumental mode"
-assert_eq "$(stem_mode_args 4stem)" "" "4stem mode"
-assert_eq "$(stem_mode_args 6stem)" "-n htdemucs_6s" "6stem mode"
+assert_eq "$(stem_profile_args acapella)" "--two-stems=vocals" "acapella profile args"
+assert_eq "$(stem_profile_args fast)" "" "fast profile args"
+assert_eq "$(stem_profile_args 6stem)" "-n htdemucs_6s" "6stem profile args"
+assert_eq "$(stem_profile_args hq)" "-n htdemucs_6s --shifts 2 --overlap 0.5" "hq profile args"
+assert_eq "$(stem_profile_model acapella)" "htdemucs" "acapella model dir"
+assert_eq "$(stem_profile_model fast)" "htdemucs" "fast model dir"
+assert_eq "$(stem_profile_model 6stem)" "htdemucs_6s" "6stem model dir"
+assert_eq "$(stem_profile_model hq)" "htdemucs_6s" "hq model dir"
+stem_profile_args bogus 2>/dev/null; assert_eq "$?" "1" "unknown profile args errors"
+stem_profile_model bogus 2>/dev/null; assert_eq "$?" "1" "unknown profile model errors"
 assert_eq "$(chop_sensitivity_args tight)" "--min-silence 0.15 --min-clip 0.3" "tight sensitivity"
 assert_eq "$(chop_sensitivity_args loose)" "--min-silence 0.35 --min-clip 0.8" "loose sensitivity"
 assert_eq "$(drum_split_args tight)" "--delta 0.04 --wait 0.05" "tight drum density"
