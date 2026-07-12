@@ -83,7 +83,7 @@ Manual path (control at each step):
 
 Pick what you need:
   Sample-flip fast ....... 8
-  Acapella / instrumental  2 (instrumental) -> 3
+  Acapella / instrumental  2 (acapella) -> 3
   Build a drum kit ....... 2 -> 4 -> 6
 
 Density / sensitivity: "loose" = more, longer clips; "tight" = fewer, cleaner.
@@ -249,7 +249,7 @@ GUIDE
       fi
       echo "$new_files" | while read -r track; do
         echo "→ Stems: ${track:t}"
-        vocals=$(separate_stems "$track" instrumental "$SCRIPT_DIR/Stems" | tail -1)
+        vocals=$(separate_stems "$track" acapella "$SCRIPT_DIR/Stems" | tail -1)
         if [[ ! -f "$vocals" ]]; then
           echo "  no vocals.wav for ${track:t} — skipping chop."; continue
         fi

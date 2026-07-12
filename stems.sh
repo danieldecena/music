@@ -10,8 +10,8 @@ read "INPUT?> "
 INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
 [[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 
-echo "Mode: 1) instrumental  2) 4stem  3) 6stem"; read "m?> "
-case "$m" in 1) MODE=instrumental;; 2) MODE=4stem;; 3) MODE=6stem;; *) echo "Invalid."; exit 1;; esac
+echo "Quality: 1) fast (4-stem)  2) 6-stem  3) 6-stem HQ [recommended, slow]  4) acapella"; read "m?> "
+case "$m" in 1) MODE=fast;; 2) MODE=6stem;; 4) MODE=acapella;; 3|"") MODE=hq;; *) echo "Invalid."; exit 1;; esac
 
 if [[ -f "$INPUT" ]]; then
   separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
