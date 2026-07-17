@@ -3,7 +3,7 @@ MUSIC TOOLKIT — HOW TO USE
 
 Run it from anywhere:
 
-    music
+    music.sh        (or just: music — same script, both names work)
 
 Or from the repo root:
 

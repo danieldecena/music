@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- Run the toolkit: `music` from anywhere (symlinked into `~/Bin`, which is on PATH; the script resolves its own repo via `${0:A:h}`), or `./music` from the repo root — interactive menu (Download / Separate stems / Chop vocals / Split drums / Chop stems / Sort kit / Analyze tempo+key / Deconstruct / Full pipeline / Quit)
+- Run the toolkit: `music.sh` or `music` from anywhere (both are `~/Bin` symlinks to the repo's `music`; `~/Bin` is on PATH and the script resolves its own repo via `${0:A:h}`), or `./music` from the repo root — interactive menu (Download / Separate stems / Chop vocals / Split drums / Chop stems / Sort kit / Analyze tempo+key / Deconstruct / Full pipeline / Quit)
 - Or run a single step directly: `./download.sh`, `./stems.sh`, `./chop.sh`, `./chop-drums.sh`, `./chop-stems.sh`, `./sort-kit.sh`, `./analyze.sh`, `./deconstruct.sh` — each prompts for input then calls the matching `music-core.sh` function
 - Run tests: `zsh tests/test-core.sh` — hand-rolled assertions (no framework) covering `stem_mode_args`, `chop_sensitivity_args`, `drum_split_args`, `find_new_m4a`
 - Python steps need the venv: `source .venv/bin/activate` before invoking `Scripts/chop.py` directly. `chop_vocals()` in music-core already does this itself, so `./chop.sh` and pipeline runs don't need manual activation.

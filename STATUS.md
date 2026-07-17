@@ -1,8 +1,8 @@
 # STATUS — music toolkit
 
 ## Confirmed working
-- `music` interactive menu (`~/Bin` symlink; `./music` from the repo also works).
-  No `set -e` (a failed step returns to the prompt).
+- `music.sh` / `music` interactive menu (both `~/Bin` symlinks; `./music` from the
+  repo also works). No `set -e` (a failed step returns to the prompt).
 - Menu options: 0 Guide, L Library (name filter, descends into track folders),
   M Bass->MIDI, O Open outputs, 1-9 pipeline, 8 Deconstruct (now also chops vocals).
 - `R) Re-voice a melody` — 35 GM instruments by name + multi-soundfont picking.
