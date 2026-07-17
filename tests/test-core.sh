@@ -46,4 +46,30 @@ assert_eq "$(stems_dir_for Song)" "$MUSIC_DIR/Stems/htdemucs/Song" "stems_dir_fo
 assert_eq "$(stems_dir_for Missing)" "" "stems_dir_for empty when none"
 rm -rf "$MUSIC_DIR"
 
+# track_state: "stems drums shots kit chops"
+MUSIC_DIR=$(mktemp -d)
+assert_eq "$(track_state Song)" "0 0 0 0 0" "track_state all zero when nothing exists"
+mkdir -p "$MUSIC_DIR/Stems/htdemucs/Song"
+touch "$MUSIC_DIR/Stems/htdemucs/Song/vocals.wav" "$MUSIC_DIR/Stems/htdemucs/Song/no_vocals.wav"
+assert_eq "$(track_state Song)" "1 0 0 0 0" "acapella split has stems but no drums"
+# the drums live in the 6s dir that stems_dir_for does NOT prefer — still found
+mkdir -p "$MUSIC_DIR/Stems/htdemucs_6s/Song"
+touch "$MUSIC_DIR/Stems/htdemucs_6s/Song/drums.wav"
+assert_eq "$(track_state Song)" "1 1 0 0 0" "drums found in the non-preferred model dir"
+mkdir -p "$MUSIC_DIR/Samples/One-Shots/Song"
+touch "$MUSIC_DIR/Samples/One-Shots/Song/drums_001.wav"
+assert_eq "$(track_state Song)" "1 1 1 0 0" "one-shots detected"
+mkdir -p "$MUSIC_DIR/Samples/One-Shots/Song/kick"
+assert_eq "$(track_state Song)" "1 1 1 0 0" "empty kick/ is not a sorted kit"
+touch "$MUSIC_DIR/Samples/One-Shots/Song/kick/kick_001.wav"
+assert_eq "$(track_state Song)" "1 1 1 1 0" "populated kick/ is a sorted kit"
+mkdir -p "$MUSIC_DIR/Samples/Chops/Song/other"
+touch "$MUSIC_DIR/Samples/Chops/Song/other/other_001.wav"
+assert_eq "$(track_state Song)" "1 1 1 1 1" "chops detected"
+# glob metachars in the title must not be read as a pattern
+mkdir -p "$MUSIC_DIR/Samples/One-Shots/Rambo [feat. X] (Live)"
+touch "$MUSIC_DIR/Samples/One-Shots/Rambo [feat. X] (Live)/hit_001.wav"
+assert_eq "$(track_state 'Rambo [feat. X] (Live)')" "0 0 1 0 0" "brackets in a title are literal"
+rm -rf "$MUSIC_DIR"
+
 exit $fail

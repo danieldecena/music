@@ -37,21 +37,14 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
 
 CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
 
-has() {  # true if the dir exists and holds anything
-  local f=("$1"/*(N))
-  (( ${#f} ))
-}
-
 HAS_STEMS=0; HAS_DRUMS=0; HAS_SHOTS=0; HAS_KIT=0; HAS_CHOPS=0
-scan_track() {  # what the current track already has — drives the progress row and Next:
-  local kit="$SCRIPT_DIR/Samples/One-Shots/$CUR_NAME" d
-  d="$(stems_dir_for "$CUR_NAME")"
-  [[ -n "$d" ]] && HAS_STEMS=1 || HAS_STEMS=0
-  # an acapella split is vocals + no_vocals only — there's no drums.wav to chop
-  [[ -f "$d/drums.wav" ]] && HAS_DRUMS=1 || HAS_DRUMS=0
-  has "$kit"      && HAS_SHOTS=1 || HAS_SHOTS=0
-  has "$kit/kick" && HAS_KIT=1   || HAS_KIT=0
-  has "$SCRIPT_DIR/Samples/Chops/$CUR_NAME" && HAS_CHOPS=1 || HAS_CHOPS=0
+scan_track() {  # unpack track_state into the flags the progress row and Next: read
+  if [[ -z "$CUR_NAME" ]]; then
+    HAS_STEMS=0; HAS_DRUMS=0; HAS_SHOTS=0; HAS_KIT=0; HAS_CHOPS=0
+    return
+  fi
+  local s=(${=$(track_state "$CUR_NAME")})
+  HAS_STEMS=$s[1]; HAS_DRUMS=$s[2]; HAS_SHOTS=$s[3]; HAS_KIT=$s[4]; HAS_CHOPS=$s[5]
 }
 
 box() { (( $1 )) && print -n "[x]" || print -n "[ ]" }
@@ -70,9 +63,12 @@ next_step() {  # the one action the current state implies
 MENU=main
 while true; do
   echo ""
-  [[ -n "$CUR_NAME" ]] && scan_track
+  # the catalog label ends in its own "[deconstructed: ...]" summary — drop it, the
+  # progress row says the same thing per-output. `%` not `%%`: the shortest suffix
+  # cuts at the last "  [", so a title like "Song  [Live]" keeps its BPM and key.
+  CUR_SHORT="${CUR_LABEL%  \[*}"
   if [[ "$MENU" == tools ]]; then
-    echo "  Tools  ·  ${CUR_LABEL:-no track selected}"
+    echo "  Tools  ·  ${CUR_SHORT:-no track selected}"
     echo "  ------------------------------------------------------------"
     echo "    A  Stem levels            loudness / presence per stem"
     echo "    M  Bass stem -> MIDI"
@@ -81,12 +77,10 @@ while true; do
     echo "    9  Download + chop        URL straight to vocal clips"
     echo ""
     echo "    B  Back"
-    read "choice?> "
   else
+    scan_track
     if [[ -n "$CUR_NAME" ]]; then
-      # the catalog label ends in its own "[deconstructed: ...]" summary — drop it,
-      # the progress row says the same thing per-output
-      echo "  Music Toolkit  ·  ${CUR_LABEL%%  \[*}"
+      echo "  Music Toolkit  ·  $CUR_SHORT"
       echo "  stems $(box $HAS_STEMS)   one-shots $(box $HAS_SHOTS)   kit $(box $HAS_KIT)   chops $(box $HAS_CHOPS)"
     else
       echo "  Music Toolkit  ·  no track selected"
@@ -112,8 +106,8 @@ while true; do
     else
       echo "    G  Guide            Q  Quit"
     fi
-    read "choice?> "
   fi
+  read "choice?> "
 
   case "$choice" in
     T|t) MENU=tools ;;

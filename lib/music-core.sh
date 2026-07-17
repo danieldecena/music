@@ -51,6 +51,29 @@ stems_dir_for() {  # echoes existing Stems/<model>/<name> dir, htdemucs preferre
   return 0
 }
 
+dir_has() {  # $1 = dir. True if it holds at least one entry. [1] stops the glob
+  local f=("$1"/*(N[1]))  # at the first match instead of listing hundreds.
+  (( ${#f} ))
+}
+
+track_state() {
+  # $1 = track name. Echoes "stems drums shots kit chops" as 1/0 flags — what
+  # this track already has, so a caller can name the next step. Owns the output
+  # layout the chop_* / sort_kit writers below produce.
+  local name="$1" m
+  local stems=0 drums=0 shots=0 kit=0 chops=0
+  # Check every model dir, not just the one stems_dir_for prefers: a track split
+  # acapella (htdemucs, no drums) and again 6-stem (htdemucs_6s, drums) has drums.
+  for m in htdemucs htdemucs_6s; do
+    [[ -d "$MUSIC_DIR/Stems/$m/$name" ]] && stems=1
+    [[ -f "$MUSIC_DIR/Stems/$m/$name/drums.wav" ]] && drums=1
+  done
+  dir_has "$MUSIC_DIR/Samples/One-Shots/$name" && shots=1
+  dir_has "$MUSIC_DIR/Samples/One-Shots/$name/kick" && kit=1
+  dir_has "$MUSIC_DIR/Samples/Chops/$name" && chops=1
+  print -- "$stems $drums $shots $kit $chops"
+}
+
 find_new_m4a() {
   # $1 = directory, $2 = epoch seconds.
   # BSD find (/usr/bin/find on macOS) can't parse -newermt "@epoch", so compare
