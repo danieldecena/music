@@ -37,29 +37,48 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
 
 CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
 
+mark() {  # [x] if the dir exists and holds anything, else [ ]
+  local f=("$1"/*(N))
+  (( ${#f} )) && print -n "[x]" || print -n "[ ]"
+}
+
+track_progress() {  # what the current track already has, so the next step is obvious
+  local stems kit
+  [[ -n "$(stems_dir_for "$CUR_NAME")" ]] && stems="[x]" || stems="[ ]"
+  kit="$SCRIPT_DIR/Samples/One-Shots/$CUR_NAME"
+  print -- "  stems $stems   one-shots $(mark "$kit")   kit $(mark "$kit/kick")   chops $(mark "$SCRIPT_DIR/Samples/Chops/$CUR_NAME")"
+}
+
 while true; do
   echo ""
   if [[ -n "$CUR_NAME" ]]; then
-    echo "Current: $CUR_LABEL"
-    echo "------------------------------------------------------------"
+    # the catalog label ends in its own "[deconstructed: ...]" summary — drop it,
+    # the progress line below says the same thing per-output
+    echo "  Music Toolkit  ·  ${CUR_LABEL%%  \[*}"
+    track_progress
+  else
+    echo "  Music Toolkit  ·  no track selected"
+    echo "  Turn songs into stems, one-shots & samples for flipping."
   fi
-  echo "Music Toolkit"
-  echo "-------------"
-  echo "Turn songs into stems, one-shots & samples for flipping."
+  echo "  ------------------------------------------------------------"
+  echo "  GET AUDIO            SPLIT IT"
+  echo "    1  Download          2  Separate stems"
+  echo "    9  Download + chop   8  Deconstruct  <- start here"
   echo ""
-  echo "Pipeline"
-  echo "  1) Download                 5) Chop stems into snippets"
-  echo "  2) Separate stems           6) Sort drum kit (kick/snare/hat)"
-  echo "  3) Chop vocals              7) Analyze tempo & key"
-  echo "  4) Split drums (one-shots)  8) Deconstruct a track (stems → kit → snippets)"
-  echo "                              9) Full pipeline (download → stems → chop)"
-  echo ""
-  echo "Tools & shortcuts"
-  echo "  L) Browse music library     M) Bass stem → MIDI"
-  echo "  O) Open outputs in Finder   R) Re-voice a melody as another instrument"
-  echo "  P) Build Logic project      A) Analyze stems (loudness/presence)"
-  echo "                              G) Guide / how it works"
-  echo "                              C) Clear current track   Q) Quit"
+  echo "  SLICE STEMS          INSPECT"
+  echo "    3  Chop vocals       7  Tempo & key"
+  echo "    4  Split drums       A  Stem levels"
+  echo "    5  Chop stems"
+  echo "    6  Sort drum kit   MAKE"
+  echo "                         M  Bass -> MIDI"
+  echo "  LIBRARY                R  Re-voice melody"
+  echo "    L  Browse tracks     P  Build Logic project"
+  echo "    O  Open Samples/"
+  if [[ -n "$CUR_NAME" ]]; then
+    echo "    C  Clear track       G  Guide    Q  Quit"
+  else
+    echo "                         G  Guide    Q  Quit"
+  fi
   read "choice?> "
 
   case "$choice" in
