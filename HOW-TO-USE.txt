@@ -1,7 +1,11 @@
 MUSIC TOOLKIT — HOW TO USE
 ==========================
 
-Everything runs from the repo root:
+Run it from anywhere:
+
+    music
+
+Or from the repo root:
 
     cd ~/Developer/music
     ./music
