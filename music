@@ -37,51 +37,87 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
 
 CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
 
-mark() {  # [x] if the dir exists and holds anything, else [ ]
+has() {  # true if the dir exists and holds anything
   local f=("$1"/*(N))
-  (( ${#f} )) && print -n "[x]" || print -n "[ ]"
+  (( ${#f} ))
 }
 
-track_progress() {  # what the current track already has, so the next step is obvious
-  local stems kit
-  [[ -n "$(stems_dir_for "$CUR_NAME")" ]] && stems="[x]" || stems="[ ]"
-  kit="$SCRIPT_DIR/Samples/One-Shots/$CUR_NAME"
-  print -- "  stems $stems   one-shots $(mark "$kit")   kit $(mark "$kit/kick")   chops $(mark "$SCRIPT_DIR/Samples/Chops/$CUR_NAME")"
+HAS_STEMS=0; HAS_DRUMS=0; HAS_SHOTS=0; HAS_KIT=0; HAS_CHOPS=0
+scan_track() {  # what the current track already has — drives the progress row and Next:
+  local kit="$SCRIPT_DIR/Samples/One-Shots/$CUR_NAME" d
+  d="$(stems_dir_for "$CUR_NAME")"
+  [[ -n "$d" ]] && HAS_STEMS=1 || HAS_STEMS=0
+  # an acapella split is vocals + no_vocals only — there's no drums.wav to chop
+  [[ -f "$d/drums.wav" ]] && HAS_DRUMS=1 || HAS_DRUMS=0
+  has "$kit"      && HAS_SHOTS=1 || HAS_SHOTS=0
+  has "$kit/kick" && HAS_KIT=1   || HAS_KIT=0
+  has "$SCRIPT_DIR/Samples/Chops/$CUR_NAME" && HAS_CHOPS=1 || HAS_CHOPS=0
 }
 
+box() { (( $1 )) && print -n "[x]" || print -n "[ ]" }
+
+next_step() {  # the one action the current state implies
+  if [[ -z "$CUR_NAME" ]]; then print -- "1  Download a song      (or  L  to pick one you have)"
+  elif (( ! HAS_STEMS ));  then print -- "8  Deconstruct          (or  2  to split stems only)"
+  elif (( ! HAS_DRUMS ));  then print -- "3  Chop vocals          (acapella split — no drums to slice)"
+  elif (( ! HAS_SHOTS ));  then print -- "4  Split drums"
+  elif (( ! HAS_KIT ));    then print -- "6  Sort drum kit"
+  elif (( ! HAS_CHOPS ));  then print -- "5  Chop stems"
+  else                          print -- "nothing — this one's fully prepped.  O  opens Samples/"
+  fi
+}
+
+MENU=main
 while true; do
   echo ""
-  if [[ -n "$CUR_NAME" ]]; then
-    # the catalog label ends in its own "[deconstructed: ...]" summary — drop it,
-    # the progress line below says the same thing per-output
-    echo "  Music Toolkit  ·  ${CUR_LABEL%%  \[*}"
-    track_progress
+  [[ -n "$CUR_NAME" ]] && scan_track
+  if [[ "$MENU" == tools ]]; then
+    echo "  Tools  ·  ${CUR_LABEL:-no track selected}"
+    echo "  ------------------------------------------------------------"
+    echo "    A  Stem levels            loudness / presence per stem"
+    echo "    M  Bass stem -> MIDI"
+    echo "    R  Re-voice a melody      as another instrument"
+    echo "    P  Build Logic project"
+    echo "    9  Download + chop        URL straight to vocal clips"
+    echo ""
+    echo "    B  Back"
+    read "choice?> "
   else
-    echo "  Music Toolkit  ·  no track selected"
-    echo "  Turn songs into stems, one-shots & samples for flipping."
+    if [[ -n "$CUR_NAME" ]]; then
+      # the catalog label ends in its own "[deconstructed: ...]" summary — drop it,
+      # the progress row says the same thing per-output
+      echo "  Music Toolkit  ·  ${CUR_LABEL%%  \[*}"
+      echo "  stems $(box $HAS_STEMS)   one-shots $(box $HAS_SHOTS)   kit $(box $HAS_KIT)   chops $(box $HAS_CHOPS)"
+    else
+      echo "  Music Toolkit  ·  no track selected"
+      echo "  Turn songs into stems, one-shots & samples for flipping."
+    fi
+    echo "  ------------------------------------------------------------"
+    echo "  Next:  $(next_step)"
+    echo ""
+    echo "  THE FLIP PATH"
+    echo "    1  Download"
+    echo "    8  Deconstruct           everything below, in one go"
+    echo "    ·"
+    echo "    2  Separate stems"
+    echo "    7  Tempo & key"
+    echo "    3  Chop vocals"
+    echo "    4  Split drums"
+    echo "    6  Sort drum kit"
+    echo "    5  Chop stems"
+    echo ""
+    echo "    L  Browse tracks    O  Open Samples/    T  More tools"
+    if [[ -n "$CUR_NAME" ]]; then
+      echo "    G  Guide            Q  Quit            C  Clear track"
+    else
+      echo "    G  Guide            Q  Quit"
+    fi
+    read "choice?> "
   fi
-  echo "  ------------------------------------------------------------"
-  echo "  GET AUDIO            SPLIT IT"
-  echo "    1  Download          2  Separate stems"
-  echo "    9  Download + chop   8  Deconstruct  <- start here"
-  echo ""
-  echo "  SLICE STEMS          INSPECT"
-  echo "    3  Chop vocals       7  Tempo & key"
-  echo "    4  Split drums       A  Stem levels"
-  echo "    5  Chop stems"
-  echo "    6  Sort drum kit   MAKE"
-  echo "                         M  Bass -> MIDI"
-  echo "  LIBRARY                R  Re-voice melody"
-  echo "    L  Browse tracks     P  Build Logic project"
-  echo "    O  Open Samples/"
-  if [[ -n "$CUR_NAME" ]]; then
-    echo "    C  Clear track       G  Guide    Q  Quit"
-  else
-    echo "                         G  Guide    Q  Quit"
-  fi
-  read "choice?> "
 
   case "$choice" in
+    T|t) MENU=tools ;;
+    B|b) MENU=main ;;
     G|g|0)
       cat <<'GUIDE'
 
