@@ -24,6 +24,8 @@ SR = 22050
 FRAME = 2048
 HOP = 512
 PITCHES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+AUDIO_EXT = (".m4a", ".mp3", ".wav", ".flac")
+STEM_NAMES = ("vocals", "drums", "bass", "other", "guitar", "piano")
 
 # Krumhansl-Schmuckler key profiles.
 _MAJ = np.array(
@@ -122,9 +124,10 @@ def detect_tempo(sp: Spec) -> float:
     return round(60.0 * fps / lag, 1)
 
 
-def detect_key(sp: Spec) -> str:
+def _chroma_vector(sp: Spec) -> np.ndarray | None:
+    """Average energy per pitch class, L1-normalized. None if there is nothing to read."""
     if sp.n_frames < 2:
-        return "unknown"
+        return None
     mag = sp.mag.mean(axis=0)
     freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
     chroma = np.zeros(12)
@@ -134,8 +137,14 @@ def detect_key(sp: Spec) -> str:
         midi = 69 + 12 * np.log2(f / 440.0)
         chroma[int(round(midi)) % 12] += m
     if chroma.sum() == 0:
+        return None
+    return chroma / chroma.sum()
+
+
+def _key_from_chroma(chroma: np.ndarray | None) -> str:
+    """Best-correlating Krumhansl-Schmuckler key for a chroma vector."""
+    if chroma is None or chroma.sum() == 0:
         return "unknown"
-    chroma = chroma / chroma.sum()
     best_score, best = -2.0, "unknown"
     for i in range(12):
         for prof, mode in ((_MAJ, ""), (_MIN, "m")):
@@ -143,6 +152,10 @@ def detect_key(sp: Spec) -> str:
             if r > best_score:
                 best_score, best = r, f"{PITCHES[i]}{mode}"
     return best
+
+
+def detect_key(sp: Spec) -> str:
+    return _key_from_chroma(_chroma_vector(sp))
 
 
 def estimate_boundaries(sp: Spec) -> list[float]:
@@ -185,17 +198,65 @@ def analyze(path: Path) -> tuple[float, str, list[float]]:
     return detect_tempo(sp), detect_key(sp), estimate_boundaries(sp)
 
 
+def stem_track_dir(p: Path) -> dict[str, Path] | None:
+    """Return the stem files if `p` is a separated track folder, else None.
+
+    Gated on drums AND bass both being present. That admits htdemucs (4-stem)
+    and htdemucs_6s (which adds guitar/piano), while excluding an acapella split
+    — that produces only vocals.wav and no_vocals.wav, which is not a track
+    folder and should keep fanning out per file.
+    """
+    if not p.is_dir():
+        return None
+    found = {n: p / f"{n}.wav" for n in STEM_NAMES if (p / f"{n}.wav").is_file()}
+    return found if {"drums", "bass"} <= found.keys() else None
+
+
+def analyze_stem_track(stems: dict[str, Path]) -> tuple[float, str, list[float]]:
+    """Analyze a separated track as ONE track, using the best stem per metric.
+
+    Previously a Stems folder was rglobbed into one line per stem, so the
+    reported "key" could come from drums.wav — which is meaningless. Each metric
+    now reads the stem that carries it: drums for tempo (cleanest onsets), the
+    pitched stems for key, and `other` for boundaries (harmonic change marks
+    sections better than percussion does).
+    """
+    bpm = detect_tempo(spectra(decode_mono(stems["drums"], SR)))
+
+    # Bass pins the tonic but cannot distinguish major from minor -- the third
+    # lives in the mid stems. Weight bass below them rather than above.
+    key_parts = [(stems["bass"], 0.6)]
+    key_parts += [(stems[n], 1.0) for n in ("other", "guitar", "piano") if n in stems]
+    chroma = np.zeros(12)
+    for path, weight in key_parts:
+        sp = spectra(decode_mono(path, SR))
+        c = _chroma_vector(sp)
+        if c is not None:
+            chroma += weight * c
+    key = _key_from_chroma(chroma)
+
+    bounds_src = stems.get("other") or stems["bass"]
+    bounds = estimate_boundaries(spectra(decode_mono(bounds_src, SR)))
+    return bpm, key, bounds
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("usage: analyze_track.py <audio file | folder>")
         sys.exit(1)
     p = Path(sys.argv[1])
+
+    stems = stem_track_dir(p)
+    if stems is not None:
+        try:
+            bpm, key, bounds = analyze_stem_track(stems)
+            print(f"{p.name}:  {bpm} BPM   key {key}   transitions {bounds}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"{p.name}:  analysis failed — {exc}")
+        return
+
     if p.is_dir():
-        files = sorted(
-            f
-            for f in p.rglob("*")
-            if f.suffix.lower() in (".m4a", ".mp3", ".wav", ".flac")
-        )
+        files = sorted(f for f in p.rglob("*") if f.suffix.lower() in AUDIO_EXT)
     else:
         files = [p]
     if not files:
