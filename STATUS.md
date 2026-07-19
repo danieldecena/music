@@ -60,18 +60,41 @@
   in this environment) — same caveat as the existing `P` build path below.
 
 ## Known broken / unverified
+- **The tempo octave fix is written but NOT committed** — it lives only in the
+  working tree, deliberately kept out of every commit until verified. It halves
+  octave errors (2 -> 1 of 10) and moves exact 5 -> 6, but introduces a second
+  3:2 error, and n=10 makes that suggestive at best. BLOCKED on hand-tapped BPM
+  for Exchange, Don't, Rambo, Nikes. See `tests/test-analysis.py score`.
+- All labels in `tests/fixtures-analysis.tsv` are Echo Nest-derived (tunebat /
+  songbpm / getsongbpm / musicstax all re-display one pipeline). Their agreement
+  is correlated, not corroboration, and they carry the same octave-error risk
+  being measured. Rows ending `?` are already suspect.
+- Key detection is no longer degenerate but is still weak: 2/13 exact against
+  published keys, unchanged by the chroma rewrite. The rewrite fixed the
+  collapse (44% of baseline rows reported "F"), not the accuracy.
 - The entire Logic-side UI-scripting path (`P` build: new project + import audio +
   import MIDI) is BEST-EFFORT and has NOT been verified against a live Logic
-  session. Selectors (template chooser, import sheets) may need re-deriving with
-  `entire contents of front window`. The bass `.mid` fallback covers import failure.
+  session. Selectors (template chooser, import sheets) may need re-deriving —
+  use `logic_dump_ui_hierarchy`, which now actually works (see below).
+  The bass `.mid` fallback covers import failure.
 - `R` on a full-length track is slow (autocorrelation over the whole file) — feed
   it short mono loops, not whole songs.
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
 
 ## Next Up
+- **Tap 4 tracks** (Exchange, Don't, Rambo, Nikes), put the values in
+  `tests/fixtures-analysis.tsv`, drop the `?`, then run
+  `.venv/bin/python tests/test-analysis.py score` to settle whether the
+  uncommitted tempo fix ships or gets narrowed. This is the one blocker.
 - Live-verify the `P` Logic build (and StudioTUI's Logic tab / Build Logic Proj
   action, same underlying `logic_cli.py`/`build_project.py`) with Logic open +
-  Accessibility granted; fix any moved selectors.
+  Accessibility granted; fix any moved selectors. Note Logic launches from
+  `/Applications/Logic Pro Creator Studio.app` — `open -a "Logic Pro"` fails,
+  and `pgrep -x "Logic Pro"` never matches (process is `Logic Pro Creator Studio`).
+- Re-record `tests/baseline-analysis.tsv`. The frozen one predates tasks 6-8, so
+  its ~65 per-stem rows are obsolete now that a Stems folder collapses to one
+  row. Keep the old file until the tempo question is settled — it is the only
+  record of pre-change behaviour.
 - Optional: chord-progression analyzer on top of the now-working section-
   boundary detection in `analyze_track.py`.
 - Optional: one-shot -> Logic Quick Sampler instrument loader.
@@ -83,6 +106,30 @@
   loudness would be recomputed/lost each scan — revisit only if a digest needs it.
 - Two design specs still pending a plan->build: none outstanding (resynth,
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
+
+### 2026-07-18
+- Decided: freeze a behavioural baseline BEFORE touching analyze_track.py. It
+  proved the old detector was degenerate in three independent ways that were
+  invisible without it: tempo railed at its 184.6 BPM ceiling on 28/120 rows
+  (49/120 sat on just 3 integer lags), key collapsed to "F" on 53/120, and
+  boundaries fired every 8s because the minimum-gap filter, not the threshold,
+  was doing the work.
+- Decided: do NOT commit the tempo octave fix until it is verified by ear. It is
+  objectively correct on synthetic signals (140 BPM read as 69.8 before, 140.3
+  after) and the sub-lag refinement is a genuine correctness fix -- at ~43
+  envelope fps, integer lags cannot represent 140 BPM at all. But against
+  published BPM it scored 6/13 both before and after, and the published values
+  are one algorithm with the same octave bias. Reasoning that sounds right is
+  not evidence.
+- Learned: the plan's diagnosis of octave errors as a *scoring* problem was
+  incomplete. The mechanism is lag quantization -- an 0.46-frame-per-beat error
+  accumulates to a full beat of drift in 30s, which collapses the evidence for
+  the FAST candidate while the slow one drifts half as fast. The resolution
+  asymmetry itself biases toward halving.
+- Learned: `entire contents of front window` returns ZERO elements for Logic
+  Pro 12.3 even when frontmost, so logic_dump_ui_hierarchy silently returned "".
+  Walk with `every UI element` and recurse through a handler parameter --
+  storing element refs in a list and mutating it invalidates them (-10000).
 
 ### 2026-07-12
 - Decided: bundle stem quality as four named profiles (acapella/fast/6stem/hq)

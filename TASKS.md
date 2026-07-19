@@ -9,7 +9,9 @@
 - [x] Vectorize chroma and reduce percussive smear in detect_key
 - [x] Replace section boundaries with beat-synchronous SSM + checkerboard novelty
 - [ ] Collect ~10 ground-truth BPM/key labels into tests/fixtures-analysis.tsv
-- [ ] Add scoring mode comparing new vs baseline accuracy
+      (partial: 13 provisional Echo Nest-derived labels landed, 3 flagged `?`.
+      Needs hand-tapped values for Exchange, Don't, Rambo, Nikes.)
+- [x] Add scoring mode comparing new vs baseline accuracy
 - [x] Add synthetic unit tests for octave logic, key, and stem-folder detection
 
 <!-- resume-footer -->
