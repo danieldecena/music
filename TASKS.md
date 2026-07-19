@@ -1,6 +1,6 @@
 ## Tasks
 
-- [ ] Fix BPM decimal truncation in music-core.sh deconstruct()
+- [x] Fix BPM decimal truncation in music-core.sh deconstruct()
 - [ ] Add tests/record-baseline.py and commit the frozen baseline TSV
 - [ ] Add tests/test-analysis.py asserting the baseline reproduces exactly
 - [ ] Refactor analyze_track.py to a single spectral pass (Spec dataclass)
