@@ -334,7 +334,10 @@ deconstruct() {
   echo "  Vocal chops: Samples/Vocals/$track"
   # Catalog (best-effort): parse BPM/key from the analysis and index this track.
   local _bpm _key
-  _bpm=$(print -r -- "$_analysis" | sed -nE 's/.*[^0-9]([0-9]{2,3})(\.[0-9]+)?[[:space:]]*BPM.*/\1/p' | head -1)
+  # Capture the decimal too, then round — catalog stores bpm as INTEGER, and
+  # truncating 93.5 to 93 loses the nearer value.
+  _bpm=$(print -r -- "$_analysis" | sed -nE 's/.*[^0-9]([0-9]{2,3}(\.[0-9]+)?)[[:space:]]*BPM.*/\1/p' | head -1)
+  _bpm=${_bpm:+$(printf '%.0f' "$_bpm")}
   _key=$(print -r -- "$_analysis" | sed -nE 's/.*[Kk]ey[[:space:]]+([A-Ga-g][b#]?m?).*/\1/p' | head -1)
   if [[ -x "$MUSIC_DIR/.venv/bin/python" ]]; then
     "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" index-track "$track" ${_bpm:+--bpm $_bpm} ${_key:+--key $_key} >/dev/null 2>&1
