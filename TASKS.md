@@ -4,7 +4,10 @@
 - [x] Add tests/record_baseline.py and commit the frozen baseline TSV
 - [x] Add tests/test-analysis.py asserting the baseline reproduces exactly
 - [x] Refactor analyze_track.py to a single spectral pass (Spec dataclass)
-- [ ] Fix tempo octave errors via harmonic scoring, prior, and grid support
+- [x] Fix tempo octave errors via harmonic scoring, prior, and grid support
+      (shipped as best-of-three measured variants: exact 5->6, octave 2->1,
+      at the cost of 3:2 errors 1->3. Refinement without scoring was WORSE
+      than the original. Revisit once tapped labels exist.)
 - [x] Detect Stems track folders and analyze them as one track
 - [x] Vectorize chroma and reduce percussive smear in detect_key
 - [x] Replace section boundaries with beat-synchronous SSM + checkerboard novelty

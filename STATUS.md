@@ -60,11 +60,18 @@
   in this environment) — same caveat as the existing `P` build path below.
 
 ## Known broken / unverified
-- **The tempo octave fix is written but NOT committed** — it lives only in the
-  working tree, deliberately kept out of every commit until verified. It halves
-  octave errors (2 -> 1 of 10) and moves exact 5 -> 6, but introduces a second
-  3:2 error, and n=10 makes that suggestive at best. BLOCKED on hand-tapped BPM
-  for Exchange, Don't, Rambo, Nikes. See `tests/test-analysis.py score`.
+- **The tempo octave fix shipped (685a489) on best-available evidence, not
+  proof.** Against 10 trusted fixture labels it moves exact 5 -> 6 and octave
+  errors 2 -> 1, but trades those for 3:2 errors 1 -> 3 — Exchange and Don't
+  went from exact to two-thirds readings. It also removes the old ceiling
+  artifact entirely. Still worth settling by ear: tap Exchange, Don't, Rambo,
+  Nikes, update `tests/fixtures-analysis.tsv`, drop the `?`, rerun
+  `tests/test-analysis.py score`. If the 3:2 errors prove real, the prior's
+  sigma (0.85) and the 3.0 harmonic multiplier are the two knobs implicated.
+- Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
+  octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
+  the candidate scoring only work together; refinement alone makes a widened
+  range actively harmful.
 - All labels in `tests/fixtures-analysis.tsv` are Echo Nest-derived (tunebat /
   songbpm / getsongbpm / musicstax all re-display one pipeline). Their agreement
   is correlated, not corroboration, and they carry the same octave-error risk
@@ -93,8 +100,9 @@
 ## Next Up
 - **Tap 4 tracks** (Exchange, Don't, Rambo, Nikes), put the values in
   `tests/fixtures-analysis.tsv`, drop the `?`, then run
-  `.venv/bin/python tests/test-analysis.py score` to settle whether the
-  uncommitted tempo fix ships or gets narrowed. This is the one blocker.
+  `.venv/bin/python tests/test-analysis.py score`. The tempo fix already
+  shipped; this decides whether its 3:2 tradeoff is real and worth tuning out.
+  The only remaining task-list item, and it needs an ear rather than code.
 - Live-verify the `P` Logic build (and StudioTUI's Logic tab / Build Logic Proj
   action, same underlying `logic_cli.py`/`build_project.py`) with Logic open +
   Accessibility granted; fix any moved selectors. Note Logic launches from
@@ -139,6 +147,17 @@
   Pro 12.3 even when frontmost, so logic_dump_ui_hierarchy silently returned "".
   Walk with `every UI element` and recurse through a handler parameter --
   storing element refs in a list and mutating it invalidates them (-10000).
+- Learned: "simplify to only the provably-correct part" was itself falsified.
+  Sub-lag refinement alone scored exact 3 / octave 5, worse than the original
+  argmax (5/2), while refinement plus candidate scoring scored 6/1. The safe-
+  looking subset was the worst of three variants -- measuring it before shipping
+  it is the only reason that was caught.
+- Learned: a verification step that cannot distinguish "no differences" from "I
+  was not shown the differences" is worthless. Piping a replay through `tail -60`
+  silently dropped every full-mix row (source paths sort before Stems/), and a
+  confident drift summary was then built on the survivors. Same silent-failure
+  shape as the dump returning "" and deconstruct's sed writing to /dev/null --
+  three in one session. Counts now sum to a known total.
 
 ### 2026-07-12
 - Decided: bundle stem quality as four named profiles (acapella/fast/6stem/hq)
