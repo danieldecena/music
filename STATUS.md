@@ -17,9 +17,13 @@
   track; bass `.mid` always saved to `Samples/MIDI/` as a fallback.
 - Fixed `session.py` `_get_fields` empty-return bug (AppleScript `result` clobber);
   `logic_get_bar_position` works again.
-- `Scripts/analyze_track.py`: added `estimate_boundaries()` (spectral-flux
-  section/transition detection). Verified via `build-logic-project.sh` run —
-  prints `transitions [...]` per stem alongside BPM/key.
+- `Scripts/analyze_track.py` — reworked 2026-07-18. One spectral pass (`Spec`)
+  shared by tempo/key/boundaries. Tempo: refined-lag candidate scoring.
+  Key: 55-2000 Hz weighted chroma, vectorized. Boundaries: beat-synchronous
+  SSM + checkerboard novelty, snapped to the bar grid. A Stems track folder is
+  analyzed as ONE track (tempo from drums, key from bass+other) — it no longer
+  fans out per stem. Tests: `tests/test-analysis.py` (18 synthetic, plus
+  `replay` and `score` modes). See Known broken for accuracy caveats.
 - **Stem quality profiles** (merged `feat/stem-quality-profiles`, commit 014bad9).
   `separate_stems` now takes a profile, not a mode: `stem_profile_args` +
   `stem_profile_model` replace `stem_mode_args`. Profiles: `acapella`
