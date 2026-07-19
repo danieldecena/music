@@ -108,20 +108,124 @@ def spectra(audio: np.ndarray) -> Spec:
     return Spec(mag, flux, fps)
 
 
+def _ac_at(ac: np.ndarray, lag: float) -> float:
+    """Autocorrelation at a fractional lag, linearly interpolated."""
+    i = int(lag)
+    if i < 1 or i + 1 >= len(ac):
+        return 0.0
+    f = lag - i
+    return float((1.0 - f) * ac[i] + f * ac[i + 1])
+
+
+def _refine_lag(ac: np.ndarray, i: int) -> float:
+    """Refine an integer autocorrelation peak to sub-frame precision.
+
+    At HOP=512/SR=22050 the envelope runs at ~43 fps, so the whole 50-210 BPM
+    range spans only integer lags 12-51. A 140 BPM pulse sits at lag 18.46 and
+    can otherwise only be read as 143.6 (lag 18) or 136.1 (lag 19).
+
+    This is not merely a precision issue. An 0.46-frame-per-beat error
+    accumulates to a full beat of drift within 30 seconds, which collapses both
+    the harmonic evidence and the grid support for the FAST candidate, while the
+    slow candidate at roughly twice the lag drifts half as fast per beat. Scoring
+    unrefined integer lags therefore has a systematic bias toward the halved
+    reading — the exact error this function exists to prevent.
+    """
+    if i < 1 or i + 1 >= len(ac):
+        return float(i)
+    denom = ac[i - 1] - 2.0 * ac[i] + ac[i + 1]
+    if denom == 0:
+        return float(i)
+    delta = 0.5 * (ac[i - 1] - ac[i + 1]) / denom
+    if not -1.0 < delta < 1.0:
+        return float(i)
+    return float(i) + float(delta)
+
+
+def _grid_support(env: np.ndarray, lag: float) -> float:
+    """Energy on the beat grid vs. the grid halfway between beats.
+
+    This is what actually separates 70 from 140. Harmonic evidence alone cannot:
+    a true 140 and a true 70 both put energy every 140-lag, so the score is
+    near-symmetric under doubling by construction. But at a real 140 the
+    odd-numbered beats carry comparable energy, while at a real 70 the halfway
+    points are relatively empty. Returns ~1.0 when the candidate is the true
+    pulse and drifts toward 0.5 when it is double-time.
+
+    The grid phase is searched, not assumed — starting at sample 0 would score a
+    track with any pickup or leading silence against a misaligned grid.
+    """
+    n = int(len(env) / lag)
+    if n < 8:
+        return 1.0
+    k = np.arange(n)
+    best = 1.0
+    for phase in np.linspace(0.0, lag, 8, endpoint=False):
+        on_idx = np.rint(phase + k * lag).astype(int).clip(0, len(env) - 1)
+        off_idx = np.rint(phase + (k + 0.5) * lag).astype(int).clip(0, len(env) - 1)
+        on, off = env[on_idx].mean(), env[off_idx].mean()
+        tot = on + off
+        if tot <= 0:
+            continue
+        score = 0.5 + on / tot
+        if score > best:
+            best = score
+    return best
+
+
+# Lag multiples scored as evidence for a candidate, with their weights.
+_TEMPO_MULTS = ((0.5, 0.55), (1.0, 1.0), (2.0, 0.85), (3.0, 0.45), (4.0, 0.30))
+_PRIOR_CENTER, _PRIOR_SIGMA = 120.0, 0.85  # sigma in log2 units
+_BPM_MIN, _BPM_MAX = 50.0, 210.0
+
+
 def detect_tempo(sp: Spec) -> float:
+    """Estimate BPM, resolving the half/double-time ambiguity.
+
+    Taking the plain argmax of the autocorrelation (the previous approach) picks
+    whichever of t, t/2, 2t happens to peak highest, so halftime-feel tracks
+    reported half their true tempo. Each candidate peak is instead scored on
+    three terms: evidence at its own harmonics, a perceptual prior, and grid
+    support.
+    """
     if sp.n_frames < 4:
         return 0.0
-    flux = sp.flux - sp.flux.mean()
-    fps = sp.fps
-    ac = np.correlate(flux, flux, mode="full")[len(flux) - 1 :]
-    lo = int(fps * 60 / 180)  # 180 BPM
-    hi = int(fps * 60 / 60)  # 60 BPM
-    if hi >= len(ac):
-        hi = len(ac) - 1
-    if lo < 1 or hi <= lo:
+    env = np.maximum(sp.flux - sp.flux.mean(), 0.0)  # half-wave rectify
+    if len(env) < 16 or not env.any():
         return 0.0
-    lag = lo + int(np.argmax(ac[lo:hi]))
-    return round(60.0 * fps / lag, 1)
+    fps = sp.fps
+    ac = np.correlate(env, env, mode="full")[len(env) - 1 :]
+    # Correlation at lag L averages over fewer products than at lag 0; without
+    # this the raw curve slopes down and biases every comparison toward short
+    # lags (fast tempi).
+    ac = ac / np.arange(len(ac), 0, -1)
+    if ac[0] > 0:
+        ac = ac / ac[0]
+
+    lo = max(1, int(fps * 60 / _BPM_MAX))
+    hi = min(len(ac) - 2, int(fps * 60 / _BPM_MIN))
+    if hi <= lo + 2:
+        return 0.0
+    band = ac[lo : hi + 1]
+    cand = lo + 1 + np.flatnonzero((band[1:-1] > band[:-2]) & (band[1:-1] >= band[2:]))
+    if cand.size == 0:
+        return 0.0
+    cand = cand[np.argsort(ac[cand])[::-1][:24]]
+
+    best_score, best_lag = -1e9, 0.0
+    for i in cand:
+        lag = _refine_lag(ac, int(i))
+        bpm = 60.0 * fps / lag
+        if not _BPM_MIN <= bpm <= _BPM_MAX:
+            continue
+        evidence = sum(w * _ac_at(ac, lag * m) for m, w in _TEMPO_MULTS)
+        prior = np.exp(-0.5 * (np.log2(bpm / _PRIOR_CENTER) / _PRIOR_SIGMA) ** 2)
+        score = evidence * prior * _grid_support(env, lag)
+        if score > best_score:
+            best_score, best_lag = score, lag
+    if best_lag == 0.0:
+        return 0.0
+    return round(60.0 * fps / best_lag, 1)
 
 
 def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
