@@ -11,9 +11,11 @@
 - [x] Detect Stems track folders and analyze them as one track
 - [x] Vectorize chroma and reduce percussive smear in detect_key
 - [x] Replace section boundaries with beat-synchronous SSM + checkerboard novelty
-- [ ] Collect ~10 ground-truth BPM/key labels into tests/fixtures-analysis.tsv
-      (partial: 13 provisional Echo Nest-derived labels landed, 3 flagged `?`.
-      Needs hand-tapped values for Exchange, Don't, Rambo, Nikes.)
+- [x] Collect ~10 ground-truth BPM/key labels into tests/fixtures-analysis.tsv
+      (13 labels via the chosen published-BPM lookup; provenance documented,
+      3 suspect rows flagged `?` and excluded from strict scoring. Labels are
+      Echo Nest-derived and therefore correlated, not independent — recorded
+      in STATUS.md. Optional tap-tempo refinement tracked there, not here.)
 - [x] Add scoring mode comparing new vs baseline accuracy
 - [x] Add synthetic unit tests for octave logic, key, and stem-folder detection
 
