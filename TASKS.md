@@ -6,8 +6,8 @@
 - [x] Refactor analyze_track.py to a single spectral pass (Spec dataclass)
 - [ ] Fix tempo octave errors via harmonic scoring, prior, and grid support
 - [x] Detect Stems track folders and analyze them as one track
-- [ ] Vectorize chroma and reduce percussive smear in detect_key
-- [ ] Replace section boundaries with beat-synchronous SSM + checkerboard novelty
+- [x] Vectorize chroma and reduce percussive smear in detect_key
+- [x] Replace section boundaries with beat-synchronous SSM + checkerboard novelty
 - [ ] Collect ~10 ground-truth BPM/key labels into tests/fixtures-analysis.tsv
 - [ ] Add scoring mode comparing new vs baseline accuracy
 - [ ] Add synthetic unit tests for octave logic, key, and stem-folder detection
