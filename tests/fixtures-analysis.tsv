@@ -1,0 +1,27 @@
+# Ground truth for scoring analyze_track.py.  path <TAB> bpm <TAB> key
+#
+# PROVISIONAL. Every value below is Echo Nest / Spotify-derived (tunebat,
+# songbpm, getsongbpm, musicstax are all re-displays of that one pipeline, not
+# independent sources). It therefore carries the SAME octave-error risk this
+# fixture exists to measure -- treat a disagreement here as a question, not a
+# verdict. Two entries are already known-suspect:
+#   - Rambo 181: an extreme outlier for a slow trap track; likely a double-time
+#     read of ~90. Our detector says 89.7.
+#   - Nikes 137: a ~68.5 halftime pocket is standard for this production style.
+# Replace a row with a hand-tapped value and drop the `?` suffix once verified
+# by ear. Rows whose bpm ends in `?` are excluded from the strict score.
+#
+# Blank bpm or key = unknown, skipped for that metric.
+Apple Music/Frank Ocean/Blonde/01 Nikes.m4a	137?	G#
+Apple Music/Frank Ocean/Blonde/02 Ivy.m4a	116	Am
+Apple Music/Frank Ocean/Blonde/03 Pink + White.m4a	79	A
+Apple Music/Frank Ocean/Blonde/05 Solo.m4a	134	Fm
+Apple Music/Frank Ocean/Blonde/07 Self Control.m4a	80	G#
+Apple Music/Frank Ocean/Blonde/09 Nights.m4a	90?	Fm
+Apple Music/Frank Ocean/Blonde/14 White Ferrari.m4a	109	C
+Apple Music/Frank Ocean/Blonde/16 Godspeed.m4a	110	F#
+Apple Music/Bryson Tiller/T R A P S O U L (Deluxe)/03 Exchange.m4a	160	F#
+Apple Music/Bryson Tiller/T R A P S O U L (Deluxe)/05 Don't.m4a	96	Bm
+Apple Music/Bryson Tiller/T R A P S O U L (Deluxe)/09 Rambo.m4a	181?	A#m
+Apple Music/Tory Lanez/Alone At Prom/04 The Color Violet.m4a	105	F#m
+Apple Music/Justin Bieber/SWAG II/1-01 SPEED DEMON.m4a	93	A#

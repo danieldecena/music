@@ -10,7 +10,7 @@
 - [x] Replace section boundaries with beat-synchronous SSM + checkerboard novelty
 - [ ] Collect ~10 ground-truth BPM/key labels into tests/fixtures-analysis.tsv
 - [ ] Add scoring mode comparing new vs baseline accuracy
-- [ ] Add synthetic unit tests for octave logic, key, and stem-folder detection
+- [x] Add synthetic unit tests for octave logic, key, and stem-folder detection
 
 <!-- resume-footer -->
 ---

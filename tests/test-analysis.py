@@ -197,8 +197,107 @@ def synthetic() -> None:
         check(ok, f"short input ({name}) returns 0.0/unknown/[] without crashing")
 
 
+FIXTURES = REPO / "tests" / "fixtures-analysis.tsv"
+
+
+def _relative(key: str) -> str:
+    """The relative major/minor partner of a key."""
+    p = at.PITCHES
+    if key.endswith("m"):
+        return p[(p.index(key[:-1]) + 3) % 12]
+    return p[(p.index(key) + 9) % 12] + "m"
+
+
+def _bpm_class(got: float, want: float) -> str:
+    if want <= 0 or got <= 0:
+        return "none"
+    for name, mult in (
+        ("exact", 1.0),
+        ("half", 0.5),
+        ("double", 2.0),
+        ("two-thirds", 2 / 3),
+        ("three-halves", 1.5),
+    ):
+        if abs(got - want * mult) / want < 0.045:
+            return name
+    return "off"
+
+
+def _key_class(got: str, want: str) -> str:
+    if got == want:
+        return "exact"
+    if got == "unknown":
+        return "unknown"
+    try:
+        if got == _relative(want):
+            return "relative"
+    except ValueError:
+        return "off"
+    if got.rstrip("m") == want.rstrip("m"):
+        return "parallel"
+    return "off"
+
+
+def score() -> None:
+    """Score the current analyzer against tests/fixtures-analysis.tsv.
+
+    Reports the distribution of error TYPES, not a single accuracy number,
+    because for this toolkit an octave error and a semitone error are different
+    problems. Rows whose bpm is suffixed `?` are counted separately -- those are
+    labels we do not trust yet.
+    """
+    if not FIXTURES.is_file():
+        print(f"skip: {FIXTURES.name} not present")
+        return
+    rows = []
+    for line in FIXTURES.read_text().splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 3:
+            rows.append((parts[0], parts[1].strip(), parts[2].strip()))
+    if not rows:
+        print("skip: no fixture rows")
+        return
+
+    from collections import Counter
+
+    bpm_c, key_c, suspect = Counter(), Counter(), Counter()
+    print(f"{'track':30s} {'want':>6} {'got':>7}  {'bpm':<13} {'key':<10}")
+    for rel, want_bpm, want_key in rows:
+        p = REPO / rel
+        if not p.is_file():
+            print(f"  MISSING {rel}")
+            continue
+        sp = at.spectra(at.decode_mono(p, at.SR))
+        got_bpm = at.detect_tempo(sp)
+        got_key = at.detect_key(sp)
+        doubtful = want_bpm.endswith("?")
+        wb = float(want_bpm.rstrip("?")) if want_bpm.rstrip("?") else 0.0
+        bc = _bpm_class(got_bpm, wb)
+        kc = _key_class(got_key, want_key) if want_key else "none"
+        (suspect if doubtful else bpm_c)[bc] += 1
+        key_c[kc] += 1
+        mark = "?" if doubtful else " "
+        print(
+            f"{p.stem[:30]:30s} {want_bpm:>6} {got_bpm:7.1f}  {bc:<13}{mark}{got_key:<8} {kc}"
+        )
+
+    total = sum(bpm_c.values())
+    print(f"\nBPM (trusted labels, n={total}): {dict(bpm_c)}")
+    print(f"BPM (suspect labels, n={sum(suspect.values())}): {dict(suspect)}")
+    print(f"KEY (n={sum(key_c.values())}): {dict(key_c)}")
+    octave = bpm_c["half"] + bpm_c["double"]
+    print(f"\noctave errors on trusted labels: {octave}/{total}")
+    print("NOTE: labels are Echo Nest-derived, not independent ground truth.")
+
+
 def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+    if mode == "score":
+        score()
+        print(f"\n{_passed} passed, {_failed} failed")
+        sys.exit(1 if _failed else 0)
     if mode in ("all", "synthetic"):
         synthetic()
     if mode in ("all", "replay"):
