@@ -72,6 +72,15 @@
 - Key detection is no longer degenerate but is still weak: 2/13 exact against
   published keys, unchanged by the chroma rewrite. The rewrite fixed the
   collapse (44% of baseline rows reported "F"), not the accuracy.
+- NEGATIVE RESULT — do not rebuild this. An attempt to settle the tempo question
+  without the ear, by scoring which BPM hypothesis makes harmonic change points
+  land on whole 4/8-bar boundaries, was written, validated, and then discarded.
+  It works on synthetic audio with exact 8-bar sections (rejects 3:2 errors with
+  0.17-0.35 separation) but FAILED the control test on real music: for Ivy,
+  where the published 116 and our 118 agree, it ranked 137 and 96 above both and
+  rejected the correct answer. Real-track separations were ~0.04, inside its own
+  noise. It is also octave-blind by construction — an 8-bar grid at B is exactly
+  a 4-bar grid at B/2 — so it could never have settled Rambo or Nikes anyway.
 - The entire Logic-side UI-scripting path (`P` build: new project + import audio +
   import MIDI) is BEST-EFFORT and has NOT been verified against a live Logic
   session. Selectors (template chooser, import sheets) may need re-deriving —
