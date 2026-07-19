@@ -22,13 +22,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "Scripts"))
 sys.path.insert(0, str(REPO / "tests"))
 
-import importlib.util  # noqa: E402
-
-_spec = importlib.util.spec_from_file_location(
-    "record_baseline", REPO / "tests" / "record-baseline.py"
-)
-record_baseline = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(record_baseline)
+import record_baseline  # noqa: E402
 
 BASELINE = REPO / "tests" / "baseline-analysis.tsv"
 
