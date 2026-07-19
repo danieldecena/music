@@ -5,7 +5,7 @@
 - [x] Add tests/test-analysis.py asserting the baseline reproduces exactly
 - [x] Refactor analyze_track.py to a single spectral pass (Spec dataclass)
 - [ ] Fix tempo octave errors via harmonic scoring, prior, and grid support
-- [ ] Detect Stems track folders and analyze them as one track
+- [x] Detect Stems track folders and analyze them as one track
 - [ ] Vectorize chroma and reduce percussive smear in detect_key
 - [ ] Replace section boundaries with beat-synchronous SSM + checkerboard novelty
 - [ ] Collect ~10 ground-truth BPM/key labels into tests/fixtures-analysis.tsv

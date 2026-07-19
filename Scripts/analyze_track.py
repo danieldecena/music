@@ -124,34 +124,87 @@ def detect_tempo(sp: Spec) -> float:
     return round(60.0 * fps / lag, 1)
 
 
+def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
+    """Bin mask and (n_kept_bins, 12) pitch-class projection matrix.
+
+    Range is 55-2000 Hz, narrowed from the original 27.5-5000. Below 55 Hz a
+    2048-point FFT at 22050 Hz has ~10.8 Hz resolution, so a single bin spans
+    more than a semitone — those bins were charging noise to a pitch class.
+    Above ~2000 Hz is mostly cymbals and air.
+
+    The Gaussian weight favours roughly C3-C6, the register where pitch class is
+    legible, instead of treating every octave as equally informative.
+    """
+    freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
+    keep = (freqs >= 55.0) & (freqs <= 2000.0)
+    midi = 69 + 12 * np.log2(freqs[keep] / 440.0)
+    weight = np.exp(-0.5 * ((midi - 60.0) / 18.0) ** 2)
+    proj = np.zeros((keep.sum(), 12), np.float32)
+    proj[np.arange(keep.sum()), np.rint(midi).astype(int) % 12] = weight
+    return keep, proj
+
+
+_KEEP, _PROJ = _chroma_projection()
+
+
 def _chroma_vector(sp: Spec) -> np.ndarray | None:
-    """Average energy per pitch class, L1-normalized. None if there is nothing to read."""
+    """Average energy per pitch class, L1-normalized. None if nothing to read.
+
+    Three cheap defenses against percussive smear, in place of a median-filter
+    HPSS that would cost far more memory than it is worth here:
+
+      1. log1p compression, so one loud hit cannot dominate the average;
+      2. per-frame L1 normalization, so a snare frame counts the same as a frame
+         of sustained pads rather than eight times as much;
+      3. dropping the top 15% of frames by spectral flux — transients are
+         exactly where broadband energy smears across every pitch class.
+    """
     if sp.n_frames < 2:
         return None
-    mag = sp.mag.mean(axis=0)
-    freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
-    chroma = np.zeros(12)
-    for f, m in zip(freqs[1:], mag[1:]):
-        if f < 27.5 or f > 5000:
-            continue
-        midi = 69 + 12 * np.log2(f / 440.0)
-        chroma[int(round(midi)) % 12] += m
+    m = np.log1p(sp.mag[:, _KEEP])
+    if sp.flux.size and m.shape[0] > 1:
+        quiet = np.ones(m.shape[0], bool)
+        quiet[1:] = sp.flux <= np.percentile(sp.flux, 85)
+        if quiet.sum() >= 8:
+            m = m[quiet]
+    c = m @ _PROJ
+    total = c.sum(axis=1, keepdims=True)
+    c = np.divide(c, total, out=np.zeros_like(c), where=total > 0)
+    chroma = c.mean(axis=0).astype(np.float64)
     if chroma.sum() == 0:
         return None
     return chroma / chroma.sum()
 
 
-def _key_from_chroma(chroma: np.ndarray | None) -> str:
-    """Best-correlating Krumhansl-Schmuckler key for a chroma vector."""
-    if chroma is None or chroma.sum() == 0:
-        return "unknown"
-    best_score, best = -2.0, "unknown"
+def _key_profiles() -> tuple[np.ndarray, list[str]]:
+    """All 24 rotated key profiles, z-scored, plus their names."""
+    rows, names = [], []
     for i in range(12):
         for prof, mode in ((_MAJ, ""), (_MIN, "m")):
-            r = np.corrcoef(chroma, np.roll(prof, i))[0, 1]
-            if r > best_score:
-                best_score, best = r, f"{PITCHES[i]}{mode}"
-    return best
+            rows.append(np.roll(prof, i))
+            names.append(f"{PITCHES[i]}{mode}")
+    p = np.array(rows)
+    p = (p - p.mean(axis=1, keepdims=True)) / p.std(axis=1, keepdims=True)
+    return p, names
+
+
+_PROFILES, _PROFILE_NAMES = _key_profiles()
+
+
+def _key_from_chroma(chroma: np.ndarray | None) -> str:
+    """Best-correlating Krumhansl-Schmuckler key for a chroma vector.
+
+    Correlating against all 24 profiles at once: z-scoring both sides makes the
+    Pearson correlation a plain dot product, so this is one (24,12) @ (12,)
+    instead of 24 separate np.corrcoef calls.
+    """
+    if chroma is None or chroma.sum() == 0:
+        return "unknown"
+    std = chroma.std()
+    if std == 0:
+        return "unknown"
+    z = (chroma - chroma.mean()) / std
+    return _PROFILE_NAMES[int(np.argmax(_PROFILES @ z))]
 
 
 def detect_key(sp: Spec) -> str:
