@@ -211,10 +211,135 @@ def detect_key(sp: Spec) -> str:
     return _key_from_chroma(_chroma_vector(sp))
 
 
-def estimate_boundaries(sp: Spec) -> list[float]:
-    """Estimate section boundaries (in seconds) by analyzing spectral flux novelty."""
+def _pick_boundaries(nov: np.ndarray, period: float, fps: float) -> list[float]:
+    """Peaks of a beat-indexed novelty curve, snapped to the bar grid.
+
+    The threshold is a local mean over +-8 bars rather than a global constant, so
+    a quiet intro and a dense chorus are judged against their own surroundings.
+
+    Snapping assumes the downbeat is beat 0, so a track with a pickup can be off
+    by up to 3 beats (~1.5 s at 120 BPM). Accepted — real downbeat estimation is
+    out of scope. Snapping can also collide two nearby peaks onto one bar, so the
+    minimum gap is re-enforced afterwards.
+    """
+    w = 32
+    pad = np.pad(nov, w, mode="edge")
+    local = np.array([pad[i : i + 2 * w + 1].mean() for i in range(len(nov))])
+    thr = local + 0.6 * nov.std()
+    is_peak = (nov[1:-1] > nov[:-2]) & (nov[1:-1] >= nov[2:]) & (nov[1:-1] > thr[1:-1])
+    peaks = np.flatnonzero(is_peak) + 1
+    if peaks.size == 0:
+        return []
+
+    chosen: list[int] = []
+    for p in peaks[np.argsort(nov[peaks])[::-1]]:
+        if all(abs(int(p) - q) >= 8 for q in chosen):
+            chosen.append(int(p))
+
+    bars = sorted({int(round(p / 4.0)) * 4 for p in chosen})
+    out: list[int] = []
+    for b in bars:
+        if b > 0 and (not out or b - out[-1] >= 8):
+            out.append(b)
+    return [round(b * period / fps, 1) for b in out]
+
+
+def _checkerboard(m: int) -> np.ndarray:
+    """Gaussian-tapered checkerboard kernel (Foote novelty).
+
+    Positive on the two diagonal quadrants, negative on the off-diagonal ones,
+    so sliding it along the self-similarity diagonal scores "these two stretches
+    resemble themselves but not each other" — i.e. a section boundary.
+    """
+    g = np.arange(-m, m) + 0.5
+    x, y = np.meshgrid(g, g)
+    k = (
+        np.exp(-0.5 * ((x / (m / 2.0)) ** 2 + (y / (m / 2.0)) ** 2))
+        * np.sign(x)
+        * np.sign(y)
+    )
+    return k / np.abs(k).sum()
+
+
+def _beat_features(sp: Spec, bpm: float) -> tuple[np.ndarray, float] | None:
+    """Beat-synchronous chroma+timbre features, unit-normed per beat.
+
+    Aggregating to beats first is the memory guard: an SSM at frame rate for a
+    5-minute track would be 13k x 13k. At 120 BPM the same track is ~600 beats,
+    so the SSM is ~1.4 MB. Beats are capped so a pathological tempo cannot blow
+    that up.
+    """
+    if bpm <= 0 or sp.n_frames < 16:
+        return None
+    period = sp.fps * 60.0 / bpm
+    n = int(sp.n_frames / period)
+    if n < 16:
+        return None
+    while n > 2000:  # aggregate to bars rather than beats
+        period *= 4.0
+        n = int(sp.n_frames / period)
+    edges = np.rint(np.arange(n + 1) * period).astype(int).clip(0, sp.n_frames)
+    logmag = np.log1p(sp.mag)
+    seg = [logmag[a:b].mean(axis=0) for a, b in zip(edges[:-1], edges[1:]) if b > a]
+    if len(seg) < 16:
+        return None
+    beats = np.stack(seg)
+
+    chroma = beats[:, _KEEP] @ _PROJ
+    chroma /= np.maximum(chroma.sum(axis=1, keepdims=True), 1e-9)
+
+    # 16 log-spaced band energies -> DCT-II. An MFCC in spirit, without scipy.
+    band_edges = np.geomspace(60.0, SR / 2 * 0.95, 17)
+    freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
+    idx = np.digitize(freqs, band_edges) - 1
+    bands = np.stack(
+        [
+            beats[:, idx == k].mean(axis=1)
+            if (idx == k).any()
+            else np.zeros(len(beats))
+            for k in range(16)
+        ],
+        axis=1,
+    )
+    dct = np.cos(np.pi / 16 * (np.arange(16) + 0.5) * np.arange(13)[:, None])
+    timbre = bands @ dct.T
+    timbre = (timbre - timbre.mean(axis=0)) / (timbre.std(axis=0) + 1e-9)
+
+    feat = np.hstack([chroma * 4.0, timbre * 0.5])  # chroma-dominant
+    feat /= np.maximum(np.linalg.norm(feat, axis=1, keepdims=True), 1e-9)
+    return feat, period
+
+
+def estimate_boundaries(sp: Spec, bpm: float = 0.0) -> list[float]:
+    """Estimate section boundaries in seconds.
+
+    With a known tempo this uses a self-similarity matrix over beat-synchronous
+    features and a checkerboard novelty kernel, then snaps to the bar grid. The
+    old flux-minus-moving-average approach fired on essentially any transient —
+    it returned 38 boundaries for a 5-minute track, which is the 8-second
+    minimum-gap filter talking, not musical structure.
+
+    Falls back to the old method when tempo is unknown, so the function stays
+    total.
+    """
     if sp.n_frames < 10:
         return []
+    if bpm > 0:
+        bf = _beat_features(sp, bpm)
+        if bf is not None:
+            feat, period = bf
+            ssm = feat @ feat.T
+            m = 16  # 4 bars of lag each side
+            pad = np.pad(ssm, m, mode="edge")
+            nov = np.array(
+                [
+                    (pad[i : i + 2 * m, i : i + 2 * m] * _checkerboard(m)).sum()
+                    for i in range(len(ssm))
+                ]
+            )
+            nov = np.maximum(nov, 0.0)
+            if nov.any():
+                return _pick_boundaries(nov, period, sp.fps)
     flux = sp.flux
 
     # Smooth flux using a moving average window
@@ -248,7 +373,8 @@ def estimate_boundaries(sp: Spec) -> list[float]:
 
 def analyze(path: Path) -> tuple[float, str, list[float]]:
     sp = spectra(decode_mono(path, SR))
-    return detect_tempo(sp), detect_key(sp), estimate_boundaries(sp)
+    bpm = detect_tempo(sp)
+    return bpm, detect_key(sp), estimate_boundaries(sp, bpm)
 
 
 def stem_track_dir(p: Path) -> dict[str, Path] | None:
@@ -289,7 +415,7 @@ def analyze_stem_track(stems: dict[str, Path]) -> tuple[float, str, list[float]]
     key = _key_from_chroma(chroma)
 
     bounds_src = stems.get("other") or stems["bass"]
-    bounds = estimate_boundaries(spectra(decode_mono(bounds_src, SR)))
+    bounds = estimate_boundaries(spectra(decode_mono(bounds_src, SR)), bpm)
     return bpm, key, bounds
 
 
