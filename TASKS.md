@@ -1,8 +1,8 @@
 ## Tasks
 
 - [x] Fix BPM decimal truncation in music-core.sh deconstruct()
-- [ ] Add tests/record-baseline.py and commit the frozen baseline TSV
-- [ ] Add tests/test-analysis.py asserting the baseline reproduces exactly
+- [x] Add tests/record_baseline.py and commit the frozen baseline TSV
+- [x] Add tests/test-analysis.py asserting the baseline reproduces exactly
 - [ ] Refactor analyze_track.py to a single spectral pass (Spec dataclass)
 - [ ] Fix tempo octave errors via harmonic scoring, prior, and grid support
 - [ ] Detect Stems track folders and analyze them as one track

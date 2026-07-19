@@ -15,6 +15,7 @@ Usage:
 
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -25,18 +26,36 @@ HOP = 512
 PITCHES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 # Krumhansl-Schmuckler key profiles.
-_MAJ = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
-_MIN = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
+_MAJ = np.array(
+    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+)
+_MIN = np.array(
+    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+)
 
 
 def decode_mono(path: Path, sr: int) -> np.ndarray:
     proc = subprocess.run(
-        ["ffmpeg", "-v", "error", "-i", str(path),
-         "-ac", "1", "-ar", str(sr), "-f", "s16le", "-"],
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-ac",
+            "1",
+            "-ar",
+            str(sr),
+            "-f",
+            "s16le",
+            "-",
+        ],
         capture_output=True,
     )
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.decode(errors="ignore") or "ffmpeg decode failed")
+        raise RuntimeError(
+            proc.stderr.decode(errors="ignore") or "ffmpeg decode failed"
+        )
     return np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
 
 
@@ -48,17 +67,53 @@ def _frames(audio: np.ndarray) -> np.ndarray:
     return audio[idx] * np.hanning(FRAME).astype(np.float32)
 
 
-def detect_tempo(audio: np.ndarray) -> float:
+@dataclass
+class Spec:
+    """One pass of spectral analysis, shared by all three detectors.
+
+    `flux` is the RAW onset-strength envelope. detect_tempo subtracts its mean
+    and estimate_boundaries does not, so the mean subtraction stays at the call
+    site — folding it in here would silently change one of them.
+    """
+
+    mag: np.ndarray  # (n_frames, n_bins) magnitude spectrogram
+    flux: np.ndarray  # (n_frames-1,) raw spectral flux
+    fps: float  # envelope frames per second
+
+    @property
+    def n_frames(self) -> int:
+        return self.mag.shape[0]
+
+
+def spectra(audio: np.ndarray) -> Spec:
+    """Frame, FFT, and difference the signal once.
+
+    The FFT runs in chunks so the frame matrix and its transform are not both
+    fully materialized — a 5-minute track is ~13k frames x 2048 samples.
+    """
     frames = _frames(audio)
-    if frames.shape[0] < 4:
-        return 0.0
-    mag = np.abs(np.fft.rfft(frames, axis=1))
+    fps = SR / HOP
+    if frames.shape[0] == 0:
+        return Spec(
+            np.empty((0, FRAME // 2 + 1), np.float32), np.empty(0, np.float32), fps
+        )
+    chunks = [
+        np.abs(np.fft.rfft(frames[i : i + 2048], axis=1)).astype(np.float32)
+        for i in range(0, frames.shape[0], 2048)
+    ]
+    mag = np.concatenate(chunks) if len(chunks) > 1 else chunks[0]
     flux = np.sqrt((np.maximum(np.diff(mag, axis=0), 0.0) ** 2).sum(axis=1))
-    flux = flux - flux.mean()
-    fps = SR / HOP  # envelope frames per second
-    ac = np.correlate(flux, flux, mode="full")[len(flux) - 1:]
-    lo = int(fps * 60 / 180)   # 180 BPM
-    hi = int(fps * 60 / 60)    # 60 BPM
+    return Spec(mag, flux, fps)
+
+
+def detect_tempo(sp: Spec) -> float:
+    if sp.n_frames < 4:
+        return 0.0
+    flux = sp.flux - sp.flux.mean()
+    fps = sp.fps
+    ac = np.correlate(flux, flux, mode="full")[len(flux) - 1 :]
+    lo = int(fps * 60 / 180)  # 180 BPM
+    hi = int(fps * 60 / 60)  # 60 BPM
     if hi >= len(ac):
         hi = len(ac) - 1
     if lo < 1 or hi <= lo:
@@ -67,11 +122,10 @@ def detect_tempo(audio: np.ndarray) -> float:
     return round(60.0 * fps / lag, 1)
 
 
-def detect_key(audio: np.ndarray) -> str:
-    frames = _frames(audio)
-    if frames.shape[0] < 2:
+def detect_key(sp: Spec) -> str:
+    if sp.n_frames < 2:
         return "unknown"
-    mag = np.abs(np.fft.rfft(frames, axis=1)).mean(axis=0)
+    mag = sp.mag.mean(axis=0)
     freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
     chroma = np.zeros(12)
     for f, m in zip(freqs[1:], mag[1:]):
@@ -91,42 +145,44 @@ def detect_key(audio: np.ndarray) -> str:
     return best
 
 
-def estimate_boundaries(audio: np.ndarray) -> list[float]:
+def estimate_boundaries(sp: Spec) -> list[float]:
     """Estimate section boundaries (in seconds) by analyzing spectral flux novelty."""
-    frames = _frames(audio)
-    if frames.shape[0] < 10:
+    if sp.n_frames < 10:
         return []
-    mag = np.abs(np.fft.rfft(frames, axis=1))
-    flux = np.sqrt((np.maximum(np.diff(mag, axis=0), 0.0) ** 2).sum(axis=1))
-    
+    flux = sp.flux
+
     # Smooth flux using a moving average window
     window_len = int(SR / HOP * 2.0)  # 2-second window
     if len(flux) < window_len:
         return []
-    smoothed = np.convolve(flux, np.ones(window_len)/window_len, mode='same')
+    smoothed = np.convolve(flux, np.ones(window_len) / window_len, mode="same")
     novelty = flux - smoothed
-    
+
     # Peak-picking: local maxima above threshold
     threshold = novelty.mean() + novelty.std() * 0.8
     peaks = []
     fps = SR / HOP
     for i in range(1, len(novelty) - 1):
-        if novelty[i] > novelty[i-1] and novelty[i] > novelty[i+1] and novelty[i] > threshold:
+        if (
+            novelty[i] > novelty[i - 1]
+            and novelty[i] > novelty[i + 1]
+            and novelty[i] > threshold
+        ):
             time_sec = round(i / fps, 1)
             peaks.append(time_sec)
-            
+
     # Filter peaks closer than 8 seconds
     filtered = []
     for p in peaks:
         if not filtered or (p - filtered[-1]) >= 8.0:
             filtered.append(p)
-            
+
     return filtered
 
 
 def analyze(path: Path) -> tuple[float, str, list[float]]:
-    audio = decode_mono(path, SR)
-    return detect_tempo(audio), detect_key(audio), estimate_boundaries(audio)
+    sp = spectra(decode_mono(path, SR))
+    return detect_tempo(sp), detect_key(sp), estimate_boundaries(sp)
 
 
 def main() -> None:
@@ -135,8 +191,11 @@ def main() -> None:
         sys.exit(1)
     p = Path(sys.argv[1])
     if p.is_dir():
-        files = sorted(f for f in p.rglob("*")
-                       if f.suffix.lower() in (".m4a", ".mp3", ".wav", ".flac"))
+        files = sorted(
+            f
+            for f in p.rglob("*")
+            if f.suffix.lower() in (".m4a", ".mp3", ".wav", ".flac")
+        )
     else:
         files = [p]
     if not files:
