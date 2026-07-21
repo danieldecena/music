@@ -2,6 +2,14 @@
 
 ## Completed
 
+- [x] Scaffold music-menu ratatui crate (Cargo.toml, main event loop)
+- [x] Ratatui Design theme.rs (brand navy/cream, yellow reversed-video select)
+- [x] steps.rs: flip-path catalog + source/stem/one-shots discovery
+- [x] worker.rs: run_zsh (stdin-null) + sh_quote, adapted from StudioTUI
+- [x] app.rs: filter, selection, input-collection state, run lifecycle
+- [x] ui.rs: two-pane layout + input forms in the design language
+- [x] Build warning-free + tmux smoke test; README
+
 - [x] Add download_and_locate helper to lib/music-core.sh
 - [x] Auto-select downloaded track (music arm 1) + select_file helper
 - [x] Make Deconstruct and Download accept a pasted URL

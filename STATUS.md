@@ -128,6 +128,27 @@
 - Two design specs still pending a plan->build: none outstanding (resynth,
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
+### 2026-07-21
+- Decided: build `music-menu/` — a new ratatui menu-launcher for the flip path in
+  the external "Ratatui Design" Claude Design system (navy/cream/yellow, JetBrains
+  Mono, box-drawing, yellow reversed-video selection). Chosen over restyling
+  StudioTUI so its LCD-Green/Phosphor look is untouched. Adapted the design kit's
+  `script-menu` template; reused StudioTUI's `worker::run_zsh` pattern (stdin
+  nulled, `sh_quote`) so it calls arg-driven `lib/music-core.sh` functions, never
+  the interactive `*.sh` wrappers (which read stdin and would hang the TUI).
+- Built warning-free (cargo build + clippy clean). Verified in tmux: renders to
+  the design, source picker discovers the real library, and running Tempo & key
+  streamed `analyze_track`'s live output + status. Note: analyze_track exits 0 but
+  prints "analysis failed" on `03 Exchange.m4a` (corrupt mvhd time scale in that
+  file) — a pre-existing pipeline/ffmpeg quirk, faithfully surfaced by the TUI,
+  not a menu bug.
+- Fixed the zsh `music` menu navigation the same session: Download (arm 1) now
+  auto-selects the fetched track; arms 1/8 accept a pasted URL (download->select);
+  "Need an audio file" now guides; blank Enter redraws. And logic-pro-mcp's
+  `_ensure_logic_running` launched `open -a "Logic Pro"` (wrong app on this
+  machine) and hung 30s — now launches `LOGIC_APP_NAME` (default "Logic Pro
+  Creator Studio", env-overridable) and fails fast. Both committed + pushed.
+
 ### 2026-07-18
 - Decided: freeze a behavioural baseline BEFORE touching analyze_track.py. It
   proved the old detector was degenerate in three independent ways that were

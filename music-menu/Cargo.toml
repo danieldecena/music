@@ -1,0 +1,12 @@
+[package]
+name = "music-menu"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "music-menu"
+path = "src/main.rs"
+
+[dependencies]
+# ratatui bundles crossterm and re-exports it as `ratatui::crossterm`.
+ratatui = "0.29"
