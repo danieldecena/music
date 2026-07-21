@@ -2,6 +2,7 @@
 
 ## Completed
 
+- [x] Test music-menu pure fns (sh_quote shell round-trip, build fns, short_label, display_val)
 - [x] Scaffold music-menu ratatui crate (Cargo.toml, main event loop)
 - [x] Ratatui Design theme.rs (brand navy/cream, yellow reversed-video select)
 - [x] steps.rs: flip-path catalog + source/stem/one-shots discovery

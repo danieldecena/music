@@ -349,3 +349,35 @@ fn display_val(v: &str) -> String {
         v.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{display_val, field_summary};
+    use crate::steps::{catalog, Step};
+
+    #[test]
+    fn display_val_shortens_paths_but_passes_plain_text() {
+        assert_eq!(display_val("Stems/htdemucs/Song"), "htdemucs/Song");
+        assert_eq!(display_val("tight"), "tight"); // a choice value, no slash
+        assert_eq!(display_val("8"), "8"); // seconds text
+    }
+
+    #[test]
+    fn field_summary_joins_labels_with_a_middot() {
+        let deconstruct = catalog().into_iter().find(|s| s.name == "Deconstruct").unwrap();
+        assert_eq!(field_summary(&deconstruct), "source track · drum density");
+    }
+
+    #[test]
+    fn field_summary_of_a_fieldless_step_is_nothing() {
+        let s = Step {
+            name: "x",
+            category: "x",
+            desc: "x",
+            fields: vec![],
+            build: |_| String::new(),
+            favorite: false,
+        };
+        assert_eq!(field_summary(&s), "nothing");
+    }
+}

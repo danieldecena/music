@@ -229,3 +229,121 @@ pub fn short_label(path: &Path) -> String {
         _ => path.to_string_lossy().to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{catalog, short_label};
+    use std::path::Path;
+
+    /// Look up a step's `build` fn by menu name.
+    fn build_for(name: &str) -> fn(&[String]) -> String {
+        catalog()
+            .into_iter()
+            .find(|s| s.name == name)
+            .unwrap_or_else(|| panic!("no step named {name}"))
+            .build
+    }
+
+    fn vals(xs: &[&str]) -> Vec<String> {
+        xs.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Run a built command line through zsh with every core function stubbed to
+    /// print each argument on its own line, so we recover the exact argv the
+    /// shell parsed. Proves the build fn + sh_quote hand core the right words.
+    fn argv_through_shell(cmdline: &str) -> Vec<String> {
+        let prelude = "for _n in download_url deconstruct separate_stems \
+             analyze_track chop_vocals chop_drums chop_stems sort_kit; do \
+             eval \"$_n(){ for _a in \\\"\\$@\\\"; do printf '%s\\n' \\\"\\$_a\\\"; done; }\"; \
+             done; ";
+        let out = std::process::Command::new("zsh")
+            .arg("-c")
+            .arg(format!("{prelude}{cmdline}"))
+            .output()
+            .expect("spawn zsh");
+        assert!(out.status.success(), "zsh failed for: {cmdline}");
+        String::from_utf8(out.stdout)
+            .expect("utf8")
+            .lines()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn download_builds_the_documented_command() {
+        assert_eq!(
+            build_for("Download")(&vals(&["https://x/y"])),
+            "download_url 'https://x/y' 'Apple Music'"
+        );
+    }
+
+    #[test]
+    fn deconstruct_passes_source_and_density() {
+        assert_eq!(
+            build_for("Deconstruct")(&vals(&["track.m4a", "tight"])),
+            "deconstruct 'track.m4a' 'tight'"
+        );
+    }
+
+    #[test]
+    fn separate_appends_the_stems_output_dir() {
+        assert_eq!(
+            build_for("Separate stems")(&vals(&["track.m4a", "hq"])),
+            "separate_stems 'track.m4a' 'hq' 'Stems'"
+        );
+    }
+
+    #[test]
+    fn chop_vocals_appends_vocals_wav_to_the_stem_dir() {
+        let argv = argv_through_shell(&build_for("Chop vocals")(&vals(&[
+            "Stems/htdemucs/Song", "loose",
+        ])));
+        assert_eq!(
+            argv,
+            vec!["Stems/htdemucs/Song/vocals.wav", "Samples/Vocals", "loose"]
+        );
+    }
+
+    #[test]
+    fn chop_drums_appends_drums_wav_to_the_stem_dir() {
+        let argv = argv_through_shell(&build_for("Split drums")(&vals(&[
+            "Stems/htdemucs/Song", "tight",
+        ])));
+        assert_eq!(
+            argv,
+            vec!["Stems/htdemucs/Song/drums.wav", "Samples/One-Shots", "tight"]
+        );
+    }
+
+    #[test]
+    fn a_source_with_spaces_stays_one_argument() {
+        // The real library has paths like "Apple Music/03 Exchange.m4a".
+        let argv = argv_through_shell(&build_for("Tempo & key")(&vals(&[
+            "Apple Music/03 Exchange.m4a",
+        ])));
+        assert_eq!(argv, vec!["Apple Music/03 Exchange.m4a"]);
+    }
+
+    #[test]
+    fn a_malicious_source_reaches_core_as_one_inert_literal() {
+        // If quoting leaked, the substitution would run and argv would differ.
+        let evil = "$(touch /tmp/music_menu_pwned); rm -rf ~";
+        let argv = argv_through_shell(&build_for("Tempo & key")(&vals(&[evil])));
+        assert_eq!(argv, vec![evil]);
+        assert!(
+            !Path::new("/tmp/music_menu_pwned").exists(),
+            "command substitution executed — quoting leaked"
+        );
+    }
+
+    #[test]
+    fn short_label_keeps_the_last_two_components() {
+        assert_eq!(short_label(Path::new("/a/b/Stems/htdemucs/Song")), "htdemucs/Song");
+        assert_eq!(short_label(Path::new("Apple Music/track.m4a")), "Apple Music/track.m4a");
+    }
+
+    #[test]
+    fn short_label_bare_name_has_no_parent_component() {
+        assert_eq!(short_label(Path::new("track.m4a")), "track.m4a");
+    }
+}

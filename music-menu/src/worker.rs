@@ -66,3 +66,64 @@ fn stream_child(mut child: std::process::Child, tx: Sender<WorkerMsg>) {
     let success = child.wait().map(|s| s.success()).unwrap_or(false);
     let _ = tx.send(WorkerMsg::Done { success });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sh_quote;
+
+    /// Feed `sh_quote(v)` into a real zsh `printf %s` and return what the shell
+    /// actually passed as the argument. If escaping is correct the shell must
+    /// hand `printf` exactly `v` — nothing expanded, nothing split.
+    fn shell_roundtrip(v: &str) -> String {
+        let out = std::process::Command::new("zsh")
+            .arg("-c")
+            .arg(format!("printf %s {}", sh_quote(v)))
+            .output()
+            .expect("spawn zsh");
+        assert!(out.status.success(), "zsh exited non-zero for {v:?}");
+        String::from_utf8(out.stdout).expect("utf8 stdout")
+    }
+
+    #[test]
+    fn quotes_survive_the_shell_verbatim() {
+        // Ordinary values and shell metacharacters must all come back byte-for-byte.
+        for v in [
+            "plain",
+            "with spaces here",
+            "Apple Music",
+            "a/b/c.m4a",
+            "don't stop",             // embedded single quote
+            "it's a 'quoted' word",   // multiple single quotes
+            "trailing quote'",
+            "'leading quote",
+            "",                       // empty string
+            "über cañón 日本語",       // non-ascii
+        ] {
+            assert_eq!(shell_roundtrip(v), v, "round-trip mismatch for {v:?}");
+        }
+    }
+
+    #[test]
+    fn no_command_substitution_or_injection_escapes() {
+        // Adversarial inputs: if any of these executed, the round-trip would
+        // return the command's output (or empty) instead of the literal text.
+        for v in [
+            "$(echo pwned)",
+            "`echo pwned`",
+            "${HOME}",
+            "'; echo pwned; '",
+            "'$(echo pwned)'",
+            "a; rm -rf /tmp/nope",
+            "a && echo pwned",
+            "a | echo pwned",
+            "* ? [abc]",              // globs must not expand
+            "$PATH",
+        ] {
+            assert_eq!(
+                shell_roundtrip(v),
+                v,
+                "injection or expansion leaked for {v:?}"
+            );
+        }
+    }
+}
