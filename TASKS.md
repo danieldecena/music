@@ -1,5 +1,13 @@
 ## Tasks
 
+## Completed
+
+- [x] Add download_and_locate helper to lib/music-core.sh
+- [x] Auto-select downloaded track (music arm 1) + select_file helper
+- [x] Make Deconstruct and Download accept a pasted URL
+- [x] Guide dead-end errors and handle blank Enter in the menu
+- [x] Fix Logic launch app name + fail-fast (config.py, build.py)
+
 - [x] Fix BPM decimal truncation in music-core.sh deconstruct()
 - [x] Add tests/record_baseline.py and commit the frozen baseline TSV
 - [x] Add tests/test-analysis.py asserting the baseline reproduces exactly
@@ -21,7 +29,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-18 18:11.
+Plan approved 2026-07-21 12:48.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -30,7 +38,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 761b2ae4-c2a9-4630-af88-852938028d8c
+    claude --resume eb6d96e7-7e28-4cf0-af52-1f9c4f3ccbca
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->

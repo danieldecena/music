@@ -35,6 +35,28 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
   read_path
 }
 
+select_file() {  # $1 = path to an audio file; makes it the current track
+  # name derived as basename-without-extension, matching deconstruct's
+  # Stems/htdemucs/<name> convention so scan_track/stems_dir_for line up.
+  CUR_SRC="$1"; CUR_NAME="${1:t:r}"; CUR_LABEL="${1:t:r}"
+}
+
+download_and_select() {  # $1 = url; downloads then auto-selects (sets CUR_*). 0 on success.
+  local files
+  files=$(download_and_locate "$1" "$SCRIPT_DIR/Apple Music")
+  if [[ -z "$files" ]]; then echo "Nothing downloaded."; return 1; fi
+  local -a arr=("${(@f)files}")
+  local pick=1
+  if (( ${#arr} > 1 )); then
+    echo "Downloaded ${#arr} tracks:"
+    local i=1 f; for f in "${arr[@]}"; do printf "  %d) %s\n" "$i" "${f:t}"; ((i++)); done
+    read "pick?Pick a file #> "
+    [[ "$pick" == <-> && "$pick" -ge 1 && "$pick" -le ${#arr} ]] || { echo "Invalid pick."; return 1; }
+  fi
+  select_file "${arr[$pick]}"
+  echo "Selected: $CUR_NAME"
+}
+
 CUR_SRC=""; CUR_NAME=""; CUR_LABEL=""
 
 HAS_STEMS=0; HAS_DRUMS=0; HAS_SHOTS=0; HAS_KIT=0; HAS_CHOPS=0
@@ -110,6 +132,7 @@ while true; do
   read "choice?> "
 
   case "$choice" in
+    "") continue ;;
     T|t) MENU=tools ;;
     B|b) MENU=main ;;
     G|g|0)
@@ -227,7 +250,7 @@ GUIDE
     1)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
-      download_url "$url" "$SCRIPT_DIR/Apple Music"
+      download_and_select "$url"
       ;;
     2)
       INPUT=$(resolve_input source)
@@ -281,7 +304,11 @@ GUIDE
       ;;
     8)
       INPUT=$(resolve_input source)
-      [[ ! -f "$INPUT" ]] && { echo "Need an audio file."; continue; }
+      if [[ "$INPUT" == http*://* ]]; then
+        download_and_select "$INPUT" || continue
+        INPUT="$CUR_SRC"
+      fi
+      [[ ! -f "$INPUT" ]] && { echo "Need an audio file — Download (1) or Browse (L) first, or paste a URL."; continue; }
       if [[ "$INPUT" == "$CUR_SRC" && -n "$CUR_NAME" ]] && [[ -n "$(stems_dir_for "$CUR_NAME")" ]]; then
         read "yn?$CUR_NAME already has stems. Re-run? [y/N]> "
         [[ "$yn" == (y|Y|yes) ]] || continue

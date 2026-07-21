@@ -127,6 +127,19 @@ download_url() {
   fi
 }
 
+download_and_locate() {
+  # $1 = url, $2 = apple-music output dir. Downloads, then prints the
+  # newline-separated paths of the .m4a files that appeared. download_url routes
+  # Apple Music -> am_out, SoundCloud -> $MUSIC_DIR/SoundCloud, else -> Downloads,
+  # so check each root that exists for files newer than the pre-download stamp.
+  local url="$1" am_out="$2" stamp d
+  stamp=$(date +%s)
+  download_url "$url" "$am_out" || return
+  for d in "$am_out" "$MUSIC_DIR/SoundCloud" "$MUSIC_DIR/Downloads"; do
+    [[ -d "$d" ]] && find_new_m4a "$d" "$stamp"
+  done
+}
+
 separate_stems() {
   # $1 = file, $2 = profile, $3 = out_dir ; echoes vocals.wav path
   local file="$1" profile="$2" out="$3"
