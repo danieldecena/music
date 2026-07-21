@@ -148,6 +148,27 @@
   `_ensure_logic_running` launched `open -a "Logic Pro"` (wrong app on this
   machine) and hung 30s — now launches `LOGIC_APP_NAME` (default "Logic Pro
   Creator Studio", env-overridable) and fails fast. Both committed + pushed.
+- CORRECTION to the tmux-verification claim above: it was a false PASS. The
+  "analysis failed" line was NOT the Exchange mvhd quirk — it was a path bug that
+  broke EVERY source/stem step. `main.rs` took the CLI root arg raw; launched with
+  a relative `..` (the README's own `cargo run -- ..`), `find_sources` baked `../`
+  into every path while `run_zsh` also set cwd to `..`, so `../Apple Music/x`
+  resolved from the wrong dir -> "No such file or directory". The earlier verify
+  saw "analysis failed", pattern-matched it to the known mvhd issue, and never read
+  the actual error text — the exact "can't tell no-diff from not-shown" trap logged
+  on 2026-07-18. Reproduced on `01 Nikes.m4a` (a clean file), not just Exchange.
+- Fixed: `let root = root.canonicalize().unwrap_or(root);` in main.rs, so discovery
+  and run cwd are both absolute. Re-verified by driving the TUI with `..`:
+  `analyze_track` now runs the absolute path and returns `69.1 BPM key C` + ✓ done.
+  Also added 14 unit tests for the pure fns (sh_quote real-shell round-trip incl.
+  injection, build fns, short_label, display_val) — these don't cover the path/cwd
+  seam, which is why running the app caught what the tests couldn't.
+- Two UX rough edges found while driving (not fixed): in a filtered list the first
+  Enter only commits the filter (a second opens the step), and once committed Esc
+  is aliased to quit — pressing Esc to back out of a filter exits the whole app.
+- Also unaddressed: the TUI marks a step `✓ done` purely on exit code, so a step
+  that self-reports failure while exiting 0 (like analyze_track on a bad file) still
+  reads green.
 
 ### 2026-07-18
 - Decided: freeze a behavioural baseline BEFORE touching analyze_track.py. It

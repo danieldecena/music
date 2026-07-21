@@ -17,10 +17,14 @@ fn main() -> io::Result<()> {
     // The music workspace to operate on: first CLI arg, else the cwd. music-core.sh
     // resolves its own MUSIC_DIR from its file location, so the cwd must be a repo
     // checkout that contains lib/music-core.sh.
+    // Canonicalize so discovered paths and the run cwd are both absolute: a
+    // relative arg like `..` would otherwise be baked into every source path
+    // AND used as the run cwd, so `../Apple Music/x` resolves from the wrong dir.
     let root = std::env::args()
         .nth(1)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
+    let root = root.canonicalize().unwrap_or(root);
 
     let mut terminal = ratatui::init();
     let mut app = App::open(root);
