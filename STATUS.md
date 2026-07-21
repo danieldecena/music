@@ -163,9 +163,13 @@
   Also added 14 unit tests for the pure fns (sh_quote real-shell round-trip incl.
   injection, build fns, short_label, display_val) — these don't cover the path/cwd
   seam, which is why running the app caught what the tests couldn't.
-- Two UX rough edges found while driving (not fixed): in a filtered list the first
-  Enter only commits the filter (a second opens the step), and once committed Esc
-  is aliased to quit — pressing Esc to back out of a filter exits the whole app.
+- Two UX rough edges found while driving (NOW FIXED, main.rs key routing): in a
+  filtered list the first Enter only committed the filter (a second opened the
+  step) — Enter in filter mode now calls `start_selected()`, so one Enter runs the
+  highlighted step. And Esc from a committed filter used to quit the app — menu-mode
+  Esc now clears a non-empty filter first and only quits when there's nothing left
+  to back out of. Re-verified in tmux: filter->Enter opens the step; Esc drops
+  Steps (2)->Steps (8) with the app still alive, second Esc quits.
 - Also unaddressed: the TUI marks a step `✓ done` purely on exit code, so a step
   that self-reports failure while exiting 0 (like analyze_track on a bad file) still
   reads green.

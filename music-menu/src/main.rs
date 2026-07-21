@@ -68,7 +68,12 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
                 if app.filtering {
                     match key.code {
                         KeyCode::Esc => app.filter_clear(),
-                        KeyCode::Enter => app.filtering = false,
+                        // Open the highlighted step directly — one Enter from a
+                        // filtered list to running it, no separate commit step.
+                        KeyCode::Enter => {
+                            app.filtering = false;
+                            app.start_selected();
+                        }
                         KeyCode::Backspace => app.filter_backspace(),
                         KeyCode::Up => app.move_sel(-1),
                         KeyCode::Down => app.move_sel(1),
@@ -79,7 +84,11 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
                 }
                 // 3) The menu.
                 match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
+                    KeyCode::Char('q') => break,
+                    // Esc backs out of an active filter first; only quits the app
+                    // when there's no filter left to clear.
+                    KeyCode::Esc if !app.query.is_empty() => app.filter_clear(),
+                    KeyCode::Esc => break,
                     KeyCode::Down | KeyCode::Char('j') => app.move_sel(1),
                     KeyCode::Up | KeyCode::Char('k') => app.move_sel(-1),
                     KeyCode::Enter => app.start_selected(),
