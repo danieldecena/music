@@ -96,7 +96,7 @@ download_url() {
     command -v gamdl >/dev/null || { echo "gamdl not found on PATH — install it (pipx install gamdl)." >&2; return 3; }
     command -v expect >/dev/null || { echo "expect not found on PATH — install it (brew install expect)." >&2; return 3; }
     if [[ ! -f "$cookies" ]]; then
-      /opt/homebrew/bin/python3 "$MUSIC_DIR/get-cookies.py" "$cookies" || {
+      python3 "$MUSIC_DIR/get-cookies.py" "$cookies" || {
         echo "Cookie extraction failed. Sign into music.apple.com in Safari + grant Full Disk Access." >&2
         return 1
       }
@@ -149,7 +149,7 @@ chop_vocals() {
   local args
   args=$(chop_sensitivity_args "$sens") || { echo "bad sensitivity: $sens" >&2; return 1; }
   source "$MUSIC_DIR/.venv/bin/activate"
-  /opt/homebrew/bin/python3 "$MUSIC_DIR/Scripts/chop.py" "$vocals" "$out" ${=args}
+  python3 "$MUSIC_DIR/Scripts/chop.py" "$vocals" "$out" ${=args}
 }
 
 chop_drums() {
