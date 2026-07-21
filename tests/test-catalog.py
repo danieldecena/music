@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/python3
+#!/usr/bin/env python3
 import sqlite3, sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Scripts"))
