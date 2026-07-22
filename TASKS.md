@@ -1,5 +1,9 @@
 ## Tasks
 
+- [ ] Make analyze_track.py exit non-zero on analysis failure
+- [ ] Add exit-code test to tests/test-analysis.py (TDD, subprocess)
+- [ ] Re-record replay baseline after tempo change settled by ear
+
 ## Completed
 
 - [x] Test music-menu pure fns (sh_quote shell round-trip, build fns, short_label, display_val)
@@ -35,10 +39,13 @@
       in STATUS.md. Optional tap-tempo refinement tracked there, not here.)
 - [x] Add scoring mode comparing new vs baseline accuracy
 - [x] Add synthetic unit tests for octave logic, key, and stem-folder detection
+- [x] Cut 3:2 tempo errors via triple-grid penalty in _grid_support
+      (3:2 errors 3->2, exact 6->7; dropping the 3x harmonic term was tried
+      and reverted as redundant. Not yet settled by ear.)
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-21 12:48.
+Plan approved 2026-07-22 12:02.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -47,7 +54,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume eb6d96e7-7e28-4cf0-af52-1f9c4f3ccbca
+    claude --resume 01d28bbd-94fc-4b50-b21d-840890831aae
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->

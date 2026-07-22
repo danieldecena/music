@@ -143,14 +143,28 @@ def _refine_lag(ac: np.ndarray, i: int) -> float:
 
 
 def _grid_support(env: np.ndarray, lag: float) -> float:
-    """Energy on the beat grid vs. the grid halfway between beats.
+    """Energy on the beat grid vs. the grids between beats — halves and thirds.
 
-    This is what actually separates 70 from 140. Harmonic evidence alone cannot:
-    a true 140 and a true 70 both put energy every 140-lag, so the score is
-    near-symmetric under doubling by construction. But at a real 140 the
-    odd-numbered beats carry comparable energy, while at a real 70 the halfway
-    points are relatively empty. Returns ~1.0 when the candidate is the true
-    pulse and drifts toward 0.5 when it is double-time.
+    This is what actually separates 70 from 140, and 3:2/2:3 misreads from the
+    true pulse. Harmonic evidence alone cannot: a true 140 and a true 70 both put
+    energy every 140-lag, so the score is near-symmetric under doubling by
+    construction.
+
+    Two off-grids are tested against the on-beat energy:
+
+      * the HALFWAY point (0.5) separates duple octave errors. At a real 140 the
+        odd-numbered beats carry comparable energy; at a real 70 the halfway
+        points are relatively empty.
+      * the THIRDS (1/3, 2/3) separate 3:2 metrical errors. A candidate at 3/2 or
+        2/3 of the true lag leaves the real onsets sitting on its thirds while its
+        own halfway point stays empty — so the halfway test alone rates it as a
+        clean pulse. Penalizing a candidate whose thirds are as full as its beats
+        rejects the triple-meter misread. Straight duple music leaves the thirds
+        empty, so the penalty is ~1.0 there.
+
+    The 1.0 floor was removed so this penalty can push a misread BELOW a clean
+    candidate rather than merely denying it the bonus. Returns roughly 0.5-1.5:
+    high for the true pulse, low for a double-time or triple-meter misread.
 
     The grid phase is searched, not assumed — starting at sample 0 would score a
     track with any pickup or leading silence against a misaligned grid.
@@ -159,18 +173,26 @@ def _grid_support(env: np.ndarray, lag: float) -> float:
     if n < 8:
         return 1.0
     k = np.arange(n)
-    best = 1.0
+    best = 0.0
     for phase in np.linspace(0.0, lag, 8, endpoint=False):
         on_idx = np.rint(phase + k * lag).astype(int).clip(0, len(env) - 1)
         off_idx = np.rint(phase + (k + 0.5) * lag).astype(int).clip(0, len(env) - 1)
+        t1_idx = (
+            np.rint(phase + (k + 1.0 / 3.0) * lag).astype(int).clip(0, len(env) - 1)
+        )
+        t2_idx = (
+            np.rint(phase + (k + 2.0 / 3.0) * lag).astype(int).clip(0, len(env) - 1)
+        )
         on, off = env[on_idx].mean(), env[off_idx].mean()
         tot = on + off
         if tot <= 0:
             continue
-        score = 0.5 + on / tot
+        third = 0.5 * (env[t1_idx].mean() + env[t2_idx].mean())
+        duple = on / (on + third) if on + third > 0 else 1.0
+        score = (0.5 + on / tot) * duple
         if score > best:
             best = score
-    return best
+    return best if best > 0 else 1.0
 
 
 # Lag multiples scored as evidence for a candidate, with their weights.

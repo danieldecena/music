@@ -72,6 +72,17 @@
   Nikes, update `tests/fixtures-analysis.tsv`, drop the `?`, rerun
   `tests/test-analysis.py score`. If the 3:2 errors prove real, the prior's
   sigma (0.85) and the 3.0 harmonic multiplier are the two knobs implicated.
+  - **Follow-up shipped 2026-07-22 (triple-grid penalty).** `_grid_support` now
+    also samples the 1/3 and 2/3 offsets and penalizes a candidate whose thirds
+    are as full as its beats — the signature of a 3:2 metrical misread, which the
+    old on-vs-halfway test was blind to. Against the 10 trusted labels: 3:2 errors
+    3 -> 2 (Exchange recovered to exact), exact 6 -> 7, no new octave errors. Still
+    unfixed: Godspeed (3:2 fast), Don't (2:3 slow), Self Control (2:1). Research
+    (research-analyst, cited) confirmed the mechanism: essentia's Percival sums
+    only duple (2x/4x) harmonics. Dropping our 3x harmonic term was tried and
+    REVERTED — redundant with the grid penalty and it broke Pink + White into a
+    2:1. Same caveat holds: this improves a correlated-label score, not proven by
+    ear. Tap the four tracks to settle it.
 - Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
   octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
   the candidate scoring only work together; refinement alone makes a widened
@@ -127,6 +138,28 @@
   loudness would be recomputed/lost each scan — revisit only if a digest needs it.
 - Two design specs still pending a plan->build: none outstanding (resynth,
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
+
+### 2026-07-22
+- Decided: cut the 3:2 tempo regression with a triple-grid penalty in
+  `_grid_support`, not by touching the harmonic-multiplier weights or the prior.
+  Web-grounded DSP research (research-analyst; Gemini offload was down) named the
+  mechanism — essentia's Percival reinforces only duple (2x/4x) autocorrelation
+  harmonics, and `_grid_support` only tested the halfway offset, so triple-meter
+  misreads (real onsets on the 1/3, 2/3 slots) sailed through. Adding the thirds
+  test moved 3:2 errors 3 -> 2 and exact 6 -> 7 with no new octave errors.
+- Learned (measured, four configs): dropping the 3x harmonic term from
+  `_TEMPO_MULTS` is a WASH on its own (fixes Godspeed, breaks Pink + White into a
+  2:1) and REDUNDANT once the grid penalty exists — Edit-2-alone scored identically
+  to Edit-1+Edit-2. Kept only the grid penalty; reverted the harmonic-term change.
+- Learned: the `replay` test has been RED since before this session — the frozen
+  `baseline-analysis.tsv` predates the octave fix, chroma rewrite, and boundary
+  rewrite, so its per-stem rows are obsolete. Proven by stashing the working edit
+  and re-running: identical drift with and without the change. It isn't guarding
+  anything until re-recorded (tracked). The synthetic suite (18 assertions) stays
+  the real regression gate.
+- Caveat unchanged: the fixture labels are Echo-Nest-derived and correlated, so a
+  better `score` is necessary-not-sufficient. Settle by ear (tap Exchange,
+  Godspeed, Don't) before trusting it.
 
 ### 2026-07-21
 - Decided: build `music-menu/` — a new ratatui menu-launcher for the flip path in
