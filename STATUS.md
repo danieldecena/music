@@ -23,7 +23,11 @@
   SSM + checkerboard novelty, snapped to the bar grid. A Stems track folder is
   analyzed as ONE track (tempo from drums, key from bass+other) — it no longer
   fans out per stem. Tests: `tests/test-analysis.py` (18 synthetic, plus
-  `replay` and `score` modes). See Known broken for accuracy caveats.
+  `replay`, `score`, and `exitcode` modes). See Known broken for accuracy caveats.
+  `analyze_track.py` now EXITS NON-ZERO when analysis fails (both the stem-track
+  and file-loop branches) — previously it printed "analysis failed" and exited 0,
+  fooling callers that gate on the exit code (music-menu, StudioTUI) and
+  `deconstruct`'s catalog parse. Guarded by the `exitcode` subprocess test.
 - **Stem quality profiles** (merged `feat/stem-quality-profiles`, commit 014bad9).
   `separate_stems` now takes a profile, not a mode: `stem_profile_args` +
   `stem_profile_model` replace `stem_mode_args`. Profiles: `acapella`
@@ -139,7 +143,24 @@
 - Two design specs still pending a plan->build: none outstanding (resynth,
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
-### 2026-07-22
+### 2026-07-22 (later)
+- Shipped: `analyze_track.py` exits non-zero on analysis failure (+ TDD
+  `exitcode` subprocess test). Closes the silent-failure hole where a corrupt
+  file read green. TASKS.md tasks 1-2 done; task 3 (re-record replay baseline)
+  still blocked on the ear.
+- RESOLVED much of the tempo-verification question with INDEPENDENT (non-Echo-
+  Nest) sources, not the ear. RunHundred (distinct pipeline) + Beatport corroborate
+  the analyzer's SLOWER readings, exposing the fixture's Echo-Nest labels as the
+  errors: Nikes analyzer 69.1 vs indep 69 (fixture 137 is the double); Rambo
+  analyzer 89.7 vs indep ~91 — Echo Nest's 181 was the *2020 "Last Blood" remix*,
+  a different song the aggregators merged; Don't analyzer 99.3 vs indep ~97 (agree).
+  Exchange resolved separately: on the CLEAN drums stem the analyzer reads 161.1
+  = Echo Nest 160 (the junk 106.7 was purely the corrupt-mvhd `.m4a`; RunHundred's
+  80 is the half-time feel). Net: the analyzer looks CORRECT on all four; the
+  suspect fixture rows (Nikes 137?, Rambo 181?) are the ones wrong. Have NOT
+  edited `fixtures-analysis.tsv` yet — updating ground-truth labels off a
+  black-box source (RunHundred's method undisclosed) is a call to make with the
+  ear as final tie-break; recorded here so the evidence isn't lost.
 - Decided: cut the 3:2 tempo regression with a triple-grid penalty in
   `_grid_support`, not by touching the harmonic-multiplier weights or the prior.
   Web-grounded DSP research (research-analyst; Gemini offload was down) named the
