@@ -264,6 +264,14 @@ mix_match() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix "$@"
 }
 
+click_compare() {
+  # $1 = an audio file or a Stems/<model>/<track> folder; extra flags pass
+  # through (--bpm B, --label L, --dur S, --start S). Interactive: auditions
+  # the tempo estimate against its octave/3:2 partners over the audio so the
+  # ear settles which BPM locks. Needs speakers; plays via afplay.
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/click_compare.py" "$@"
+}
+
 bass_to_midi() {
   # $1 = bass.wav (monophonic stem), $2 = out .mid, $3 = tempo BPM (default 120).
   # Best-effort: reliable only for clean single-note lines; polyphony won't transcribe.

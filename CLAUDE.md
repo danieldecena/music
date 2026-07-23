@@ -22,6 +22,7 @@ Core functions and what they shell out to:
 - `chop_stems(track_folder, out_root, seconds)` — pure-ffmpeg fixed-length chops of every stem in a `Stems/<model>/<track>` folder into `Samples/Chops/<track>/<stem>/<stem>_NNN.wav` (auditioning layout; default 8s)
 - `sort_kit(oneshots_folder)` — runs `Scripts/sort_drums.py` to classify drum one-shots into `kick/`, `snare/`, `hat/` subfolders by spectral centroid + band energy (heuristic)
 - `analyze_track(file_or_folder)` — runs `Scripts/analyze_track.py` to estimate BPM (onset-autocorrelation) and key (Krumhansl-Schmuckler chroma). Estimates only
+- `click_compare(file_or_folder, [--bpm B] [--label L])` — runs `Scripts/click_compare.py` (venv python, numpy; reuses `analyze_track`'s decode/tempo). Auditions the tempo estimate against its half/double/1.5x/0.667x octaves (plus any `--label`) by laying a metronome click over a short excerpt (drums stem if a Stems folder) and playing each via `afplay`, so the ear settles which BPM locks. Interactive; `--render-only DIR` writes the mixes non-interactively. Menu `T` in Tools / `./click-compare.sh`
 - `deconstruct(file, density)` — one-command flip prep chaining the reliable steps: `analyze_track` → `separate_stems` (4stem) → `chop_drums` → `sort_kit` → `chop_stems`. Menu option 8 / `./deconstruct.sh`
 - `Scripts/bass_to_midi.py` (not yet wired into a menu step) — monophonic bass→MIDI via autocorrelation pitch detection + a hand-written MIDI writer. Best-effort; single-note lines only
 

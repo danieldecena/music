@@ -95,6 +95,7 @@ while true; do
     echo "    A  Stem levels            loudness / presence per stem"
     echo "    H  Chords                 bar-by-bar progression"
     echo "    X  Mix-match              catalog pairs that mix well"
+    echo "    T  Tempo lock             settle BPM by ear (click A/B)"
     echo "    M  Bass stem -> MIDI"
     echo "    R  Re-voice a melody      as another instrument"
     echo "    P  Build Logic project"
@@ -210,6 +211,17 @@ GUIDE
     X|x)
       read "ly?Match lyric themes too? (slower, needs network) [y/N]> "
       if [[ "$ly" == (y|Y|yes) ]]; then mix_match --lyrics; else mix_match; fi
+      ;;
+    T|t)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      read "cbpm?Base BPM estimate (blank = auto-detect)> "
+      read "clab?Known label BPM to also audition (blank = none)> "
+      cargs=("$INPUT")
+      [[ -n "$cbpm" ]] && cargs+=(--bpm "$cbpm")
+      [[ -n "$clab" ]] && cargs+=(--label "$clab")
+      click_compare "${cargs[@]}"
       ;;
     M|m)
       INPUT=$(resolve_stems)

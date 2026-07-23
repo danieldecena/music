@@ -112,6 +112,19 @@
   `mix_match()` in music-core. 45/45 `tests/test-harmonic-mix.py` pass;
   verified end-to-end against the real catalog (relative-key and half/double
   pairs surface; the two "Rambo" versions top the lyric re-rank).
+- **Click-comparator** (`Scripts/click_compare.py`) — settles a track's tempo by
+  ear, the honest tie-break the analyzer can't make. Auditions the estimate
+  against its half/double/1.5x/0.667x octaves (plus any `--label`), laying a
+  synthesized metronome click over a ~18s excerpt (drums stem if a Stems folder,
+  clearest beat) and playing each candidate via `afplay`; whichever locks is the
+  tempo. Reuses `analyze_track`'s decode + `detect_tempo` (no DSP duplicated);
+  click synth + candidate/octave logic are the only new pure pieces. Reached via
+  `T) Tempo lock` in Tools, `click-compare.sh`, or `click_compare()` in
+  music-core; `--render-only DIR` writes mixes non-interactively. 24/24
+  `tests/test-click-compare.py` pass; render path verified end-to-end on a real
+  Stems drums stem (6 candidate mixes written, base+label+octaves correct). The
+  interactive afplay/listen loop is unverified here (headless, no audio out) —
+  needs a real listen to settle the 4 tracks.
 
 ## Known broken / unverified
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
@@ -171,11 +184,12 @@
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
 
 ## Next Up
-- **Tap 4 tracks** (Exchange, Don't, Rambo, Nikes), put the values in
-  `tests/fixtures-analysis.tsv`, drop the `?`, then run
-  `.venv/bin/python tests/test-analysis.py score`. The tempo fix already
-  shipped; this decides whether its 3:2 tradeoff is real and worth tuning out.
-  The only remaining task-list item, and it needs an ear rather than code.
+- **Settle 4 tracks by ear with the new click-comparator** (Exchange, Don't,
+  Rambo, Nikes): run `T) Tempo lock` (or `./click-compare.sh`) on each, pass the
+  analyzer reading as `--bpm` and the fixture label as `--label`, listen for the
+  click that locks, then put the values in `tests/fixtures-analysis.tsv`, drop the
+  `?`, and run `.venv/bin/python tests/test-analysis.py score`. The tool now exists;
+  this is a pure human-listen step (the last blocker) — no code left.
 - Live-verify the `P` Logic build (and StudioTUI's Logic tab / Build Logic Proj
   action, same underlying `logic_cli.py`/`build_project.py`) with Logic open +
   Accessibility granted; fix any moved selectors. Note Logic launches from
@@ -196,6 +210,19 @@
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-23
+- Shipped: **click-comparator** (`Scripts/click_compare.py` + `click-compare.sh` +
+  `click_compare()` in music-core + `T) Tempo lock` menu, TDD). This is the chosen
+  unblock for the parked "settle the 4 tempos by ear" task — Logic Smart Tempo was
+  ruled out (can't report a single BPM for a finished song), so the tool lays a
+  synthesized metronome click over a track excerpt at each candidate BPM (estimate +
+  half/double/1.5x/0.667x octaves + optional `--label`) and plays them via `afplay`;
+  the ear picks the one that locks. Decided to reuse `analyze_track` decode/tempo
+  rather than duplicate DSP (mirrors how `chords.py` imports it); the only new pure
+  logic is click synthesis + octave-candidate generation, both unit-tested (24/24).
+  Verified the render path end-to-end on a real drums stem (6 mixes, candidates
+  correct); the interactive listen loop is inherently ear-gated and unverified
+  headless. **Next actual step is a human listen** — run `T) Tempo lock` on
+  Exchange/Don't/Rambo/Nikes, then update `fixtures-analysis.tsv` and rerun score.
 - Shipped (logic-pro-mcp `c56acf3`, pushed): `logic_get_tempo` and `logic_get_key`
   now read **scoped Control Bar selectors** instead of `entire contents of front
   window`, killing the 10-20s timeout. Root cause for tempo was structural, not just

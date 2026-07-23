@@ -1,10 +1,11 @@
 ## Tasks
 
-- [ ] Decide how to settle 4 tempos (Logic Smart Tempo ruled out by probe; click-comparator recommended) — then update fixtures-analysis.tsv, drop ?, re-run score
+- [ ] LISTEN: run T) Tempo lock on Exchange/Don't/Rambo/Nikes, update fixtures-analysis.tsv, drop ?, re-run score (pure human-ear step; tool built)
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 
 ## Completed
 
+- [x] Click-comparator to settle tempos by ear (Scripts/click_compare.py + menu/wrapper/core, TDD)
 - [x] Repair logic_get_tempo/key entire-contents timeout — scoped Control Bar reads, TDD — logic-pro-mcp c56acf3
 
 - [x] Smart Tempo spike + probe: off-screen Logic drivable, control mapped, tempo readable — but Logic can't report a single BPM for a full song (File Tempo 0.00). Feature ruled out; findings in logic-pro-mcp/docs/smart-tempo-probe.md
