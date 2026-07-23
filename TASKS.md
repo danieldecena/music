@@ -1,7 +1,5 @@
 ## Tasks
 
-- [ ] chords.py CLI layer: format_chart, chords_txt, main, exit-code contract
-- [ ] Wire chord_progression into music-core.sh, chords.sh, music menu
 - [ ] Re-record replay baseline after tempo change settled by ear
 
 ## Completed
