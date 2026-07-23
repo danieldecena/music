@@ -220,6 +220,17 @@
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-23
+- Verified live (Logic off-screen on BetterDisplay VD): the **scoped Control Bar
+  tempo/key reads work** — `logic_get_key` returned `C Major` via MCP; tempo
+  returns `120.0` (<0.2s) via raw osascript, the shipped `_TEMPO_SCRIPT`, and the
+  server's own python, and `120` is legible on the transport. The 20s
+  `entire contents` hang is gone. Two caveats: (1) `logic_get_tempo` through the
+  *long-running* MCP server returned empty for the AXSlider read (the key popup
+  beside it worked) — stale AX context in a server started before Logic existed,
+  restart to clear. (2) **build.py's live import is fragile** — an end-to-end run
+  left Logic with 0 windows (no tracks imported) yet returned its hardcoded
+  "imported N stems" success string; the summary is unverified. Both filed in
+  TASKS. Process for driving Logic off-screen saved to project memory.
 - Decided: track prompts accept a **typed title, not just a dragged path**
   (`Scripts/find_track.py`, stdlib difflib). Fuzzy so typos still match; a lone
   hit auto-resolves, several show a picker. Kept it out of the bass-stem and

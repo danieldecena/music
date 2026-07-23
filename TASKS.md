@@ -2,6 +2,8 @@
 
 - [ ] LISTEN: run T) Tempo lock on Exchange/Don't/Rambo/Nikes, update fixtures-analysis.tsv, drop ?, re-run score (pure human-ear step; tool built)
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
+- [ ] Harden build.py live import: fails end-to-end on Logic Creator Studio (0 windows), returns unverified success string
+- [ ] logic_get_tempo empty via long-running MCP server (stale AX ctx) — verify a restart clears it
 
 ## Completed
 
