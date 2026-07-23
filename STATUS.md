@@ -70,6 +70,14 @@
   `logic_get_status` returns cleanly against a running Logic (no -1728), so the
   app-name parametrization works end-to-end. The write/UI-scripting paths
   (build, bounce, track ops) remain unverified against a live session.
+  Live data point 2026-07-22: the heavier read tools that walk `entire
+  contents of front window` (`logic_list_tracks`, `logic_get_tempo`) TIME OUT
+  (10s/20s) against "Logic Pro Creator Studio", and `logic_get_bar_position`
+  can't find the transport field on an Untitled project — the ★★-brittle tier
+  is confirmed slow/unreliable here. Only the cheap `logic_get_status`
+  (running check + window name) is fast and dependable. If these are worth
+  fixing, the culprit is the full-tree traversal — scope it to specific
+  UI element roles/paths instead of `entire contents`.
 
 ## Known broken / unverified
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
