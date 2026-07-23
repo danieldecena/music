@@ -452,7 +452,35 @@ def _mix_track_label(t):
     return f"{who}{t['name']} ({t['key']}/{t['bpm']})"
 
 
-def cmd_mix(con, tol, limit, as_json):
+def _lyric_rerank(pairs):
+    """Fetch lyrics for the strong pairs, set lyric_sim, re-sort. Returns True if
+    any lyrics were missing. Fully degrade-safe -- lyrics.py never raises, and a
+    missing lyric just leaves that pair scored by audio (lyric_sim 0)."""
+    import re as _re
+
+    import lyrics as _lyrics
+
+    cache: dict = {}
+    missing = False
+
+    def _get(t):
+        nonlocal missing
+        name = t["name"]
+        if name not in cache:
+            title = _re.sub(r"^\d+\s+", "", name)  # drop a leading track number
+            cache[name] = _lyrics.fetch_lyrics(t.get("artist"), title)
+            if cache[name] is None:
+                missing = True
+        return cache[name]
+
+    for p in pairs:
+        if p["tier"] == "strong":
+            p["lyric_sim"] = _lyrics.lyric_similarity(_get(p["a"]), _get(p["b"]))
+    harmonic_mix.sort_pairs(pairs)
+    return missing
+
+
+def cmd_mix(con, tol, limit, as_json, use_lyrics=False):
     """Rank catalog track pairs that mix well (Camelot key + tempo). Returns an
     exit code: 1 when there are too few analyzed tracks, else 0."""
     init(con)
@@ -472,6 +500,7 @@ def cmd_mix(con, tol, limit, as_json):
         return 1
 
     pairs = harmonic_mix.rank_pairs(tracks, tol)
+    lyrics_missing = _lyric_rerank(pairs) if use_lyrics else False
     if limit:
         pairs = pairs[:limit]
 
@@ -497,14 +526,19 @@ def cmd_mix(con, tol, limit, as_json):
 
     print(
         f"{len(pairs)} compatible pair(s) from {len(tracks)} analyzed tracks "
-        f"(tempo tol ±{tol * 100:.0f}%)\n"
+        f"(tempo tol ±{tol * 100:.0f}%)"
     )
+    if use_lyrics and lyrics_missing:
+        print("  (some lyrics unavailable — those pairs ranked by audio only)")
+    print()
     for p in pairs:
         note = p["key_rel"] or "—"
         if p["half_double"]:
             note += ", ½/2x tempo"
         elif p["tier"] != "key-only":
             note += f", Δ{p['tempo_gap']} BPM"
+        if p["lyric_sim"]:
+            note += f", lyric {p['lyric_sim']:.2f}"
         print(
             f"[{p['tier']:^10}] {_mix_track_label(p['a'])}  x  "
             f"{_mix_track_label(p['b'])}   ({note})"
@@ -552,6 +586,7 @@ def main(argv):
     p.add_argument("--tempo-tol", type=float, default=0.06)
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--json", action="store_true")
+    p.add_argument("--lyrics", action="store_true")
     ns = ap.parse_args(argv)
 
     con = connect()
@@ -596,7 +631,7 @@ def main(argv):
         elif ns.cmd == "search":
             cmd_search(con, ns.query, ns.json, ns.menu)
         elif ns.cmd == "mix":
-            return cmd_mix(con, ns.tempo_tol, ns.limit, ns.json)
+            return cmd_mix(con, ns.tempo_tol, ns.limit, ns.json, ns.lyrics)
     finally:
         con.close()
     return 0

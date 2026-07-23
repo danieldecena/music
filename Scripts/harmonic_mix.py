@@ -130,6 +130,23 @@ _TIER_RANK = {"strong": 0, "key-only": 1, "tempo-only": 2}
 _REL_RANK = {"perfect": 0, "relative": 1, "adjacent": 2, None: 3}
 
 
+def _sort_key(p: dict):
+    # tier, then higher lyric similarity (0 when unscored -> neutral), then key
+    # closeness, then smallest tempo gap. A no-lyrics run sorts as (tier, rel, gap).
+    return (
+        _TIER_RANK[p["tier"]],
+        -(p["lyric_sim"] or 0.0),
+        _REL_RANK[p["key_rel"]],
+        p["tempo_gap"],
+    )
+
+
+def sort_pairs(pairs: list[dict]) -> None:
+    """Sort pairs in place, best mixes first. Call again after setting lyric_sim
+    on the strong pairs to fold the lyric re-rank in."""
+    pairs.sort(key=_sort_key)
+
+
 def rank_pairs(tracks: list[dict], tol: float = 0.06) -> list[dict]:
     """Rank every compatible unordered pair of tracks, best mixes first.
 
@@ -167,11 +184,5 @@ def rank_pairs(tracks: list[dict], tol: float = 0.06) -> list[dict]:
                     "lyric_sim": None,
                 }
             )
-    out.sort(
-        key=lambda p: (
-            _TIER_RANK[p["tier"]],
-            _REL_RANK[p["key_rel"]],
-            p["tempo_gap"],
-        )
-    )
+    sort_pairs(out)
     return out

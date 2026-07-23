@@ -14,6 +14,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "Scripts"))
 
 import harmonic_mix as hm  # noqa: E402
+import lyrics as ly  # noqa: E402
 
 _passed = 0
 _failed = 0
@@ -124,11 +125,32 @@ def ranking() -> None:
     check(hm.rank_pairs([tracks[0]]) == [], "single track -> []")
 
 
+def lyric_theme() -> None:
+    # Signature keeps content words, drops stopwords and short tokens.
+    sig = ly.theme_signature("love love money the the a is on")
+    check(sig == {"love", "money"}, "signature keeps content words, drops stopwords")
+    check(ly.theme_signature("") == set(), "empty text -> empty signature")
+    check(ly.theme_signature(None) == set(), "None text -> empty signature")
+
+    # Jaccard similarity.
+    check(
+        ly.lyric_similarity("love money power", "love money power") == 1.0,
+        "identical lyrics -> 1.0",
+    )
+    check(
+        ly.lyric_similarity("love money power", "love money fame") == 0.5,
+        "half-overlapping themes -> 0.5",
+    )
+    check(ly.lyric_similarity("love", None) == 0.0, "one side empty -> 0.0")
+    check(ly.lyric_similarity(None, None) == 0.0, "both empty -> 0.0")
+
+
 def main() -> None:
     camelot()
     key_compat()
     tempo()
     ranking()
+    lyric_theme()
     print(f"\n{_passed} passed, {_failed} failed")
     sys.exit(1 if _failed else 0)
 
