@@ -66,6 +66,10 @@
   tested under a pty (clean start/quit, no panic). The Logic-tab/Build-Logic-
   Proj live-Logic-session behavior itself is unverified here (no Logic Pro
   in this environment) — same caveat as the existing `P` build path below.
+  Update 2026-07-22: the MCP read path IS now live-verified on this machine —
+  `logic_get_status` returns cleanly against a running Logic (no -1728), so the
+  app-name parametrization works end-to-end. The write/UI-scripting paths
+  (build, bounce, track ops) remain unverified against a live session.
 
 ## Known broken / unverified
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
@@ -144,6 +148,12 @@
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-22 (later)
+- Live-verified the logic-pro-mcp app-name fix (committed last session in the
+  nested logic-pro-mcp repo): with the MCP server reattached, `logic_get_status`
+  returns "Logic Pro is running" against a running "Logic Pro Creator Studio"
+  with no -1728 — the systemic hardcoded-"Logic Pro" bug is closed for the read
+  path. Write/UI-scripting tools (build, bounce, track ops) still need a live
+  check.
 - Shipped: `analyze_track.py` exits non-zero on analysis failure (+ TDD
   `exitcode` subprocess test). Closes the silent-failure hole where a corrupt
   file read green. TASKS.md tasks 1-2 done; task 3 (re-record replay baseline)
