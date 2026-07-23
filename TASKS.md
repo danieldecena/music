@@ -5,6 +5,7 @@
 
 ## Completed
 
+- [x] Fix build.py File>Import menu path (real ellipsis + verified nesting), TDD — logic-pro-mcp babbad8
 - [x] Click-comparator to settle tempos by ear (Scripts/click_compare.py + menu/wrapper/core, TDD)
 - [x] Repair logic_get_tempo/key entire-contents timeout — scoped Control Bar reads, TDD — logic-pro-mcp c56acf3
 

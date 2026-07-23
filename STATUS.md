@@ -251,9 +251,13 @@
   click-comparator (metronome-at-candidate-BPM, listen for the lock) to settle the 4
   tempos. Redirect left open with the user (not yet chosen). Full live-discovery
   notes: `logic-pro-mcp/docs/smart-tempo-probe.md`.
-- Bug found in passing: `logic-pro-mcp/tools/build.py` `_import_stems`/`_import_midi`
-  use the menu string `"Audio File..."` (three ASCII dots) — WRONG on Logic 12
-  Creator Studio, which uses a real ellipsis `…`. Not fixed this session.
+- Fixed (logic-pro-mcp `babbad8`, pushed): `build.py` `_import_stems`/`_import_midi`
+  clicked `"Audio File..."` / `"MIDI File..."` (three ASCII dots) with a wrong
+  `menu "Import" of menu "File"` nesting — silently no-ops on Logic 12 Creator
+  Studio, which uses a real ellipsis `…`. Corrected the glyph AND the nesting to
+  the probe-verified `menu 1 of menu item "Import" of menu 1 of menu bar item
+  "File" of menu bar 1`, via a new pure `_import_menu_click` builder (2 tests,
+  37 pass). The full `P` build UI path is still best-effort / unverified live.
 - Env note: a focus-stealing game (Hearthstone/Battle.net) and macOS out-of-process
   open panels made live modal UI-scripting flaky — relevant to any future Logic
   automation.
