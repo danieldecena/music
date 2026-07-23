@@ -1,5 +1,11 @@
 ## Tasks
 
+- [ ] harmonic_mix.py: Camelot map + key/tempo compatibility + rank_pairs (TDD)
+- [ ] catalog.py mix subcommand: query + tiered table + --json + sparse exit
+- [ ] lyrics.py: LRCLIB fetch + cache + Jaccard theme sim; wire --lyrics
+- [ ] Wire mix_match into music-core.sh, mixmatch.sh, music menu + tmux e2e
+- [ ] Fix H) Chords crash on non-stem folders (handle no_vocals.wav, else clean error)
+- [ ] Drop ? on Self Control/Godspeed/Don't fixtures, re-run test-analysis.py score
 - [ ] Re-record replay baseline after tempo change settled by ear
 
 ## Completed
@@ -48,7 +54,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-22 19:59.
+Plan approved 2026-07-22 20:35.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -57,7 +63,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 2c3f106a-8f54-4ea9-ae07-da4b809e5d39
+    claude --resume c0015eba-369a-4136-beb5-800d314b0684
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->
