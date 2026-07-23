@@ -3,10 +3,10 @@
 - [ ] LISTEN: run T) Tempo lock on Exchange/Don't/Rambo/Nikes, update fixtures-analysis.tsv, drop ?, re-run score (pure human-ear step; tool built)
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 - [ ] Harden build.py live import: fails end-to-end on Logic Creator Studio (0 windows), returns unverified success string
-- [ ] logic_get_tempo empty via long-running MCP server (stale AX ctx) — verify a restart clears it
 
 ## Completed
 
+- [x] Confirm restarting the MCP server clears the empty tempo read — fresh server returns bpm 120.0 via transport
 - [x] Type-a-title fuzzy track input at prompts (find_track.py + core resolver, TDD)
 - [x] Fix build.py File>Import menu path (real ellipsis + verified nesting), TDD — logic-pro-mcp babbad8
 - [x] Click-comparator to settle tempos by ear (Scripts/click_compare.py + menu/wrapper/core, TDD)

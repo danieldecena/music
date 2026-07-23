@@ -226,8 +226,13 @@
   server's own python, and `120` is legible on the transport. The 20s
   `entire contents` hang is gone. Two caveats: (1) `logic_get_tempo` through the
   *long-running* MCP server returned empty for the AXSlider read (the key popup
-  beside it worked) — stale AX context in a server started before Logic existed,
-  restart to clear. (2) **build.py's live import is fragile** — an end-to-end run
+  beside it worked) — stale AX context in a server started before Logic existed.
+  **Confirmed the fix by restart:** a freshly-spawned `server.py` (started with
+  Logic already running), driven over stdio through the real tool dispatch,
+  returned `{"bpm":120.0,"source":"transport"}` and `{"key":"C Major"}`. So the
+  read fix is fully verified end-to-end; the empty read was purely the stale
+  process, cleared by restarting the server. (2) **build.py's live import is
+  fragile** — an end-to-end run
   left Logic with 0 windows (no tracks imported) yet returned its hardcoded
   "imported N stems" success string; the summary is unverified. Both filed in
   TASKS. Process for driving Logic off-screen saved to project memory.
