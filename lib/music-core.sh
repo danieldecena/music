@@ -251,6 +251,12 @@ analyze_track() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/analyze_track.py" "$1"
 }
 
+chord_progression() {
+  # $1 = an audio file or a Stems/<model>/<track> folder. Prints a bar-by-bar
+  # chord chart and writes <input>/chords.txt (read-only; never re-encodes).
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
+}
+
 bass_to_midi() {
   # $1 = bass.wav (monophonic stem), $2 = out .mid, $3 = tempo BPM (default 120).
   # Best-effort: reliable only for clean single-note lines; polyphony won't transcribe.

@@ -93,6 +93,7 @@ while true; do
     echo "  Tools  ·  ${CUR_SHORT:-no track selected}"
     echo "  ------------------------------------------------------------"
     echo "    A  Stem levels            loudness / presence per stem"
+    echo "    H  Chords                 bar-by-bar progression"
     echo "    M  Bass stem -> MIDI"
     echo "    R  Re-voice a melody      as another instrument"
     echo "    P  Build Logic project"
@@ -198,6 +199,12 @@ GUIDE
       [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       analyze_stems "$INPUT"
+      ;;
+    H|h)
+      INPUT=$(resolve_stems)
+      [[ -z "$INPUT" ]] && continue
+      [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
+      chord_progression "$INPUT"
       ;;
     M|m)
       INPUT=$(resolve_stems)

@@ -1,9 +1,12 @@
 ## Tasks
 
+- [ ] chords.py CLI layer: format_chart, chords_txt, main, exit-code contract
+- [ ] Wire chord_progression into music-core.sh, chords.sh, music menu
 - [ ] Re-record replay baseline after tempo change settled by ear
 
 ## Completed
 
+- [x] Chord-progression analyzer (Scripts/chords.py + menu/wrapper/core, TDD)
 - [x] Make analyze_track.py exit non-zero on analysis failure
 - [x] Add exit-code test to tests/test-analysis.py (TDD, subprocess)
 - [x] Enable rust-analyzer-lsp per-project (music-menu, StudioTUI)
@@ -47,7 +50,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-22 18:38.
+Plan approved 2026-07-22 19:59.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -56,7 +59,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 6b4c7da2-79c0-4694-86c7-88d5e7fbfc95
+    claude --resume 2c3f106a-8f54-4ea9-ae07-da4b809e5d39
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->

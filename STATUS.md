@@ -78,6 +78,20 @@
   (running check + window name) is fast and dependable. If these are worth
   fixing, the culprit is the full-tree traversal — scope it to specific
   UI element roles/paths instead of `entire contents`.
+- **Chord-progression analyzer** (`Scripts/chords.py`). Bar-by-bar chord
+  estimation reusing `analyze_track.py`'s chroma/tempo/key machinery (no DSP
+  duplicated — it imports `spectra`, `detect_tempo`, `detect_key`, `_KEEP`,
+  `_PROJ`, `stem_track_dir`). 60 z-scored triad+7th templates matched per bar
+  with the same z-score-Pearson dot trick as key detection, nudged by a soft
+  diatonic prior (`PRIOR=0.15`, the one tuning knob) from the detected key. A
+  Stems folder reads tempo from drums and chords from the harmonic stems; a
+  single file uses itself. Prints a 4-bars/line chart (repeats collapsed to
+  `·`) and writes read-only `chords.txt` beside the input. Exits non-zero on
+  failure (matches the `analyze_track.py` exit-code contract). Reached via
+  `H) Chords` in the Tools submenu, `chords.sh`, or `chord_progression()` in
+  music-core. 24/24 `tests/test-chords.py` synthetic assertions pass;
+  live-verified end-to-end on real `Stems/htdemucs_6s/02 Let Em' Know` (120-bar
+  chart + sidecar, exit 0). See Known broken for the accuracy caveat.
 
 ## Known broken / unverified
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
@@ -110,6 +124,14 @@
 - Key detection is no longer degenerate but is still weak: 2/13 exact against
   published keys, unchanged by the chroma rewrite. The rewrite fixed the
   collapse (44% of baseline rows reported "F"), not the accuracy.
+- **Chord-analyzer accuracy is unverified by ear** — same caveat as tempo/key,
+  and it inherits the weak key detection above (its diatonic prior leans on the
+  detected key). On real "02 Let Em' Know" it reported key `A` while the chart
+  is heavily minor (Am/Bm7/Dm7), i.e. the tonic may be off. The chart is a
+  starting estimate, not ground truth. If real charts look noisy with
+  out-of-key labels, raise `PRIOR`; if flattened onto the diatonic set, lower
+  it — one constant in `Scripts/chords.py`. Synthetic tests cover the mechanism
+  (template recovery, prior discrimination, exit code), not real-track accuracy.
 - NEGATIVE RESULT — do not rebuild this. An attempt to settle the tempo question
   without the ear, by scoring which BPM hypothesis makes harmonic change points
   land on whole 4/8-bar boundaries, was written, validated, and then discarded.
@@ -143,8 +165,6 @@
   its ~65 per-stem rows are obsolete now that a Stems folder collapses to one
   row. Keep the old file until the tempo question is settled — it is the only
   record of pre-change behaviour.
-- Optional: chord-progression analyzer on top of the now-working section-
-  boundary detection in `analyze_track.py`.
 - Optional: one-shot -> Logic Quick Sampler instrument loader.
 - StudioTUI: `cargo build` still emits 4 pre-existing dead-code warnings
   (unused `Focus::SeqBpm`, `fs::skip_dir`, `Theme.seq_pad_off`, unused `Theme`
@@ -199,6 +219,19 @@
 - Caveat unchanged: the fixture labels are Echo-Nest-derived and correlated, so a
   better `score` is necessary-not-sufficient. Settle by ear (tap Exchange,
   Godspeed, Don't) before trusting it.
+- Shipped: chord-progression analyzer (`Scripts/chords.py`), brainstormed +
+  spec'd + planned + built TDD on `feat/chord-progression-analyzer` in 4 commits.
+  Decided to IMPORT from `analyze_track.py` rather than duplicate any DSP — the
+  per-bar chroma is the exact `_beat_features` recipe, matching is the
+  `_key_from_chroma` z-score-dot trick over 60 triad+7th templates. Soft
+  diatonic prior chosen over hard-constraint (borrowed chords are constant in
+  sampled soul) and over pure-match (too noisy); `PRIOR=0.15` is a first guess,
+  the single retune knob. Granularity per-bar (not per-section/per-beat), vocab
+  triads+7ths (not full jazz — chroma can't resolve 9ths/sus reliably). Verified:
+  24/24 synthetic tests incl. a deterministic prior-flip case (C vs its vi Cm in
+  D# major) and an exit-code subprocess test; live 120-bar chart on a real
+  6-stem folder. Caveat carried to Known broken: real-track accuracy is
+  ear-unverified and rides on the weak key detector.
 
 ### 2026-07-21
 - Decided: build `music-menu/` — a new ratatui menu-launcher for the flip path in
