@@ -193,6 +193,28 @@
 - Two design specs still pending a plan->build: none outstanding (resynth,
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
+### 2026-07-23
+- Explored using **Logic Pro Smart Tempo as an independent tempo detector** for the
+  4 unsettled tracks (Exchange/Don't/Rambo/Nikes), driving Logic live on an
+  off-screen BetterDisplay virtual display. RULED OUT — Logic Smart Tempo does not
+  report a single BPM for a finished mixed song. What worked: the off-screen harness
+  (Logic launches, parks, and takes menu/keystroke automation invisibly); the Smart
+  Tempo control is `pop up button 2` of the Control Bar (KEEP/ADAPT/AUTO), settable;
+  and the tempo is readable directly from an `AXSlider` value (defused the read-back
+  kill-risk). What failed: opening/importing Exchange.m4a imported the audio but left
+  `File Tempo: 0.00`, project stuck at 120 KEEP — Smart Tempo is built to tempo-MAP
+  performances, not to report a master's BPM. Forcing a region analysis would likely
+  yield a tempo map, not one number. Decision: abandon the Logic path; recommend the
+  click-comparator (metronome-at-candidate-BPM, listen for the lock) to settle the 4
+  tempos. Redirect left open with the user (not yet chosen). Full live-discovery
+  notes: `logic-pro-mcp/docs/smart-tempo-probe.md`.
+- Bug found in passing: `logic-pro-mcp/tools/build.py` `_import_stems`/`_import_midi`
+  use the menu string `"Audio File..."` (three ASCII dots) — WRONG on Logic 12
+  Creator Studio, which uses a real ellipsis `…`. Not fixed this session.
+- Env note: a focus-stealing game (Hearthstone/Battle.net) and macOS out-of-process
+  open panels made live modal UI-scripting flaky — relevant to any future Logic
+  automation.
+
 ### 2026-07-22 (later)
 - Shipped: harmonic mix-match finder (`feat/harmonic-mix-match`), brainstormed +
   spec'd + planned + built TDD in 4 commits, then merged. Scope decided with the

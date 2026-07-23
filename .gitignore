@@ -38,6 +38,7 @@ Projects/**/*.logicx
 logic-pro-mcp/
 soundfonts/
 Samples/Resynth/
+Samples/Lyrics/
 
 # SQLite catalog (generated)
 catalog.sqlite
