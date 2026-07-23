@@ -558,6 +558,7 @@ def main() -> None:
             print(f"{p.name}:  {bpm} BPM   key {key}   transitions {bounds}")
         except Exception as exc:  # noqa: BLE001
             print(f"{p.name}:  analysis failed — {exc}")
+            sys.exit(1)
         return
 
     if p.is_dir():
@@ -567,12 +568,16 @@ def main() -> None:
     if not files:
         print("No audio files found.")
         sys.exit(1)
+    failed = False
     for f in files:
         try:
             bpm, key, bounds = analyze(f)
             print(f"{f.name}:  {bpm} BPM   key {key}   transitions {bounds}")
         except Exception as exc:  # noqa: BLE001
             print(f"{f.name}:  analysis failed — {exc}")
+            failed = True
+    if failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

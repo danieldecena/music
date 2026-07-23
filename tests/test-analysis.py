@@ -15,8 +15,10 @@ Run with the venv python — numpy is required:
     .venv/bin/python tests/test-analysis.py [replay]
 """
 
+import subprocess
 import sys
 import tempfile
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -292,6 +294,37 @@ def score() -> None:
     print("NOTE: labels are Echo Nest-derived, not independent ground truth.")
 
 
+def _write_wav(path: Path, audio: "np.ndarray") -> None:
+    pcm = (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2")
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(at.SR)
+        w.writeframes(pcm.tobytes())
+
+
+def exit_codes() -> None:
+    """analyze_track.py must exit non-zero when analysis fails. The TUIs and
+    deconstruct() gate on the exit code, so a self-reported failure at exit 0
+    reads as success — the bug this asserts against."""
+    script = REPO / "Scripts" / "analyze_track.py"
+    with tempfile.TemporaryDirectory() as d:
+        bad = Path(d) / "garbage.wav"
+        bad.write_bytes(b"not audio, just bytes " * 64)
+        r = subprocess.run(
+            [sys.executable, str(script), str(bad)], capture_output=True, text=True
+        )
+        check(r.returncode != 0, f"bad file -> non-zero exit (got {r.returncode})")
+        check("analysis failed" in r.stdout, "bad file -> prints 'analysis failed'")
+
+        good = Path(d) / "good.wav"
+        _write_wav(good, _clicks(120, secs=8.0))
+        r = subprocess.run(
+            [sys.executable, str(script), str(good)], capture_output=True, text=True
+        )
+        check(r.returncode == 0, f"good file -> zero exit (got {r.returncode})")
+
+
 def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     if mode == "score":
@@ -300,9 +333,11 @@ def main() -> None:
         sys.exit(1 if _failed else 0)
     if mode in ("all", "synthetic"):
         synthetic()
+    if mode in ("all", "exitcode"):
+        exit_codes()
     if mode in ("all", "replay"):
         replay()
-    if mode not in ("all", "synthetic", "replay"):
+    if mode not in ("all", "synthetic", "replay", "exitcode"):
         print(f"unknown mode: {mode}")
         sys.exit(2)
     print(f"\n{_passed} passed, {_failed} failed")
