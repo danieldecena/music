@@ -175,11 +175,29 @@ def _bars_from_stems(stems: dict[str, Path], bpm: float) -> np.ndarray | None:
     return np.divide(acc, s, out=np.zeros_like(acc), where=s > 0)
 
 
+def _audio_source(p: Path) -> Path:
+    """The single file to analyze when `p` is not a full stem track folder.
+
+    A file is itself. An acapella / 2-stem split (vocals.wav + no_vocals.wav, no
+    drums/bass) is not a stem folder, but its no_vocals.wav is the instrumental
+    that carries the chords -- analyze that. Any other directory has no obvious
+    source, so refuse it with a clean message rather than handing ffmpeg a
+    directory (which fails with an opaque "Is a directory").
+    """
+    if not p.is_dir():
+        return p
+    inst = p / "no_vocals.wav"
+    if inst.is_file():
+        return inst
+    raise ValueError(f"not a stem folder or audio file: {p.name}")
+
+
 def analyze_chords(p: Path) -> tuple[float, str, list[str]]:
     """Return (bpm, key, per-bar chord labels). Raises ValueError if unbarrable.
 
     A Stems track folder reads tempo from drums and chords from the harmonic
-    stems (matching analyze_track). A single file uses itself for all three.
+    stems (matching analyze_track). An acapella split routes to its no_vocals.wav
+    instrumental. A single file uses itself for all three.
     """
     stems = at.stem_track_dir(p)
     if stems is not None:
@@ -187,7 +205,7 @@ def analyze_chords(p: Path) -> tuple[float, str, list[str]]:
         bars = _bars_from_stems(stems, bpm)
         key = at._key_from_chroma(bars.mean(axis=0)) if bars is not None else "unknown"
     else:
-        sp = at.spectra(at.decode_mono(p, at.SR))
+        sp = at.spectra(at.decode_mono(_audio_source(p), at.SR))
         bpm = at.detect_tempo(sp)
         key = at.detect_key(sp)
         bars = bar_chroma(sp, bpm)
