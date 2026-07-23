@@ -32,6 +32,9 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import harmonic_mix  # noqa: E402  (local module, same Scripts/ dir)
+
 ROOT = Path(
     os.environ.get("LOGIC_STUDIO_MUSIC_ROOT", Path(__file__).resolve().parent.parent)
 )
@@ -444,6 +447,107 @@ def cmd_search(con, query, as_json, menu):
             print("(no matches)")
 
 
+def _mix_track_label(t):
+    who = f"{t['artist']} — " if t.get("artist") else ""
+    return f"{who}{t['name']} ({t['key']}/{t['bpm']})"
+
+
+def _lyric_rerank(pairs):
+    """Fetch lyrics for the strong pairs, set lyric_sim, re-sort. Returns True if
+    any lyrics were missing. Fully degrade-safe -- lyrics.py never raises, and a
+    missing lyric just leaves that pair scored by audio (lyric_sim 0)."""
+    import re as _re
+
+    import lyrics as _lyrics
+
+    cache: dict = {}
+    missing = False
+
+    def _get(t):
+        nonlocal missing
+        name = t["name"]
+        if name not in cache:
+            title = _re.sub(r"^\d+\s+", "", name)  # drop a leading track number
+            cache[name] = _lyrics.fetch_lyrics(t.get("artist"), title)
+            if cache[name] is None:
+                missing = True
+        return cache[name]
+
+    for p in pairs:
+        if p["tier"] == "strong":
+            p["lyric_sim"] = _lyrics.lyric_similarity(_get(p["a"]), _get(p["b"]))
+    harmonic_mix.sort_pairs(pairs)
+    return missing
+
+
+def cmd_mix(con, tol, limit, as_json, use_lyrics=False):
+    """Rank catalog track pairs that mix well (Camelot key + tempo). Returns an
+    exit code: 1 when there are too few analyzed tracks, else 0."""
+    init(con)
+    rows = con.execute(
+        "SELECT name, artist, bpm, key FROM tracks "
+        "WHERE bpm IS NOT NULL AND key IS NOT NULL AND key != '' AND key != 'unknown'"
+    ).fetchall()
+    tracks = [
+        {"name": r["name"], "artist": r["artist"], "bpm": r["bpm"], "key": r["key"]}
+        for r in rows
+    ]
+    if len(tracks) < 2:
+        print(
+            f"need at least 2 analyzed tracks to find mixes (have {len(tracks)}) — "
+            "download + deconstruct more first"
+        )
+        return 1
+
+    pairs = harmonic_mix.rank_pairs(tracks, tol)
+    lyrics_missing = _lyric_rerank(pairs) if use_lyrics else False
+    if limit:
+        pairs = pairs[:limit]
+
+    if as_json:
+        flat = [
+            {
+                "a": p["a"]["name"],
+                "b": p["b"]["name"],
+                "tier": p["tier"],
+                "key_rel": p["key_rel"],
+                "a_key": p["a"]["key"],
+                "a_bpm": p["a"]["bpm"],
+                "b_key": p["b"]["key"],
+                "b_bpm": p["b"]["bpm"],
+                "tempo_gap": p["tempo_gap"],
+                "half_double": p["half_double"],
+                "lyric_sim": p["lyric_sim"],
+            }
+            for p in pairs
+        ]
+        print(json.dumps(flat, ensure_ascii=False))
+        return 0
+
+    print(
+        f"{len(pairs)} compatible pair(s) from {len(tracks)} analyzed tracks "
+        f"(tempo tol ±{tol * 100:.0f}%)"
+    )
+    if use_lyrics and lyrics_missing:
+        print("  (some lyrics unavailable — those pairs ranked by audio only)")
+    print()
+    for p in pairs:
+        note = p["key_rel"] or "—"
+        if p["half_double"]:
+            note += ", ½/2x tempo"
+        elif p["tier"] != "key-only":
+            note += f", Δ{p['tempo_gap']} BPM"
+        if p["lyric_sim"]:
+            note += f", lyric {p['lyric_sim']:.2f}"
+        print(
+            f"[{p['tier']:^10}] {_mix_track_label(p['a'])}  x  "
+            f"{_mix_track_label(p['b'])}   ({note})"
+        )
+    if not pairs:
+        print("(no compatible pairs — keys/tempos are all too far apart)")
+    return 0
+
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="catalog.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -478,6 +582,11 @@ def main(argv):
     p.add_argument("query", nargs="?", default="")
     p.add_argument("--json", action="store_true")
     p.add_argument("--menu", action="store_true")
+    p = sub.add_parser("mix")
+    p.add_argument("--tempo-tol", type=float, default=0.06)
+    p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--lyrics", action="store_true")
     ns = ap.parse_args(argv)
 
     con = connect()
@@ -521,6 +630,8 @@ def main(argv):
             backfill(con, ns.limit)
         elif ns.cmd == "search":
             cmd_search(con, ns.query, ns.json, ns.menu)
+        elif ns.cmd == "mix":
+            return cmd_mix(con, ns.tempo_tol, ns.limit, ns.json, ns.lyrics)
     finally:
         con.close()
     return 0

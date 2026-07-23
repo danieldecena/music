@@ -1,15 +1,12 @@
 ## Tasks
 
-- [ ] harmonic_mix.py: Camelot map + key/tempo compatibility + rank_pairs (TDD)
-- [ ] catalog.py mix subcommand: query + tiered table + --json + sparse exit
-- [ ] lyrics.py: LRCLIB fetch + cache + Jaccard theme sim; wire --lyrics
-- [ ] Wire mix_match into music-core.sh, mixmatch.sh, music menu + tmux e2e
-- [ ] Fix H) Chords crash on non-stem folders (handle no_vocals.wav, else clean error)
-- [ ] Drop ? on Self Control/Godspeed/Don't fixtures, re-run test-analysis.py score
-- [ ] Re-record replay baseline after tempo change settled by ear
+- [ ] Tap Exchange/Don't/Rambo/Nikes by ear, update fixtures-analysis.tsv, re-run score (ear-blocked; indep sources already corroborate the analyzer — see STATUS)
+- [ ] Re-record replay baseline after tempo change settled by ear (ear-blocked)
 
 ## Completed
 
+- [x] Harmonic mix-match finder (harmonic_mix.py + catalog mix + lyrics.py + wiring, TDD) — 1b0e978
+- [x] Fix H) Chords crash on non-stem folders (no_vocals.wav route, else clean error) — 9802370
 - [x] Chord-progression analyzer (Scripts/chords.py + menu/wrapper/core, TDD)
 - [x] Make analyze_track.py exit non-zero on analysis failure
 - [x] Add exit-code test to tests/test-analysis.py (TDD, subprocess)

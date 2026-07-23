@@ -155,15 +155,52 @@ def exitcode() -> None:
         check("BPM" in r.stdout, "good file -> prints a chart header")
 
 
+def dirs() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        # Acapella / 2-stem split: only vocals.wav + no_vocals.wav, no drums/bass,
+        # so it is NOT a stem track folder. analyze_chords must analyze the
+        # instrumental (no_vocals.wav) instead of handing the directory to ffmpeg.
+        split = Path(d) / "acapella"
+        split.mkdir()
+        _write_wav(split / "vocals.wav", _tone([440.0], secs=12.0))
+        _write_wav(split / "no_vocals.wav", _clicks_over_tone(120.0, secs=12.0))
+        try:
+            _bpm, _key, labels = ch.analyze_chords(split)
+            check(
+                len(labels) >= 2,
+                f"acapella split -> chords from no_vocals ({len(labels)} bars)",
+            )
+        except Exception as exc:  # noqa: BLE001
+            check(False, f"acapella split raised: {type(exc).__name__}: {exc}")
+
+        # Any other non-stem directory has no obvious audio source -> clean
+        # ValueError, not an ffmpeg "Is a directory" crash.
+        misc = Path(d) / "misc"
+        misc.mkdir()
+        (misc / "notes.txt").write_text("nope")
+        try:
+            ch.analyze_chords(misc)
+            check(False, "non-stem dir should raise")
+        except ValueError as exc:
+            check(
+                "not a stem folder" in str(exc),
+                f"non-stem dir -> clean ValueError ({exc})",
+            )
+        except Exception as exc:  # noqa: BLE001
+            check(False, f"non-stem dir raised {type(exc).__name__}, want ValueError")
+
+
 def main() -> None:
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
     if mode in ("all", "unit"):
         unit()
     if mode in ("all", "audio"):
         audio()
+    if mode in ("all", "dirs"):
+        dirs()
     if mode in ("all", "exitcode"):
         exitcode()
-    if mode not in ("all", "unit", "audio", "exitcode"):
+    if mode not in ("all", "unit", "audio", "dirs", "exitcode"):
         print(f"unknown mode: {mode}")
         sys.exit(2)
     print(f"\n{_passed} passed, {_failed} failed")

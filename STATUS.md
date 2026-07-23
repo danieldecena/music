@@ -92,6 +92,24 @@
   music-core. 24/24 `tests/test-chords.py` synthetic assertions pass;
   live-verified end-to-end on real `Stems/htdemucs_6s/02 Let Em' Know` (120-bar
   chart + sidecar, exit 0). See Known broken for the accuracy caveat.
+  Update 2026-07-22: `analyze_chords` now routes an acapella / 2-stem split
+  (vocals.wav + no_vocals.wav, no drums/bass) to its `no_vocals.wav`
+  instrumental and refuses any other non-stem directory with a clean
+  ValueError — closes an "Is a directory" ffmpeg crash found via `/run`.
+  26/26 `tests/test-chords.py` pass.
+- **Harmonic mix-match finder** (`Scripts/harmonic_mix.py` + `Scripts/lyrics.py`
+  + `catalog.py mix`). Ranks compatible pairs of analyzed catalog tracks the way
+  a DJ mixes: Camelot-wheel key compatibility (perfect / relative / adjacent with
+  12<->1 wrap) plus tempo tolerance (±6% default, half/double-time folded and
+  labeled). Tiers strong (key AND tempo) > key-only > tempo-only. Optional
+  `--lyrics` re-rank fetches LRCLIB lyrics (urllib, cached to `Samples/Lyrics/`,
+  every failure -> None so it never breaks the audio ranking) and re-sorts the
+  strong tier by Jaccard theme similarity. Pure-stdlib logic, fully isolated from
+  the fragile network layer. `<2` analyzed tracks -> clean message + non-zero
+  exit. Reached via `X) Mix-match` in the Tools submenu, `mixmatch.sh`, or
+  `mix_match()` in music-core. 45/45 `tests/test-harmonic-mix.py` pass;
+  verified end-to-end against the real catalog (relative-key and half/double
+  pairs surface; the two "Rambo" versions top the lyric re-rank).
 
 ## Known broken / unverified
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
@@ -176,6 +194,31 @@
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-22 (later)
+- Shipped: harmonic mix-match finder (`feat/harmonic-mix-match`), brainstormed +
+  spec'd + planned + built TDD in 4 commits, then merged. Scope decided with the
+  user: rank pairs from the EXISTING catalog (no discovery/download), "mix well"
+  = DJ harmonic mixing (Camelot key adjacency + tempo tolerance incl.
+  half/double), lyrics a SECONDARY opt-in re-rank. Hardened per "harden this":
+  null/unknown key+bpm excluded at query and re-checked in `rank_pairs`; flats
+  mapped defensively though the analyzer emits sharps; unordered-pair dedupe;
+  `<2` tracks -> clean non-zero exit; the lyrics/network layer is fully isolated
+  (urllib timeout, disk cache, all-exceptions->None, opt-in flag) so it can never
+  crash or change the audio ranking. Pure logic in `harmonic_mix.py` (no DB, no
+  net) tested to 45 assertions; `lyrics.py` greenfield; `catalog.py mix`
+  subcommand with `--json`/`--limit`/`--tempo-tol`/`--lyrics`. `from __future__
+  import annotations` added so the `str | None` hints run under system py3.9.
+- Fixed: `H) Chords` crashed with an opaque ffmpeg "Is a directory" when fed an
+  acapella / 2-stem split folder (only vocals.wav + no_vocals.wav) — `stem_track_dir`
+  correctly returned None, but the fallback handed the directory to ffmpeg.
+  `analyze_chords` now resolves such a split to its `no_vocals.wav` instrumental
+  and raises a clean ValueError for any other non-stem directory. Found via `/run`,
+  fixed TDD (two new `dirs` cases). 26/26 chord tests pass.
+- Clarified (reading this log against `fixtures-analysis.tsv`): the parked
+  "drop the `?`" task named the wrong rows. Self Control / Godspeed / Don't carry
+  NO `?` — they are already in strict scoring. The `?` rows are Nikes / Nights /
+  Rambo, and the standing decision (recorded below) is to NOT edit them off a
+  black-box source without the ear. Both tempo tasks are therefore ear-blocked,
+  not code-actionable; TASKS.md collapsed to the single tap-4-tracks item.
 - Live-verified the logic-pro-mcp app-name fix (committed last session in the
   nested logic-pro-mcp repo): with the MCP server reattached, `logic_get_status`
   returns "Logic Pro is running" against a running "Logic Pro Creator Studio"

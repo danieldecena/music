@@ -257,6 +257,13 @@ chord_progression() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
 }
 
+mix_match() {
+  # Ranks catalog track pairs that mix well (Camelot key + tempo). Reads the
+  # catalog; takes no track path. Flags pass through to `catalog.py mix`
+  # (e.g. --lyrics, --limit N, --tempo-tol F).
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix "$@"
+}
+
 bass_to_midi() {
   # $1 = bass.wav (monophonic stem), $2 = out .mid, $3 = tempo BPM (default 120).
   # Best-effort: reliable only for clean single-note lines; polyphony won't transcribe.
