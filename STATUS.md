@@ -70,14 +70,16 @@
   `logic_get_status` returns cleanly against a running Logic (no -1728), so the
   app-name parametrization works end-to-end. The write/UI-scripting paths
   (build, bounce, track ops) remain unverified against a live session.
-  Live data point 2026-07-22: the heavier read tools that walk `entire
-  contents of front window` (`logic_list_tracks`, `logic_get_tempo`) TIME OUT
-  (10s/20s) against "Logic Pro Creator Studio", and `logic_get_bar_position`
-  can't find the transport field on an Untitled project — the ★★-brittle tier
-  is confirmed slow/unreliable here. Only the cheap `logic_get_status`
-  (running check + window name) is fast and dependable. If these are worth
-  fixing, the culprit is the full-tree traversal — scope it to specific
-  UI element roles/paths instead of `entire contents`.
+  `logic_get_tempo` and `logic_get_key` now read **scoped Control Bar
+  selectors** (the "Tempo" AXSlider / "Key Signature" popup of the inner
+  Control Bar group), NOT `entire contents` — fixed in `c56acf3`, so the
+  old 10-20s timeout is gone (raw selectors verified in the probe doc; live
+  MCP call still unverified). `logic_list_tracks` is the last tool still
+  walking `entire contents of front window` and remains slow/at-risk of
+  timeout (different UI area, no verified scoped selector yet — deferred).
+  `logic_get_bar_position` uses `every text field` (not entire contents) but
+  can't find the transport field on an Untitled project. Only the cheap
+  `logic_get_status` (running check + window name) is fast and dependable.
 - **Chord-progression analyzer** (`Scripts/chords.py`). Bar-by-bar chord
   estimation reusing `analyze_track.py`'s chroma/tempo/key machinery (no DSP
   duplicated — it imports `spectra`, `detect_tempo`, `detect_key`, `_KEEP`,
@@ -194,6 +196,20 @@
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-23
+- Shipped (logic-pro-mcp `c56acf3`, pushed): `logic_get_tempo` and `logic_get_key`
+  now read **scoped Control Bar selectors** instead of `entire contents of front
+  window`, killing the 10-20s timeout. Root cause for tempo was structural, not just
+  slow: the BPM is an `AXSlider`, so the fast text-field path (`_get_fields`) could
+  never see it and every call fell to the 20s full-tree scan. New primary reads bind
+  `icb` (inner Control Bar group) and pull the "Tempo" slider / "Key Signature" popup
+  directly — the selectors live-verified in `docs/smart-tempo-probe.md` (120.0 /
+  C Major). Factored into a pure `_control_bar_read_script` builder (testable without
+  Logic, mirrors `tracks._select_track_script`); deleted `_UI_VALUES_SCRIPT`,
+  `_tempo_from_ui`, `_BPM_DECIMAL_RE`, `_KEY_POPUP_SCRIPT`, `_KEY_RE`. `.logicx`
+  fallback unchanged. 35 tests pass (4 new pure-builder asserts). **`logic_list_tracks`
+  is now the last `entire contents` reader** — deferred (different UI area, no verified
+  scoped selector yet). Live MCP call unverified this session (Logic not running); raw
+  AppleScript already proven in the probe doc, unit + static checks gate the change.
 - Explored using **Logic Pro Smart Tempo as an independent tempo detector** for the
   4 unsettled tracks (Exchange/Don't/Rambo/Nikes), driving Logic live on an
   off-screen BetterDisplay virtual display. RULED OUT — Logic Smart Tempo does not

@@ -2,9 +2,10 @@
 
 - [ ] Decide how to settle 4 tempos (Logic Smart Tempo ruled out by probe; click-comparator recommended) — then update fixtures-analysis.tsv, drop ?, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
-- [ ] (Optional) Repair logic_get_tempo entire-contents timeout in logic-pro-mcp (TDD) — standalone MCP fix, independent of tempo-detection
 
 ## Completed
+
+- [x] Repair logic_get_tempo/key entire-contents timeout — scoped Control Bar reads, TDD — logic-pro-mcp c56acf3
 
 - [x] Smart Tempo spike + probe: off-screen Logic drivable, control mapped, tempo readable — but Logic can't report a single BPM for a full song (File Tempo 0.00). Feature ruled out; findings in logic-pro-mcp/docs/smart-tempo-probe.md
 - [x] Harmonic mix-match finder (harmonic_mix.py + catalog mix + lyrics.py + wiring, TDD) — 1b0e978
@@ -53,7 +54,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-23 00:34.
+Plan approved 2026-07-23 11:52.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -62,7 +63,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume ee4a7a62-6856-4a8d-926f-b7bd9238aa54
+    claude --resume 239c5ffd-663a-413c-80df-ac40363cdba8
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->
