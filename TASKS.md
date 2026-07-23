@@ -4,6 +4,7 @@
 
 ## Completed
 
+- [x] Chord-progression analyzer (Scripts/chords.py + menu/wrapper/core, TDD)
 - [x] Make analyze_track.py exit non-zero on analysis failure
 - [x] Add exit-code test to tests/test-analysis.py (TDD, subprocess)
 - [x] Enable rust-analyzer-lsp per-project (music-menu, StudioTUI)
