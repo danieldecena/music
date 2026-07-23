@@ -5,10 +5,11 @@ source "$SCRIPT_DIR/lib/music-core.sh"
 
 echo "Click-Compare Tempo"
 echo "-------------------"
-echo "Drag an audio file or a Stems/<model>/<track> folder, then press Enter:"
-read "INPUT?> "
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
-[[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
+echo "Type a song title (typos OK) or drag an audio file / Stems folder, then Enter:"
+read "RAW?> "
+INPUT="$(resolve_target "$RAW")"
+[[ -z "$INPUT" || ! -e "$INPUT" ]] && { echo "No match. Exiting."; exit 1; }
+echo "Using: ${INPUT:t}"
 
 echo "Base BPM estimate (blank = auto-detect):"
 read "BPM?> "

@@ -272,6 +272,50 @@ click_compare() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/click_compare.py" "$@"
 }
 
+find_tracks() {  # $1 = title query. Prints "score<TAB>kind<TAB>label<TAB>path" rows, best first.
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/find_track.py" "$1" --tsv 2>/dev/null
+}
+
+pick_track() {
+  # $1 = a typed song title (typos tolerated). Fuzzy-resolves it to a path and
+  # echoes that path on stdout; the match list and prompts go to stderr so a
+  # caller can capture the path with $(pick_track ...). A lone match is returned
+  # without a menu; Enter takes the top (best) match. Returns 1 (empty stdout)
+  # when nothing matches or the user cancels with q.
+  local q="$1"
+  local -a rows; rows=("${(@f)$(find_tracks "$q")}"); rows=("${(@)rows:#}")
+  if (( ${#rows} == 0 )); then
+    echo "No track matches \"$q\" — try fewer letters, or drag the file/folder." >&2
+    return 1
+  fi
+  if (( ${#rows} == 1 )); then
+    local -a p=("${(@s:	:)rows[1]}"); print -- "$p[4]"; return 0
+  fi
+  echo "Matches for \"$q\":" >&2
+  local i=1 r
+  for r in "${rows[@]}"; do
+    local -a p=("${(@s:	:)r}")
+    printf "  %d) [%s] %s\n" "$i" "$p[2]" "$p[3]" >&2
+    ((i++))
+  done
+  local pick; read "pick?Pick # (Enter = 1, q = cancel)> "
+  [[ "$pick" == (q|Q) ]] && return 1
+  [[ -z "$pick" ]] && pick=1
+  [[ "$pick" == <-> && "$pick" -ge 1 && "$pick" -le ${#rows} ]] || { echo "Invalid pick." >&2; return 1; }
+  local -a p=("${(@s:	:)rows[$pick]}"); print -- "$p[4]"
+}
+
+resolve_target() {
+  # $1 = raw typed input — a dragged path or a song title. Echoes a resolved
+  # path (empty + return 1 on no match/cancel). An existing path is passed
+  # through untouched; anything else is fuzzy-matched via pick_track.
+  local raw="$1"
+  raw="${raw//\\ / }"; raw="${raw%"${raw##*[! ]}"}"
+  [[ -z "$raw" ]] && return 1
+  [[ -e "$raw" ]] && { print -- "$raw"; return 0; }
+  pick_track "$raw"
+}
+
 bass_to_midi() {
   # $1 = bass.wav (monophonic stem), $2 = out .mid, $3 = tempo BPM (default 120).
   # Best-effort: reliable only for clean single-note lines; polyphony won't transcribe.

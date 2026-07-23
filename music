@@ -16,7 +16,8 @@ resolve_input() {  # mode=source: current track's source, else a dragged path
     if [[ -z "$p" ]]; then print -- "$CUR_SRC"; return; fi
     p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
   else
-    echo "Drag a file or folder:"; read_path
+    local p; echo "Type a song title (typos OK) or drag a file/folder:"; read "p?> "
+    resolve_target "$p"
   fi
 }
 
@@ -32,7 +33,8 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
     echo "No stems for $CUR_NAME yet — run Separate (2) or Deconstruct (8) first." >&2
     return
   fi
-  read_path
+  local p; echo "Type a song title (typos OK) or drag a folder/stem:" >&2; read "p?> "
+  resolve_target "$p"
 }
 
 select_file() {  # $1 = path to an audio file; makes it the current track

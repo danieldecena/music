@@ -125,6 +125,16 @@
   Stems drums stem (6 candidate mixes written, base+label+octaves correct). The
   interactive afplay/listen loop is unverified here (headless, no audio out) —
   needs a real listen to settle the 4 tracks.
+- **Type-a-title track input** (`Scripts/find_track.py` + `find_tracks`/`pick_track`/
+  `resolve_target` in music-core). At any track-level prompt you can now type a
+  song title instead of dragging a path — typos tolerated. `find_track.py` (stdlib,
+  difflib) fuzzy-ranks Stems folders + source audio (Apple Music/SoundCloud/
+  Downloads), collapses a track that is both source and stem to one row (stem
+  wins, has drums), and trims the weak tail. `resolve_target` passes an existing
+  path through untouched and only searches non-paths; a lone match auto-resolves,
+  several show a numbered picker (Enter = best, q = cancel). Wired into
+  `click-compare.sh` and the menu's generic file + no-current-track stems prompts.
+  18/18 `tests/test-find-track.py` pass.
 
 ## Known broken / unverified
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
@@ -210,6 +220,13 @@
   build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
 
 ### 2026-07-23
+- Decided: track prompts accept a **typed title, not just a dragged path**
+  (`Scripts/find_track.py`, stdlib difflib). Fuzzy so typos still match; a lone
+  hit auto-resolves, several show a picker. Kept it out of the bass-stem and
+  One-Shots-folder prompts (they want a specific sub-asset, not a track) — only
+  the track-level prompts (`click-compare.sh`, generic file, no-current-track
+  stems) route through `resolve_target`. `resolve_target` passes real paths
+  through untouched so nothing regresses for drag users. TDD (18 tests).
 - Shipped: **click-comparator** (`Scripts/click_compare.py` + `click-compare.sh` +
   `click_compare()` in music-core + `T) Tempo lock` menu, TDD). This is the chosen
   unblock for the parked "settle the 4 tempos by ear" task — Logic Smart Tempo was
