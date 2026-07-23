@@ -16,7 +16,7 @@ resolve_input() {  # mode=source: current track's source, else a dragged path
     if [[ -z "$p" ]]; then print -- "$CUR_SRC"; return; fi
     p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
   else
-    local p; echo "Type a song title (typos OK) or drag a file/folder:"; read "p?> "
+    local p; echo "Type a song title (typos OK) or drag a file/folder:" >&2; read "p?> "
     resolve_target "$p"
   fi
 }
