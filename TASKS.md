@@ -3,6 +3,7 @@
 - [ ] Make analyze_track.py exit non-zero on analysis failure
 - [ ] Add exit-code test to tests/test-analysis.py (TDD, subprocess)
 - [ ] Re-record replay baseline after tempo change settled by ear
+- [x] Enable rust-analyzer-lsp per-project (music-menu, StudioTUI)
 
 ## Completed
 
@@ -45,7 +46,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-22 12:02.
+Plan approved 2026-07-22 18:32.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -54,7 +55,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 01d28bbd-94fc-4b50-b21d-840890831aae
+    claude --resume f9cbc6b9-02ed-4504-adf4-8d8adef0f285
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->
