@@ -195,3 +195,48 @@ def analyze_chords(p: Path) -> tuple[float, str, list[str]]:
         raise ValueError("no tempo or too short to form bars")
     mask = _diatonic_mask(key)
     return bpm, key, [label_bar(b, mask) for b in bars]
+
+
+def format_chart(name: str, bpm: float, key: str, labels: list[str]) -> str:
+    """Bar-by-bar chart, 4 bars per line, repeats collapsed to a mid-dot."""
+    cells: list[str] = []
+    prev = None
+    for lab in labels:
+        cells.append("·" if lab == prev else lab)
+        prev = lab
+    width = max((len(c) for c in cells), default=1)
+    lines = [f"Chords -- {name}", f"key {key} · {bpm} BPM · {len(labels)} bars", ""]
+    for i in range(0, len(cells), BEATS_PER_BAR):
+        body = "  ".join(c.ljust(width) for c in cells[i : i + BEATS_PER_BAR])
+        lines.append(f"{i + 1:>3} | {body} |")
+    return "\n".join(lines)
+
+
+def chords_txt(name: str, bpm: float, key: str, labels: list[str]) -> str:
+    """Full, uncollapsed bar list for the sidecar file: 'bar<TAB>chord' per line."""
+    head = [f"# Chords -- {name}", f"# key {key}  {bpm} BPM  {len(labels)} bars"]
+    body = [f"{i + 1}\t{lab}" for i, lab in enumerate(labels)]
+    return "\n".join(head + body) + "\n"
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print("usage: chords.py <audio file | Stems folder>")
+        sys.exit(1)
+    p = Path(sys.argv[1])
+    try:
+        bpm, key, labels = analyze_chords(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"chord analysis failed -- {exc}")
+        sys.exit(1)
+    print(format_chart(p.name, bpm, key, labels))
+    dest = (p if p.is_dir() else p.parent) / "chords.txt"
+    try:
+        dest.write_text(chords_txt(p.name, bpm, key, labels))
+        print(f"\n  Chart: {dest}")
+    except OSError:
+        pass  # a chart printed to stdout is still the primary output
+
+
+if __name__ == "__main__":
+    main()
