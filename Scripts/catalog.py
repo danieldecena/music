@@ -655,6 +655,24 @@ def _seeded_mix(con, tracks, seed_query, tol, limit, as_json, use_lyrics, previe
     return 0
 
 
+def _excerpt_start(path: Path, bpm: float) -> float:
+    """Where mix_preview should start this track — the first section boundary,
+    not an arbitrary offset. Falls back to mix_preview's own duration*0.25
+    guess if analysis fails, so a bad decode never blocks the preview."""
+    try:
+        import analyze_track as A
+
+        sp = A.spectra(A.decode_mono(path, A.SR))
+        duration = sp.n_frames / sp.fps
+        transitions = A.estimate_boundaries(sp, bpm or 0.0)
+    except Exception as e:
+        print(
+            f"  ({path.name}: boundary estimate failed, using a fallback start — {e})"
+        )
+        return mix_preview.excerpt_start([], 0.0)
+    return mix_preview.excerpt_start(transitions, duration)
+
+
 def _play_preview(con, pair):
     """Render the pair to a temp wav and play it. Never fails the whole report."""
     paths = {}
@@ -666,8 +684,12 @@ def _play_preview(con, pair):
         paths[side] = ROOT / src
 
     ratio = mix_preview.atempo_ratio(pair["a"]["bpm"], pair["b"]["bpm"])
+    a_start = _excerpt_start(paths["a"], pair["a"]["bpm"])
+    b_start = _excerpt_start(paths["b"], pair["b"]["bpm"])
     out = Path(tempfile.gettempdir()) / "music-mix-preview.wav"
-    args = mix_preview.preview_args(paths["a"], paths["b"], ratio, out, 40.0, 30.0)
+    args = mix_preview.preview_args(
+        paths["a"], paths["b"], ratio, out, a_start, b_start
+    )
     print(f"\nrendering preview -> {out}")
     if mix_preview.render(args):
         mix_preview.play(out)
