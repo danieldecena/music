@@ -159,12 +159,39 @@ def ranking() -> None:
     hm.sort_pairs(ps)
     check(ps[0] is exact, "exact tempo match ranks first")
 
-    # Lyric similarity still outranks both when a --lyrics run has scored them.
+    # A --lyrics run must not reorder across tempo buckets. Word overlap is the
+    # weakest of the three signals -- shared vocabulary, not shared meaning -- so
+    # letting it outrank a measured BPM gap put a 6 BPM pair above two straight
+    # beatmatches on words as generic as "make" and "tell".
     dull = {"tier": "strong", "lyric_sim": 0.0, "key_rel": "perfect", "tempo_gap": 0.0}
     rich = {"tier": "strong", "lyric_sim": 0.5, "key_rel": "adjacent", "tempo_gap": 4.0}
-    ps = [dull, rich]
+    ps = [rich, dull]
     hm.sort_pairs(ps)
-    check(ps[0] is rich, "lyric re-rank still leads when scored")
+    check(ps[0] is dull, "lyrics never outrank a closer beatmatch")
+
+    # Inside one bucket lyrics DO decide, ahead of the key relation -- both are
+    # weak, but a shared-vocabulary hit is at least measured off the actual text.
+    wordy = {
+        "tier": "strong",
+        "lyric_sim": 0.5,
+        "key_rel": "adjacent",
+        "tempo_gap": 1.0,
+    }
+    quiet = {"tier": "strong", "lyric_sim": 0.0, "key_rel": "perfect", "tempo_gap": 0.8}
+    ps = [quiet, wordy]
+    hm.sort_pairs(ps)
+    check(ps[0] is wordy, "inside one bucket, lyrics break the tie before key")
+
+    # An unscored pair (None) must sort as neutral, not crash or win.
+    unscored = {
+        "tier": "strong",
+        "lyric_sim": None,
+        "key_rel": "perfect",
+        "tempo_gap": 1.0,
+    }
+    ps = [unscored, wordy]
+    hm.sort_pairs(ps)
+    check(ps[0] is wordy, "an unscored pair loses the tie-break to a scored one")
 
 
 def lyric_theme() -> None:

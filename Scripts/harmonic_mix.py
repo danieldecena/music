@@ -133,29 +133,36 @@ _REL_RANK = {"perfect": 0, "relative": 1, "adjacent": 2, None: 3}
 
 
 def _sort_key(p: dict):
-    # tier, then higher lyric similarity (0 when unscored -> neutral), then the
-    # tempo gap, then key closeness. A no-lyrics run sorts as (tier, gap, rel).
+    # tier, then the tempo gap, then higher lyric similarity (0 when unscored ->
+    # neutral), then key closeness. A no-lyrics run sorts as (tier, gap, rel).
     #
-    # Tempo outranks key because it is the reliable half of the analysis: key
-    # detection is 2/13 exact against published labels, and the report already
-    # hedges every key claim with "confirm by ear". Ranking by a signal we tell
-    # the user not to trust put a 4-BPM/perfect-key pair above a 1-BPM/relative
-    # one -- the wrong call for actually beatmatching.
+    # Tempo leads because it is the reliable half of the analysis: key detection
+    # is 2/13 exact against published labels, and the report already hedges every
+    # key claim with "confirm by ear". Ranking by a signal we tell the user not to
+    # trust put a 4-BPM/perfect-key pair above a 1-BPM/relative one -- the wrong
+    # call for actually beatmatching.
+    #
+    # Lyric similarity sits BELOW the gap for the same reason, one rung further
+    # down: it measures shared vocabulary, not shared meaning. Above the gap it
+    # led a --lyrics run with a 6-BPM pair over two straight beatmatches, on words
+    # as generic as "make" and "tell". It still beats the key relation, since it
+    # is at least measured off the actual text.
     #
     # The gap buckets to whole BPM (the report's own "straight beatmatch"
-    # threshold) so an inaudible 1.0-vs-0.8 difference cannot override the key.
-    # Inside a bucket, key closeness is the real tie-break.
+    # threshold) so an inaudible 1.0-vs-0.8 difference cannot override the two
+    # categorical signals below it.
     return (
         _TIER_RANK[p["tier"]],
-        -(p["lyric_sim"] or 0.0),
         math.ceil(p["tempo_gap"]),
+        -(p["lyric_sim"] or 0.0),
         _REL_RANK[p["key_rel"]],
     )
 
 
 def sort_pairs(pairs: list[dict]) -> None:
     """Sort pairs in place, best mixes first. Call again after setting lyric_sim
-    on the strong pairs to fold the lyric re-rank in."""
+    on the strong pairs to fold the lyric tie-break in; it only reorders pairs
+    that already share a whole-BPM bucket."""
     pairs.sort(key=_sort_key)
 
 

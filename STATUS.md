@@ -197,13 +197,6 @@
   an IDF-weighted word-set overlap — it finds shared vocabulary, not shared
   meaning, so a high score means the two songs use the same words, not that they
   are about the same thing.
-- **`--lyrics` overrides the tempo-first ordering.** `_sort_key` puts lyric
-  similarity above the tempo gap, so with `--lyrics` a high word-overlap pair can
-  outrank a closer beatmatch — seeding YUKON with lyrics leads with a 6-BPM pair
-  while the 1-BPM one sits fifth. That is the documented "lyric re-rank"
-  behaviour, so it is left as is, but it means tempo-first only fully applies to a
-  no-lyrics run. The lyric score is the weakest of the three signals (word overlap,
-  not meaning), so it having top priority is worth revisiting.
 - Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
   octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
   the candidate scoring only work together; refinement alone makes a widened
@@ -246,8 +239,10 @@
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
-- **[code] Decide the mix report's tier order** — key-over-tempo may be backwards
-  (see Known broken). Needs a call, then a one-line change to `_sort_key`.
+- **[code] Key detection is 2/13 exact** — but the open question is the oracle, not
+  the algorithm: every fixture label is Echo Nest-derived, so a better `score` is
+  necessary-not-sufficient. The untried autonomous path is an independent key
+  source to grade against; find one before touching `detect_key`.
 
 Full open list: `TASKS.md`.
 
@@ -261,6 +256,17 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-23
+- Decided (user's call): **lyric similarity is a tie-break, not a lead signal.**
+  `_sort_key` had `lyric_sim` above the tempo gap, so `--lyrics` reordered across
+  tempo buckets and undid the tempo-first ranking decided hours earlier: seeding
+  YUKON led with a 6-BPM pair while both 1-BPM straight beatmatches sat 4th and
+  5th, won on words as generic as "make" and "tell". The gap now outranks it, and
+  lyrics only reorder pairs already inside one whole-BPM bucket — where they still
+  beat the key relation, since word overlap is at least measured off the actual
+  text while the key is a 2/13-exact estimate. Live: `--seed YUKON --lyrics` now
+  leads with the two 1-BPM pairs, tie-broken to '87 Stingray. Rejected: a
+  similarity threshold above which lyrics could still outrank tempo — it needs a
+  constant with no labelled data to pick it from.
 - Decided (user's call): **the mix report ranks by tempo before key** (`483f45c`).
   `_sort_key` had key relation above tempo gap, so a 4-BPM/perfect-key pair
   outranked a 1-BPM/relative one — the report hedged every key claim with "confirm
