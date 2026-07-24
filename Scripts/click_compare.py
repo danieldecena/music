@@ -15,8 +15,9 @@ click synthesis and candidate logic are the only new pieces here.
         [--label L ...] [--dur S] [--start S] [--render-only DIR]
 
 Without --render-only it is interactive: each candidate plays, then you press
-Enter (next), r (replay), y (lock this one), or q (quit). It prints the locked
-BPM and the fixtures-analysis.tsv line to paste.
+Enter (next), r (replay), y (lock this one), or q (quit). On lock it updates the
+matching fixtures-analysis.tsv row in place (dropping the `?`) and offers to
+rerun the tempo score; if no row matches it prints a line to paste instead.
 """
 
 from __future__ import annotations
@@ -39,6 +40,9 @@ BPM_MAX = 220.0
 CLICK_HZ = 1500.0
 CLICK_MS = 45.0
 CLICK_GAIN = 0.4
+
+REPO = Path(__file__).resolve().parent.parent
+FIXTURES = REPO / "tests" / "fixtures-analysis.tsv"
 
 
 def candidate_bpms(base: float, extra: list[float] | None = None) -> list[float]:
@@ -142,6 +146,83 @@ def _tsv_line(name: str, bpm: float) -> str:
     return f"{name}\t{bpm:g}\t<key>\t<source>"
 
 
+def _apply_locked_bpm(lines: list[str], stem: str, bpm: float) -> tuple[list[str], str]:
+    """Update the fixtures row whose path stem matches `stem` to `bpm`.
+
+    Pure over a list of newline-free lines so it is unit-testable. Matches a data
+    row (not blank / `#` comment) when Path(field0).stem == stem, rewrites its bpm
+    field to f"{bpm:g}" preserving the path and key fields and dropping any `?`
+    suffix. Returns (new_lines, status): "updated:<path>" on a lone match,
+    "nomatch" if none, "ambiguous:<names>" if more than one. Lines are returned
+    unchanged unless exactly one row matched.
+    """
+    hits = []
+    for idx, line in enumerate(lines):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        first = line.split("\t")[0]
+        if first.strip() and Path(first).stem == stem:
+            hits.append(idx)
+    if not hits:
+        return lines, "nomatch"
+    if len(hits) > 1:
+        names = ",".join(Path(lines[i].split("\t")[0]).name for i in hits)
+        return lines, f"ambiguous:{names}"
+    idx = hits[0]
+    fields = lines[idx].split("\t")
+    path = fields[0]
+    key = fields[2] if len(fields) >= 3 else ""
+    new_lines = list(lines)
+    new_lines[idx] = f"{path}\t{bpm:g}\t{key}"
+    return new_lines, f"updated:{path}"
+
+
+def _print_paste_line(name: str, bpm: float) -> None:
+    print("fixtures-analysis.tsv line (fill key/source):")
+    print(f"  {_tsv_line(name, bpm)}")
+
+
+def _write_fixture(name: str, bpm: float) -> bool:
+    """Write the locked BPM into the matching fixtures row, dropping `?`.
+
+    Returns True if a row was updated and written. On no / ambiguous match (or no
+    fixtures file), prints the reason and the paste-line fallback and returns False.
+    """
+    if not FIXTURES.is_file():
+        print(f"(no fixtures file at {FIXTURES}; nothing to update)")
+        _print_paste_line(name, bpm)
+        return False
+    lines = FIXTURES.read_text().split("\n")
+    new_lines, status = _apply_locked_bpm(lines, name, bpm)
+    if status.startswith("updated:"):
+        idx = next(i for i in range(len(lines)) if lines[i] != new_lines[i])
+        print(f"  fixtures row: {lines[idx]}")
+        print(f"            ->  {new_lines[idx]}")
+        ans = input("  write to fixtures-analysis.tsv? [Y/n]: ").strip().lower()
+        if ans in ("", "y", "yes"):
+            FIXTURES.write_text("\n".join(new_lines))
+            print(f"  wrote {FIXTURES}")
+            return True
+        print("  (not written)")
+        _print_paste_line(name, bpm)
+        return False
+    if status.startswith("ambiguous:"):
+        print(f"  multiple fixtures rows match {name!r}: {status.split(':', 1)[1]}")
+    else:
+        print(f"  no fixtures row matches {name!r}.")
+    _print_paste_line(name, bpm)
+    return False
+
+
+def _rerun_score() -> None:
+    ans = input("rerun score now? [Y/n]: ").strip().lower()
+    if ans in ("", "y", "yes"):
+        subprocess.run(
+            [sys.executable, str(REPO / "tests" / "test-analysis.py"), "score"]
+        )
+
+
 def _audition(mixes: list[tuple[float, Path]], name: str) -> float | None:
     print(f"\nAuditioning {len(mixes)} candidates for {name!r}.")
     print("Each plays once; then: [Enter] next  r replay  y lock  q quit\n")
@@ -224,9 +305,10 @@ def main() -> int:
         print("\nnothing locked.")
         return 0
     print(f"\nlocked: {locked:g} BPM")
-    print("fixtures-analysis.tsv line (fill key/source):")
-    print(f"  {_tsv_line(name, locked)}")
-    print("then: .venv/bin/python tests/test-analysis.py score")
+    if _write_fixture(name, locked):
+        _rerun_score()
+    else:
+        print("then: .venv/bin/python tests/test-analysis.py score")
     return 0
 
 

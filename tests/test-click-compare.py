@@ -81,6 +81,50 @@ def unit() -> None:
     e = cc.excerpt_of(a, sr, start=2.0, dur=5.0)  # only 1s remains
     check(e.shape[0] == sr, "excerpt clamps to remaining audio")
 
+    # _apply_locked_bpm: update the matching row, drop `?`, keep path + key.
+    fixt = [
+        "# comment header",
+        "",
+        "Apple Music/Bryson Tiller/T R A P S O U L (Deluxe)/09 Rambo.m4a\t181?\tA#m",
+        "Apple Music/Frank Ocean/Blonde/02 Ivy.m4a\t116\tAm",
+    ]
+    out, status = cc._apply_locked_bpm(fixt, "09 Rambo", 90.0)
+    check(
+        status
+        == "updated:Apple Music/Bryson Tiller/T R A P S O U L (Deluxe)/09 Rambo.m4a",
+        "apply reports updated:<path>",
+    )
+    check(
+        out[2]
+        == "Apple Music/Bryson Tiller/T R A P S O U L (Deluxe)/09 Rambo.m4a\t90\tA#m",
+        "apply rewrites bpm, drops ?, keeps path + key",
+    )
+    check(
+        out[0] == fixt[0] and out[1] == fixt[1] and out[3] == fixt[3],
+        "apply leaves other lines untouched",
+    )
+    check(fixt[2].endswith("181?\tA#m"), "apply does not mutate the input list")
+
+    # :g formatting — integral prints clean, fractional keeps the decimal.
+    out2, _ = cc._apply_locked_bpm(fixt, "02 Ivy", 89.7)
+    check(out2[3].endswith("\t89.7\tAm"), "apply formats fractional bpm with :g")
+    out3, _ = cc._apply_locked_bpm(fixt, "02 Ivy", 90.0)
+    check(out3[3].endswith("\t90\tAm"), "apply formats integral bpm without .0")
+
+    # No match -> nomatch, lines unchanged.
+    same, st = cc._apply_locked_bpm(fixt, "Nonexistent Track", 100.0)
+    check(st == "nomatch", "unknown stem -> nomatch")
+    check(same == fixt, "nomatch leaves lines unchanged")
+
+    # Two rows sharing a stem -> ambiguous, lines unchanged.
+    dup = [
+        "Apple Music/A/09 Rambo.m4a\t181?\tA#m",
+        "Apple Music/B/09 Rambo.m4a\t90\tA#m",
+    ]
+    unchanged, st2 = cc._apply_locked_bpm(dup, "09 Rambo", 88.0)
+    check(st2.startswith("ambiguous"), "duplicate stem -> ambiguous")
+    check(unchanged == dup, "ambiguous leaves lines unchanged")
+
 
 def _sine_wav(path: Path, sr: int, secs: float, hz: float) -> None:
     t = np.arange(int(sr * secs)) / sr
