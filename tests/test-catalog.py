@@ -79,3 +79,47 @@ assert (
 )
 
 print("ok: catalog song_title")
+
+con.execute(
+    "INSERT INTO tracks(name,source_path,artist,bpm,key,first_seen) VALUES(?,?,?,?,?,?)",
+    (
+        "03 YUKON",
+        "Apple Music/JB/SWAG/03 YUKON.m4a",
+        "Justin Bieber",
+        128,
+        "Dm",
+        "2026-07-11T00:00:00",
+    ),
+)
+con.execute(
+    "INSERT INTO tracks(name,source_path,artist,bpm,key,first_seen) VALUES(?,?,?,?,?,?)",
+    (
+        "06 Skyline To",
+        "Apple Music/FO/Blonde/06 Skyline To.m4a",
+        "Frank Ocean",
+        129,
+        "F",
+        "2026-07-11T00:00:00",
+    ),
+)
+con.commit()
+
+seed, status = catalog.resolve_seed(con, "YUKON")
+assert status == "ok" and seed["name"] == "03 YUKON", (status, seed)
+
+# Case-insensitive and tolerant of the track number the user won't type.
+seed, status = catalog.resolve_seed(con, "yukon")
+assert status == "ok", (status, seed)
+
+# An unanalyzed track cannot seed a mix -- it has no bpm/key to match on.
+seed, status = catalog.resolve_seed(con, "Random Track")
+assert status == "nomatch", (status, seed)
+
+seed, status = catalog.resolve_seed(con, "zzzznope")
+assert status == "nomatch" and seed is None, (status, seed)
+
+# Substring hitting two analyzed tracks must refuse to guess.
+seed, status = catalog.resolve_seed(con, "o")
+assert status == "ambiguous" and seed is None, (status, seed)
+
+print("ok: catalog resolve_seed")

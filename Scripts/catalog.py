@@ -443,6 +443,28 @@ def _search_rows(con, query):
     return out
 
 
+def resolve_seed(con, query):
+    """Find the one analyzed track a seed query names: (row, status).
+
+    status is 'ok', 'nomatch', or 'ambiguous'. Only tracks carrying both bpm and
+    key can seed a mix -- an unanalyzed track has nothing to match against, so it
+    reads as nomatch rather than a match that returns no pairs.
+
+    An exact title hit wins over a longer substring match, so seeding "Solo" is
+    not blocked by "Solo (Reprise)". Anything still ambiguous refuses to guess.
+    """
+    rows = [r for r in _search_rows(con, query) if r["bpm"] and r["key"]]
+    if not rows:
+        return None, "nomatch"
+    if len(rows) == 1:
+        return rows[0], "ok"
+    q = (query or "").strip().lower()
+    exact = [r for r in rows if song_title(r["name"]).lower() == q]
+    if len(exact) == 1:
+        return exact[0], "ok"
+    return None, "ambiguous"
+
+
 def _label(row):
     title = song_title(row["name"])
     who = f"{row['artist']} / {title}" if row["artist"] else title
