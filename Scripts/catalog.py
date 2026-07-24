@@ -27,6 +27,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import sqlite3
 import sys
 from datetime import datetime, timedelta
@@ -34,6 +35,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import harmonic_mix  # noqa: E402  (local module, same Scripts/ dir)
+import mix_preview  # noqa: E402
+import mix_report  # noqa: E402
 
 ROOT = Path(
     os.environ.get("LOGIC_STUDIO_MUSIC_ROOT", Path(__file__).resolve().parent.parent)
@@ -503,6 +506,97 @@ def _mix_track_label(t):
     return f"{who}{song_title(t['name'])} ({t['key']}/{t['bpm']})"
 
 
+def _source_path(con, name):
+    row = con.execute("SELECT source_path FROM tracks WHERE name=?", (name,)).fetchone()
+    return row["source_path"] if row else None
+
+
+def _seeded_mix(con, tracks, seed_query, tol, limit, as_json, use_lyrics, preview):
+    """Rank one track against the rest, render, and optionally play the top pair."""
+    row, status = resolve_seed(con, seed_query)
+    if status == "nomatch":
+        print(
+            f"no analyzed track matches {seed_query!r} — "
+            f"try: catalog.py search {seed_query!r}"
+        )
+        return 1
+    if status == "ambiguous":
+        print(f"{seed_query!r} matches more than one analyzed track:")
+        for r in _search_rows(con, seed_query):
+            if r["bpm"] and r["key"]:
+                print(f"  {song_title(r['name'])}")
+        return 1
+
+    seed_name = row["name"]
+    pairs = [
+        p
+        for p in harmonic_mix.rank_pairs(tracks, tol)
+        if p["a"]["name"] == seed_name or p["b"]["name"] == seed_name
+    ]
+    # Orient every pair seed-first so the report reads "seed x partner".
+    for p in pairs:
+        if p["b"]["name"] == seed_name:
+            p["a"], p["b"] = p["b"], p["a"]
+
+    words_by_pair = {}
+    if use_lyrics:
+        import lyrics as _lyrics
+
+        texts = {
+            t["name"]: _lyrics.fetch_lyrics(
+                t.get("artist"),
+                song_title(t["name"]),
+                source_path=_source_path(con, t["name"]),
+            )
+            for t in tracks
+        }
+        df, n = _lyrics.word_index(texts.values())
+        for p in pairs:
+            ta, tb = texts.get(p["a"]["name"]), texts.get(p["b"]["name"])
+            p["lyric_sim"] = _lyrics.lyric_similarity(ta, tb, df, n)
+            words_by_pair[id(p)] = _lyrics.shared_words(ta, tb, df)
+        harmonic_mix.sort_pairs(pairs)
+
+    seed_track = {
+        "name": row["name"],
+        "artist": row["artist"],
+        "bpm": row["bpm"],
+        "key": row["key"],
+    }
+    misses = mix_report.near_misses(seed_track, tracks, tol)
+    shown = pairs[:limit] if limit else pairs
+    report = mix_report.build_report(seed_track, shown, words_by_pair, misses)
+
+    if as_json:
+        print(json.dumps(report, ensure_ascii=False, default=str))
+    else:
+        print(mix_report.render_text(report))
+
+    if preview and shown:
+        _play_preview(con, shown[0])
+    elif preview:
+        print("\nnothing to preview — no compatible pair")
+    return 0
+
+
+def _play_preview(con, pair):
+    """Render the pair to a temp wav and play it. Never fails the whole report."""
+    paths = {}
+    for side in ("a", "b"):
+        src = _source_path(con, pair[side]["name"])
+        if not src:
+            print(f"\nno source file for {pair[side]['name']} — cannot preview")
+            return
+        paths[side] = ROOT / src
+
+    ratio = mix_preview.atempo_ratio(pair["a"]["bpm"], pair["b"]["bpm"])
+    out = Path(tempfile.gettempdir()) / "music-mix-preview.wav"
+    args = mix_preview.preview_args(paths["a"], paths["b"], ratio, out, 40.0, 30.0)
+    print(f"\nrendering preview -> {out}")
+    if mix_preview.render(args):
+        mix_preview.play(out)
+
+
 def _lyric_rerank(pairs):
     """Fetch lyrics for the strong pairs, set lyric_sim, re-sort. Returns True if
     any lyrics were missing. Fully degrade-safe -- lyrics.py never raises, and a
@@ -531,7 +625,7 @@ def _lyric_rerank(pairs):
     return missing
 
 
-def cmd_mix(con, tol, limit, as_json, use_lyrics=False):
+def cmd_mix(con, tol, limit, as_json, use_lyrics=False, seed=None, preview=False):
     """Rank catalog track pairs that mix well (Camelot key + tempo). Returns an
     exit code: 1 when there are too few analyzed tracks, else 0."""
     init(con)
@@ -549,6 +643,13 @@ def cmd_mix(con, tol, limit, as_json, use_lyrics=False):
             "download + deconstruct more first"
         )
         return 1
+
+    if preview and not seed:
+        print("--preview needs --seed (there is no single pair to preview otherwise)")
+        return 1
+
+    if seed:
+        return _seeded_mix(con, tracks, seed, tol, limit, as_json, use_lyrics, preview)
 
     pairs = harmonic_mix.rank_pairs(tracks, tol)
     lyrics_missing = _lyric_rerank(pairs) if use_lyrics else False
@@ -643,6 +744,14 @@ def main(argv):
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--json", action="store_true")
     p.add_argument("--lyrics", action="store_true")
+    p.add_argument(
+        "--seed", help="rank partners for one track instead of the whole library"
+    )
+    p.add_argument(
+        "--preview",
+        action="store_true",
+        help="render and play a tempo-matched crossfade of the top pair (implies --seed)",
+    )
     ns = ap.parse_args(argv)
 
     con = connect()
@@ -687,7 +796,9 @@ def main(argv):
         elif ns.cmd == "search":
             cmd_search(con, ns.query, ns.json, ns.menu)
         elif ns.cmd == "mix":
-            return cmd_mix(con, ns.tempo_tol, ns.limit, ns.json, ns.lyrics)
+            return cmd_mix(
+                con, ns.tempo_tol, ns.limit, ns.json, ns.lyrics, ns.seed, ns.preview
+            )
     finally:
         con.close()
     return 0
