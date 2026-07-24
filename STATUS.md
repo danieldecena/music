@@ -256,6 +256,22 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-23
+- Found, not yet usable: **Hooktheory TheoryTab is a genuinely independent key
+  oracle, but reaching it needs a call from the user.** Every current fixture label
+  is Echo Nest-derived, so scoring `detect_key` against them is circular. TheoryTab
+  is the one source found that breaks that: ~73k songs transcribed *by ear* by
+  humans in Hookpad, with key and mode stated per song — a different pipeline, not
+  a re-display of the same one. Its live pages cover exactly the fixture tracks
+  (Ivy, Self Control, Pink + White, Nights, Godspeed all have tabs). Two dead ends
+  measured: the public data dump (`owencm/hooktheory-data`) is a stale 375-song
+  sample and overlaps the 13 fixtures **0/13**, though its XML has the right shape
+  (`<artist>`, `<title>`, `<key>`); and the live pages return **HTTP 403** to
+  WebFetch. So the remaining routes are (a) a Hooktheory account for the API — a
+  credential only the user can create, and the public API exposes chord-trend
+  endpoints, not lookup-by-title — or (b) driving a real browser at the pages,
+  which is a scraping decision, not a technical one. Not attempted either way.
+  Untried third option worth a look first: Ultimate Guitar's human-submitted chord
+  sheets, where the key is derivable from the chord set rather than stated.
 - Decided (user's call): **lyric similarity is a tie-break, not a lead signal.**
   `_sort_key` had `lyric_sim` above the tempo gap, so `--lyrics` reordered across
   tempo buckets and undid the tempo-first ranking decided hours earlier: seeding
