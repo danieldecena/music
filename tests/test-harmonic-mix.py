@@ -126,11 +126,14 @@ def ranking() -> None:
 
 
 def lyric_theme() -> None:
-    # Signature keeps content words, drops stopwords and short tokens.
-    sig = ly.theme_signature("love love money the the a is on")
-    check(sig == {"love", "money"}, "signature keeps content words, drops stopwords")
-    check(ly.theme_signature("") == set(), "empty text -> empty signature")
-    check(ly.theme_signature(None) == set(), "None text -> empty signature")
+    # Word extraction keeps 3+ char tokens; rarity, not a stopword list, is what
+    # demotes function words now, so 'the' survives extraction and sinks later.
+    check(
+        ly.doc_words("love love money the a is on") == {"love", "money", "the"},
+        "doc_words dedupes and drops tokens under 3 chars",
+    )
+    check(ly.doc_words("") == set(), "empty text -> no words")
+    check(ly.doc_words(None) == set(), "None text -> no words")
 
     # Jaccard similarity.
     check(

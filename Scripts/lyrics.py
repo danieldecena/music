@@ -13,6 +13,7 @@ as-is, which also makes the whole feature work fully offline.
 from __future__ import annotations
 
 import json
+import math
 import re
 import urllib.parse
 import urllib.request
@@ -22,96 +23,6 @@ ROOT = Path(__file__).resolve().parent.parent
 CACHE_DIR = ROOT / "Samples" / "Lyrics"
 _LRCLIB = "https://lrclib.net/api/get"
 
-# Small stopword set -- enough to stop function words dominating the overlap
-# without pulling in a dependency. Theme words are what survive.
-_STOPWORDS = {
-    "the",
-    "a",
-    "an",
-    "and",
-    "or",
-    "but",
-    "if",
-    "of",
-    "to",
-    "in",
-    "on",
-    "for",
-    "with",
-    "at",
-    "by",
-    "from",
-    "up",
-    "out",
-    "so",
-    "as",
-    "it",
-    "its",
-    "is",
-    "am",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "being",
-    "i",
-    "im",
-    "you",
-    "youre",
-    "your",
-    "me",
-    "my",
-    "we",
-    "he",
-    "she",
-    "they",
-    "them",
-    "his",
-    "her",
-    "our",
-    "that",
-    "this",
-    "these",
-    "those",
-    "there",
-    "here",
-    "what",
-    "when",
-    "where",
-    "who",
-    "how",
-    "not",
-    "no",
-    "yeah",
-    "oh",
-    "na",
-    "la",
-    "ooh",
-    "uh",
-    "yo",
-    "aint",
-    "do",
-    "dont",
-    "did",
-    "got",
-    "get",
-    "gonna",
-    "wanna",
-    "cause",
-    "just",
-    "all",
-    "like",
-    "can",
-    "will",
-    "would",
-    "could",
-    "know",
-    "now",
-    "one",
-    "let",
-    "go",
-}
 _WORD = re.compile(r"[a-z']+")
 
 # An .lrc line is either a metadata tag ([ar:...], [ti:...]) or a timestamped
@@ -196,22 +107,64 @@ def fetch_lyrics(
     return text
 
 
-def theme_signature(text: str | None, top_n: int = 40) -> set[str]:
-    """The top-N most frequent content words (>=3 chars, non-stopword)."""
+def doc_words(text: str | None) -> set[str]:
+    """Content words in a lyric: 3+ chars, surrounding apostrophes trimmed.
+
+    No stopword list -- document frequency demotes function words on its own,
+    and a hand-maintained list goes stale against a growing library.
+    """
     if not text:
         return set()
-    counts: dict[str, int] = {}
-    for w in _WORD.findall(text.lower()):
-        w = w.strip("'")
-        if len(w) >= 3 and w not in _STOPWORDS:
-            counts[w] = counts.get(w, 0) + 1
-    top = sorted(counts, key=lambda w: (-counts[w], w))[:top_n]
-    return set(top)
+    return {
+        w for w in (m.strip("'") for m in _WORD.findall(text.lower())) if len(w) >= 3
+    }
 
 
-def lyric_similarity(a: str | None, b: str | None) -> float:
-    """Jaccard overlap of two lyric theme signatures; 0.0 if either is empty."""
-    sa, sb = theme_signature(a), theme_signature(b)
+def word_index(docs) -> tuple[dict[str, int], int]:
+    """(document frequency per word, number of non-empty documents)."""
+    df: dict[str, int] = {}
+    n = 0
+    for text in docs:
+        ws = doc_words(text)
+        if not ws:
+            continue
+        n += 1
+        for w in ws:
+            df[w] = df.get(w, 0) + 1
+    return df, n
+
+
+def _idf(word: str, df: dict[str, int], n_docs: int) -> float:
+    return math.log(n_docs / df.get(word, 1)) if n_docs > 0 else 0.0
+
+
+def shared_words(
+    a: str | None, b: str | None, df: dict[str, int], limit: int = 8
+) -> list[tuple[str, int]]:
+    """Words in both lyrics, rarest in the library first, with their doc counts.
+
+    Sorting by raw document frequency is equivalent to sorting by IDF -- the log
+    is monotonic -- so no document count is needed here. Ties break alphabetically.
+    """
+    common = doc_words(a) & doc_words(b)
+    ranked = sorted(common, key=lambda w: (df.get(w, 1), w))
+    return [(w, df.get(w, 1)) for w in ranked[:limit]]
+
+
+def lyric_similarity(
+    a: str | None, b: str | None, df: dict[str, int] | None = None, n_docs: int = 0
+) -> float:
+    """IDF-weighted overlap of two lyrics; 0.0 if either is empty.
+
+    Weighting by rarity matters: unweighted, two songs that merely share 'you'
+    and 'the' outscore two that share a genuine theme word. Without an index
+    (no corpus available) it degrades to a plain unweighted overlap.
+    """
+    sa, sb = doc_words(a), doc_words(b)
     if not sa or not sb:
         return 0.0
-    return len(sa & sb) / len(sa | sb)
+    if not df or n_docs <= 0:
+        return len(sa & sb) / len(sa | sb)
+    inter = sum(_idf(w, df, n_docs) for w in sa & sb)
+    union = sum(_idf(w, df, n_docs) for w in sa | sb)
+    return inter / union if union > 0 else 0.0
