@@ -3,11 +3,13 @@
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 - [ ] Improve key detection accuracy — 2/13 exact, mix key relations need the ear
-- [ ] Decide mix report tier order — _sort_key ranks key above tempo
+- [ ] Revisit whether --lyrics should outrank the tempo gap in _sort_key
 
 ## Completed
 
-- [x] Fix scan's filename-stem track collision (decodability, not size)
+- [x] Mix report: rank tempo before key; fix key-only pair's false tempo claim — 483f45c
+
+- [x] Fix scan's filename-stem track collision (decodability, not size) — aa868ce
 
 - [x] Seed-pivot mix report: .lrc lyrics, IDF word ranking, preview, TDD — d42d7da
 

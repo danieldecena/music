@@ -197,13 +197,13 @@
   an IDF-weighted word-set overlap — it finds shared vocabulary, not shared
   meaning, so a high score means the two songs use the same words, not that they
   are about the same thing.
-- **The mix report's ranking disagrees with how it reads.** `harmonic_mix._sort_key`
-  ranks key relation above tempo gap, so a perfect-key/4-BPM-apart pair outranks a
-  relative-key/1-BPM-apart one — the seed report then leads with the former as
-  "Best mix". Given key detection is the weak half (above) and 4 BPM is real
-  pitch-fader work, the tier order is probably backwards for actual beatmatching.
-  Left unchanged: `rank_pairs`' tier logic was explicitly out of scope for the
-  report work, so flipping it is a decision, not a fix.
+- **`--lyrics` overrides the tempo-first ordering.** `_sort_key` puts lyric
+  similarity above the tempo gap, so with `--lyrics` a high word-overlap pair can
+  outrank a closer beatmatch — seeding YUKON with lyrics leads with a 6-BPM pair
+  while the 1-BPM one sits fifth. That is the documented "lyric re-rank"
+  behaviour, so it is left as is, but it means tempo-first only fully applies to a
+  no-lyrics run. The lyric score is the weakest of the three signals (word overlap,
+  not meaning), so it having top priority is worth revisiting.
 - Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
   octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
   the candidate scoring only work together; refinement alone makes a widened
@@ -261,6 +261,21 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-23
+- Decided (user's call): **the mix report ranks by tempo before key** (`483f45c`).
+  `_sort_key` had key relation above tempo gap, so a 4-BPM/perfect-key pair
+  outranked a 1-BPM/relative one — the report hedged every key claim with "confirm
+  by ear" and then ranked by that same signal. Tempo now leads, bucketed to whole
+  BPM (the report's own "straight beatmatch" threshold) so an inaudible 1.0-vs-0.8
+  difference cannot override the key; inside a bucket key still decides. Rejected
+  the weighted-score alternative as a bigger change than the evidence justifies.
+  Seeding YUKON now leads with Skyline To, which is what the hand-written report
+  the user liked had said all along.
+- Fixed alongside it: **`why_line` claimed a rejected tempo was workable.** It
+  assumed the tempo check had passed, so a key-only pair — one that check
+  REJECTED — still rendered "35 BPM apart — inside pitch-fader range". Key-only
+  pairs now say the gap is too far to beatmatch and to mix on the drums. Found by
+  reading the live output after the ranking change, not by a test; the fixture
+  pair in the suite was always tempo-compatible, so nothing exercised that branch.
 - Fixed: **`scan`'s filename-stem collision now resolves by decodability, not by
   iteration order.** New pure `pick_source(candidates, probe)`; `scan()` groups
   source files by stem and returns the conflicts it resolved, which the CLI
