@@ -29,15 +29,17 @@ def why_line(pair: dict) -> str:
     exact against published labels. Leading with key would project confidence
     the estimate does not earn, so the key claim trails and is hedged.
     """
+    gap = pair["tempo_gap"]
     if pair["half_double"]:
         tempo = "half/double time — one plays at twice the other's pulse, 0 BPM apart once folded"
+    elif pair["tier"] == "key-only":
+        # This pair reached the list on key alone -- the tempo check rejected it.
+        # Saying "inside pitch-fader range" here would assert the opposite.
+        tempo = f"{gap:g} BPM apart — too far to beatmatch, so mix on the drums"
+    elif gap <= 1:
+        tempo = f"{gap:g} BPM apart — straight beatmatch, no pitch-fader work"
     else:
-        gap = pair["tempo_gap"]
-        tempo = (
-            f"{gap:g} BPM apart — straight beatmatch, no pitch-fader work"
-            if gap <= 1
-            else f"{gap:g} BPM apart — inside pitch-fader range"
-        )
+        tempo = f"{gap:g} BPM apart — inside pitch-fader range"
     rel = pair["key_rel"]
     if not rel:
         return f"{tempo}. Keys are unrelated, so mix on the drums."

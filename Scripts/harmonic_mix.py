@@ -10,6 +10,8 @@ within a pitch-shift tolerance, or a clean half/double-time relationship).
 
 from __future__ import annotations  # str | None annotations on py3.9
 
+import math
+
 # Analyzer key label -> Camelot code. The analyzer spells with sharps only
 # (PITCHES in analyze_track.py) and an "m" suffix for minor, so these 24 cover
 # every value it can emit. Minor keys sit on the "A" ring, major on "B"; a
@@ -131,13 +133,23 @@ _REL_RANK = {"perfect": 0, "relative": 1, "adjacent": 2, None: 3}
 
 
 def _sort_key(p: dict):
-    # tier, then higher lyric similarity (0 when unscored -> neutral), then key
-    # closeness, then smallest tempo gap. A no-lyrics run sorts as (tier, rel, gap).
+    # tier, then higher lyric similarity (0 when unscored -> neutral), then the
+    # tempo gap, then key closeness. A no-lyrics run sorts as (tier, gap, rel).
+    #
+    # Tempo outranks key because it is the reliable half of the analysis: key
+    # detection is 2/13 exact against published labels, and the report already
+    # hedges every key claim with "confirm by ear". Ranking by a signal we tell
+    # the user not to trust put a 4-BPM/perfect-key pair above a 1-BPM/relative
+    # one -- the wrong call for actually beatmatching.
+    #
+    # The gap buckets to whole BPM (the report's own "straight beatmatch"
+    # threshold) so an inaudible 1.0-vs-0.8 difference cannot override the key.
+    # Inside a bucket, key closeness is the real tie-break.
     return (
         _TIER_RANK[p["tier"]],
         -(p["lyric_sim"] or 0.0),
+        math.ceil(p["tempo_gap"]),
         _REL_RANK[p["key_rel"]],
-        p["tempo_gap"],
     )
 
 

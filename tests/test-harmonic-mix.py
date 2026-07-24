@@ -124,6 +124,48 @@ def ranking() -> None:
     check(hm.rank_pairs([]) == [], "empty input -> []")
     check(hm.rank_pairs([tracks[0]]) == [], "single track -> []")
 
+    # Within a tier, TEMPO decides before key. Key detection is the weak half of
+    # the analysis (2/13 exact), so ranking by it over a measured BPM gap would
+    # lead with the signal the report itself hedges. A 1 BPM gap is a straight
+    # beatmatch; 4 BPM is real pitch-fader work.
+    near = {
+        "tier": "strong",
+        "lyric_sim": None,
+        "key_rel": "relative",
+        "tempo_gap": 1.0,
+    }
+    far = {"tier": "strong", "lyric_sim": None, "key_rel": "perfect", "tempo_gap": 4.0}
+    ps = [far, near]
+    hm.sort_pairs(ps)
+    check(ps[0] is near, "1 BPM/relative outranks 4 BPM/perfect")
+
+    # ...but tempo buckets at 1 BPM, the report's own "straight beatmatch"
+    # threshold. Inside a bucket the gap difference is inaudible, so the key
+    # relation is the real tie-break -- not a 0.2 BPM rounding artifact.
+    a = {"tier": "strong", "lyric_sim": None, "key_rel": "perfect", "tempo_gap": 1.0}
+    b = {"tier": "strong", "lyric_sim": None, "key_rel": "adjacent", "tempo_gap": 0.8}
+    ps = [b, a]
+    hm.sort_pairs(ps)
+    check(ps[0] is a, "inside one BPM bucket, key breaks the tie")
+
+    # An exact tempo match is its own bucket, ahead of anything that needs nudging.
+    exact = {
+        "tier": "strong",
+        "lyric_sim": None,
+        "key_rel": "adjacent",
+        "tempo_gap": 0.0,
+    }
+    ps = [a, exact]
+    hm.sort_pairs(ps)
+    check(ps[0] is exact, "exact tempo match ranks first")
+
+    # Lyric similarity still outranks both when a --lyrics run has scored them.
+    dull = {"tier": "strong", "lyric_sim": 0.0, "key_rel": "perfect", "tempo_gap": 0.0}
+    rich = {"tier": "strong", "lyric_sim": 0.5, "key_rel": "adjacent", "tempo_gap": 4.0}
+    ps = [dull, rich]
+    hm.sort_pairs(ps)
+    check(ps[0] is rich, "lyric re-rank still leads when scored")
+
 
 def lyric_theme() -> None:
     # Word extraction keeps 3+ char tokens; rarity, not a stopword list, is what

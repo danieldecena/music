@@ -148,6 +148,23 @@ check(
     "half" in mr.why_line(HALF).lower(), f"half/double is named: {mr.why_line(HALF)!r}"
 )
 
+# A key-only pair is one the tempo check REJECTED, so the why-line must not
+# claim the gap is workable. It used to render "35 BPM apart — inside
+# pitch-fader range", which is plainly false and the opposite of the hedging
+# the rest of the line does.
+KEY_ONLY = dict(
+    PAIR,
+    tier="key-only",
+    tempo_gap=35,
+    b={"name": "x", "artist": "y", "bpm": 93, "key": "F"},
+)
+wk = mr.why_line(KEY_ONLY)
+check(
+    "pitch-fader range" not in wk, f"key-only pair must not claim fader range: {wk!r}"
+)
+check("35 BPM apart" in wk, f"key-only pair still states the real gap: {wk!r}")
+check("drums" in wk or "too far" in wk, f"key-only pair says what to do: {wk!r}")
+
 # Near-misses explain an empty result instead of returning nothing.
 LONE = {"name": "1-01 SPEED DEMON", "artist": "Justin Bieber", "bpm": 92.7, "key": "Dm"}
 misses = mr.near_misses(LONE, [OTHER], tol=0.06)
