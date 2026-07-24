@@ -4,7 +4,9 @@
 - **`Z) Mix report` / `./mix-report.sh` / `catalog.py mix --seed <title>`** — pivots
   on one named track instead of dumping every library pair. Prints a verdict, a
   why-line, rarest-first shared lyric words, and near misses; `--preview` renders
-  a tempo-matched crossfade of the top pair and plays it via `afplay`. Verified
+  a tempo-matched crossfade of the top pair, starting each track at its nearest
+  detected section boundary (not a fixed offset — fixed 2026-07-24), and plays
+  it via `afplay`. Verified
   against the live catalog for seed hits, near-miss-only seeds, nomatch (exit 1),
   `--preview` without `--seed` (exit 1), `--json`, and the unchanged library-wide
   path. Rendering is pure (`Scripts/mix_report.py`), as is the ffmpeg command
@@ -263,13 +265,6 @@
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
-- **[code] Improve `detect_key` pitch detection** — the oracle is now trustworthy
-  (`key_oracle.py score` runs the live analyzer, fixed 2026-07-24) and it says
-  `detect_key` is 1/10 exact, 7/10 unrelated. The dominant error is **wrong pitch
-  class**, not the mode flip the roadmap assumed — the chroma/pitch stage is the
-  real problem. A relative-pair tie-break would help only ~2 tracks (Ivy, The
-  Color Violet); the pitch stage is the larger payoff. Grade with `key_oracle.py
-  score`. Direction on scope is open (measurement fixed first, per the user).
 
 Full open list: `TASKS.md`.
 
@@ -283,6 +278,18 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-24
+- Fixed: **mix preview crossfaded at fixed offsets, not real section boundaries.**
+  `mix_preview.excerpt_start()` existed to pick a track's first section boundary
+  (from `estimate_boundaries`) but `catalog.py`'s `_play_preview` never called it
+  — it hardcoded 40s/30s start points instead. Noticed when asked whether the
+  preview mixed at a lyric/beat transition point; it didn't. Added
+  `_excerpt_start(path, bpm)` (lazy `analyze_track` import, matching
+  `key_oracle.py`'s pattern since `catalog.py` stays numpy-free at module level)
+  to decode each side, estimate boundaries, and feed both into `excerpt_start`.
+  python-reviewer caught two real issues before commit: `bpm=None` would throw
+  inside `estimate_boundaries` (guarded with `bpm or 0.0`), and the exception
+  fallback silently swallowed failures (now prints a one-line diagnostic).
+  Verified: both test suites still pass, live preview still renders. `618dc07`.
 - Tried and REVERTED-IN-SPIRIT (code kept, hypothesis rejected): **subharmonic-
   summation chroma for detect_key.** `_chroma_projection` now also votes a
   bin's energy toward the pitch class of freq/3 and freq/5 (weights 0.5/0.35),
