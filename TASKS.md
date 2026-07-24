@@ -2,9 +2,9 @@
 
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
-- [ ] Improve detect_key pitch detection — 1/10 exact vs UG, error is pitch not mode
+- [x] Improve detect_key pitch detection — fixed chroma column-normalization bug + subharmonic votes, 1/10 -> 4/10 exact vs UG
 - [x] Implement subharmonic-summation chroma fix (3rd/5th harmonic weighting in _chroma_projection)
-- [x] Verify chroma fix vs test-analysis.py + key_oracle.py score, update STATUS.md — negative result, oracle score unchanged
+- [x] Verify chroma fix vs test-analysis.py + key_oracle.py score, update STATUS.md — combined with normalization fix, 4/10 exact
 
 ## Completed
 

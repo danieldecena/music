@@ -290,7 +290,20 @@ def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
     Each bin also casts a smaller vote for its 3rd- and 5th-subharmonic pitch
     class (see `_HARMONICS`), so a bin that IS a 3rd/5th harmonic of some lower
     fundamental reinforces that fundamental's pitch class instead of only its
-    own — the fix for detect_key's measured wrong-pitch-class bias.
+    own.
+
+    The per-pitch-class column totals are then equalized. Linear FFT bin
+    spacing vs. logarithmic semitone spacing means a fixed bin can span more
+    than one semitone at the low end of the range, and `np.rint(midi) % 12`
+    rounds each such bin to a single pitch class -- which pitch classes
+    happen to catch the extra bins is an accident of where 55-2000 Hz lands
+    on the frequency grid, not anything about the audio. Measured: unweighted,
+    white noise (zero tonal content) still resolves to a specific key (`D`,
+    total column weight ~16.2 vs. ~11.3 for C#/D#) -- a content-independent
+    bias baked into every track's chroma. Equalizing collapses that bias
+    (white-noise chroma spread 0.030 -> 0.001) and, combined with the
+    subharmonic votes above, moved the independent UG key-oracle score from
+    1/10 exact to 4/10 exact, 7/10 sharing the pitch-class set.
     """
     freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
     keep = (freqs >= 55.0) & (freqs <= 2000.0)
@@ -301,6 +314,9 @@ def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
     for n, w in _HARMONICS:
         pc = np.rint(midi - 12 * np.log2(n)).astype(int) % 12
         proj[idx, pc] += (register * w).astype(np.float32)
+    totals = proj.sum(axis=0, keepdims=True)
+    proj = np.divide(proj, totals, out=np.zeros_like(proj), where=totals > 0)
+    proj *= totals.mean()
     return keep, proj
 
 

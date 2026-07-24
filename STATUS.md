@@ -205,33 +205,33 @@
   songbpm / getsongbpm / musicstax all re-display one pipeline). Their agreement
   is correlated, not corroboration, and they carry the same octave-error risk
   being measured. Rows ending `?` are already suspect.
-- Key detection is WEAK — and worse than the roadmap believed. Graded against the
-  independent UG oracle with the oracle FIXED to run the live analyzer
-  (`key_oracle.py score`, 2026-07-24): **1/10 exact, 3/10 share the pitch-class
-  set, 7/10 unrelated.** The dominant error is a **wrong pitch class**, not a
-  mode flip — only Ivy and The Color Violet are relative flips. The prior "4/10
-  exact / mode-flip on Ivy+Nights" number was a MEASUREMENT BUG: `key_oracle`
-  graded fixtures-analysis.tsv column 3 (Echo Nest ground truth) against UG, so
-  it compared two reference label sets and never ran `detect_key`. Nights, for
-  one, reads `F` major live (a pitch error vs UG `Ab`), not the `Fm` the fixture
-  claims. See the decision log.
-  - **NEGATIVE RESULT (2026-07-24): subharmonic-summation chroma did not move
-    the oracle score.** Tried adding 3rd/5th-harmonic subharmonic votes to
-    `_chroma_projection` (each bin also casts a smaller vote for the pitch
-    class of freq/3 and freq/5, on the theory that a weak-fundamental
-    bass/guitar note's energy was piling into its harmonic's own pitch class
-    instead of the true tonic's — a plausible mechanism, and the standard
-    HPCP fix for it). Score unchanged: still 1/10 exact, 3/10 pitch-class
-    match, 7/10 unrelated, same tracks in each bucket. It did shift raw
-    labels for 3 tracks (Solo and Self Control C->F, Godspeed F->Dm) but none
-    crossed into a correct-pitch-class bucket. All 21 synthetic tests and all
-    26 chord tests still pass. Left shipped (harmless, mechanistically sound,
-    no regression) but the real defect is evidently elsewhere — the weak
-    fundamental / dominant-harmonic theory does not explain most of these
-    7 misses. Do not assume this mechanism again without new evidence; next
-    step is probably to look at whether the bass/other stem WEIGHTING
-    (0.6/1.0 in `analyze_stem_track`) or something in profile matching itself
-    is the real culprit, not the chroma projection.
+- Key detection was WEAK (1/10 exact vs the independent UG oracle) and is now
+  **FIXED to 4/10 exact, 7/10 sharing the pitch-class set** (`key_oracle.py
+  score`, 2026-07-24, `_chroma_projection` in `analyze_track.py`). Two changes,
+  and the second one is where the real fix was:
+  - Subharmonic-summation votes (3rd/5th harmonic -> its subharmonic's pitch
+    class) alone moved NOTHING — same 1/10 exact, same per-track buckets,
+    confirmed by `git stash` diff. The "weak fundamental" theory was wrong (or
+    at least not the dominant cause).
+  - **The actual bug: `_chroma_projection`'s per-pitch-class total weight was
+    content-independent and uneven.** Linear FFT bin spacing vs. logarithmic
+    semitone spacing means a bin can span more than a semitone at the low end
+    of 55-2000 Hz, and `np.rint(midi) % 12` rounds each such bin to one pitch
+    class — which classes catch the extra bins is an accident of the
+    frequency grid. Proof: pure white noise (zero tonal content) still
+    resolved to a specific key (`D`; column totals ~16.2 for D/A vs ~11.3 for
+    C#/D#) regardless of what's playing. Equalizing the column totals in
+    `_chroma_projection` collapsed that bias (white-noise chroma spread 0.030
+    -> 0.001) and, *combined with* the subharmonic votes (normalization alone
+    only got to 2/10 exact, 3/10 pitch-class), took the oracle score to 4/10
+    exact, 7/10 pitch-class match. The two fixes are synergistic, not
+    independently additive — measured across 4 variants (baseline, harmonics
+    only, normalize only, both) before shipping.
+  - Remaining misses (Pink+White, Nights, Godspeed, The Color Violet): Nights
+    and Pink+White are now `unrelated` rather than a near-tie; Godspeed reads
+    `adjacent` (a fifth off — plausible dominant/tonic confusion, a smaller
+    problem than the pre-fix wrong-pitch-class-entirely errors). All 21
+    `test-analysis.py` and 26 `test-chords.py` assertions still pass.
 - **Chord-analyzer accuracy is unverified by ear** — same caveat as tempo/key,
   and it inherits the weak key detection above (its diatonic prior leans on the
   detected key). On real "02 Let Em' Know" it reported key `A` while the chart
@@ -296,11 +296,31 @@ dead-code warnings.
   Self Control: C->F; Godspeed: F->Dm) but none crossed into a correct
   bucket. All 21 `test-analysis.py` and 26 `test-chords.py` assertions still
   pass, so nothing regressed — left shipped since it's mechanistically sound
-  and harmless, but it did not fix the measured problem. The weak-fundamental
-  theory is not the dominant cause of these 7 misses; next suspect is the
-  bass(0.6)/other+guitar+piano(1.0 each) stem-blend weighting in
-  `analyze_stem_track`, or the KS profile-matching step itself, not the
-  chroma projection.
+  and harmless, but it did not fix the measured problem on its own.
+  - **Follow-up, same session: found and fixed the actual bug.** Suspecting the
+    stem-blend weighting was a dead end — the oracle grades `detect_key` on
+    the raw full-mix `.m4a` (fixtures column 0), which never goes through
+    `analyze_stem_track` at all, so that theory couldn't apply. Instead:
+    dumped the two full-mix chroma vectors that were miscalled (Solo, Self
+    Control) and found them nearly FLAT (spread ~0.03-0.04 across all 12
+    pitch classes) — the discriminating signal was already weak before any
+    profile matching. More aggressive percussive-frame dropping (15% -> 70%)
+    changed nothing, ruling out drum-transient smear. Tested pure white noise
+    through `_chroma_vector` next: it resolved to a specific key (`D`) rather
+    than a flat/arbitrary result, proving a content-independent bias baked
+    into `_chroma_projection` itself, not the audio. Root cause: linear FFT
+    bin spacing vs. logarithmic semitone spacing means low-range bins can
+    span more than a semitone, and `np.rint(midi) % 12` rounds each such bin
+    to one pitch class — which classes catch the extra bins is an accident
+    of the 55-2000 Hz frequency grid (column totals ~16.2 for D/A vs. ~11.3
+    for C#/D#). Fix: equalize `_chroma_projection`'s per-pitch-class column
+    totals after the harmonic-vote step. Tested 4 variants against the
+    oracle before shipping (baseline / harmonics-only / normalize-only /
+    both): normalize-only reached 2/10 exact but only 3/10 pitch-class
+    (same as baseline); harmonics+normalize together reached **4/10 exact,
+    7/10 pitch-class** — the two fixes are synergistic, neither alone gets
+    there. Shipped both. See the Known-broken entry above for the final
+    per-track breakdown.
 - Fixed: **`key_oracle.py score` was grading the wrong thing.** `_fixture_tracks`
   yielded fixtures-analysis.tsv **column 3** as "our_key" and `score` graded that
   against UG. But column 3 is the Echo Nest ground-truth reference (its header
