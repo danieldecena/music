@@ -2,9 +2,13 @@
 
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
-- [ ] Re-index catalog bpm/key — all 20 rows are stale, 38 tracks unanalyzed
+- [ ] Improve key detection accuracy — 2/13 exact, mix key relations need the ear
+- [ ] Fix scan's filename-stem track collision (corrupt Exchange copy won)
+- [ ] Brainstorm + improve the mix-match report output
 
 ## Completed
+
+- [x] Re-index catalog bpm/key via backfill --refresh, clean song titles — 132b5ce
 
 - [x] Fix the Exchange 3:2 misread by searching the grid's lag, not just phase — 4300a1d
 

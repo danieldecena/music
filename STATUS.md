@@ -175,7 +175,23 @@
     three-halves unchanged; the other 12 tracks byte-identical. Still open:
     Godspeed (3:2 fast) and Self Control (2:1). Same standing caveat — a
     correlated-label score, not the ear.
-- **The catalog's stored bpm/key are stale and the key column is not usable.**
+- **`scan` keys tracks by filename stem, so same-titled tracks on two albums
+  collide.** Found 2026-07-23: `03 Exchange` exists in both `T R A P S O U L`
+  and `T R A P S O U L (Deluxe)`; one row won, and it pointed at the non-Deluxe
+  copy, which is **corrupt** (`ffprobe`: invalid mvhd time scale, no decodable
+  audio) — the sole failure in an otherwise clean 54/55 refresh. Repointed that
+  row at the Deluxe file by hand and re-backfilled it (161 BPM, Am). The
+  underlying collision is unfixed: the Deluxe album's other 17 tracks are indexed
+  and the plain album's are shadowed. A track key should include the album.
+- **Mix-report caveats, for anything read off `catalog.py mix`.** BPM/key are
+  estimates from this repo's analyzer. Tempo is the solid half; key is the weak
+  half at 2/13 exact against published labels, so treat key relationships as a
+  shortlist to confirm by ear rather than a verdict. The optional lyric score is
+  a word-set overlap after stopword removal — it finds shared vocabulary, not
+  shared meaning, so a high score means the two songs use the same words, not
+  that they are about the same thing.
+- ~~**The catalog's stored bpm/key are stale and the key column is not usable.**~~
+  **RESOLVED 2026-07-23 (132b5ce).** Kept for the mechanism:
   All 20 analyzed rows carry one timestamp (2026-07-10T09:51:56), predating every
   tempo/key change, and hold only two distinct keys across 20 tracks (F and Am).
   Re-analyzing three at random: `07 Ten Nine Fourteen` F/70 -> C/105.0,
@@ -187,6 +203,10 @@
   key distribution, not a real match. 38 of 58 tracks have no analysis at all.
   `backfill` will not repair this: it only fills rows where bpm/key are NULL, so
   it skips all 20. A re-index needs a refresh path that overwrites.
+  Fixed by `backfill --refresh`. After re-running: 55 analyzed tracks (was 20),
+  eight distinct keys (was two), and cross-artist pairs now surface where the
+  output had been almost entirely same-album. Lesson: a fill-NULLs-only backfill
+  silently freezes whatever the estimator believed the day a row was written.
 - Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
   octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
   the candidate scoring only work together; refinement alone makes a widened
