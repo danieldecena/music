@@ -114,13 +114,51 @@ seed and ranked pairs it emits:
   `--limit` caps the ranked list only; near-misses are capped at 3 regardless, so
   a low limit never hides the explanation for an empty result.
 
-### 5. JSON output
+### 5. Mix preview — `Scripts/mix_preview.py` (new)
+
+A report that recommends a mix you cannot hear is a claim you have to take on
+faith. `--preview` renders the recommended pair as a tempo-matched crossfade and
+plays it, so the verdict is checkable by ear in about ten seconds. This matters
+more than usual here because key detection is the weak input: the ear is the only
+oracle that does not share the estimator's blind spots.
+
+Verified end to end before speccing (YUKON 128 x Skyline To 129):
+
+```
+ffmpeg -ss <a_start> -t <len> -i A  -ss <b_start> -t <len> -i B \
+  -filter_complex "[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a];\
+                   [1:a]aformat=sample_rates=44100:channel_layouts=stereo,atempo=<r>[b];\
+                   [a][b]acrossfade=d=8:c1=tri:c2=tri[out]" \
+  -map "[out]" -vn -ac 2 preview.wav
+```
+
+Produced a correct 32.1s file (20 + 20 - 8 overlap). Played with `afplay`, the
+same mechanism `click_compare` already uses.
+
+Details that the trial settled:
+
+- **`-vn` is required.** Every Apple Music `.m4a` carries an embedded mjpeg cover
+  art stream. Without `-vn` ffmpeg pulls it into the output and the wav muxer
+  fails with `does not support more than one stream of type audio`. This cost the
+  first attempt and is not obvious from the error text.
+- **`atempo` ratio** is `a_bpm / b_bpm`, stretching B onto A's grid. The filter
+  accepts 0.5-2.0 per instance; a half/double pair needs the ratio folded to the
+  same octave first, which `tempo_compatible` already reports.
+- **Excerpt start points** come from `analyze_track`'s existing section
+  transitions, so the preview begins at a musical boundary rather than an
+  arbitrary offset. Falls back to 25% into the track when no transitions exist.
+- Renders to a temp file, not into `Samples/`. Previews are disposable.
+
+`--preview` implies a seed. Without ffmpeg on PATH it prints how to install and
+returns cleanly rather than failing the whole report.
+
+### 6. JSON output
 
 Mirrors the text exactly: verdict, the parts of the why-line as separate fields,
 shared words with their document frequencies, and near-misses. A future
 `--narrate` consumer reads this; the core never learns about narration.
 
-### 6. Tests — `tests/test-mix-report.py` (new)
+### 7. Tests — `tests/test-mix-report.py` (new)
 
 Hand-rolled `check()` assertions matching the repo's existing style. All pure
 functions — no network, no audio decode, no database.
@@ -132,6 +170,11 @@ functions — no network, no audio decode, no database.
 - Near-miss selection when no pair clears the tempo tolerance.
 - Renderer output against a fixed pair, asserting the tempo fact precedes the key
   claim and that the key claim carries its hedge.
+- The preview's ffmpeg command is built by a pure `preview_args(...)` builder
+  tested without invoking ffmpeg — the same no-live-dependency pattern the
+  logic-pro-mcp AppleScript builders use. Assert `-vn` is present, the atempo
+  ratio matches `a_bpm / b_bpm`, a half/double pair folds into 0.5-2.0, and the
+  excerpt start comes from a section transition when one exists.
 
 ## Out of scope
 
@@ -139,6 +182,18 @@ Named so they do not creep in:
 
 - Set or tracklist chaining (a path search over pairs — a separate project).
 - The `--narrate` layer.
+- **Playing the preview through Logic Pro.** Decided against 2026-07-23, not
+  deferred. The preview answers "does this pair work" and must be instant and
+  disposable; Logic answers "let me build it" and is a different job. Routing the
+  ear-check through `build_project_with_stems` would put the codebase's least
+  reliable path — hardened the same day precisely because it claimed success
+  without verifying the import — in front of a ten-second question, and the
+  off-screen launch/park/AX sequence is slow and takes the user's screen. Import
+  into Logic by hand when a pair is worth flipping.
+- **Playing the preview on a BetterDisplay virtual display.** Not applicable: it
+  creates virtual screens, the preview is audio, and macOS audio output is
+  independent of displays. The off-screen display exists to hide a GUI from the
+  user; a preview exists to be perceived by them.
 - Any change to `rank_pairs`' tier logic or the Camelot compatibility rules.
 - Fixing key-detection accuracy. Tracked separately; this design works around it
   by how it words the report, not by improving the estimate.
