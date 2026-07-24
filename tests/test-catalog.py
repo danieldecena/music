@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import sqlite3, sys, os
+import os
+import sqlite3
+import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Scripts"))
 import catalog
@@ -48,3 +50,32 @@ assert "Daft Punk" in label and "123 BPM" in label and "F#m" in label, label
 assert "deconstructed" in label, label
 
 print("ok: catalog search")
+
+# song_title: strip the leading track-number prefix and any file extension, so
+# display reads "Pink + White", not "03 Pink + White.m4a".
+assert catalog.song_title("03 Pink + White") == "Pink + White"
+assert catalog.song_title("1-01 SPEED DEMON") == "SPEED DEMON"
+assert catalog.song_title("09 Nights.m4a") == "Nights"
+assert (
+    catalog.song_title("Apple Music/Frank Ocean/Blonde/16 Godspeed.m4a") == "Godspeed"
+)
+# No prefix, nothing to strip.
+assert catalog.song_title("One More Time") == "One More Time"
+assert catalog.song_title("YUKON") == "YUKON"
+# Only ONE prefix is stripped, so a title that itself starts with a number keeps it.
+assert catalog.song_title("10 502 Come Up") == "502 Come Up"
+assert catalog.song_title("1979") == "1979"
+# Degenerate input must never yield an empty label.
+assert catalog.song_title("07") == "07"
+assert catalog.song_title("") == ""
+assert catalog.song_title(None) == ""
+
+assert "One More Time" in catalog._label(hit[0])
+assert (
+    catalog._mix_track_label(
+        {"artist": "Justin Bieber", "name": "1-01 SPEED DEMON", "key": "Dm", "bpm": 93}
+    )
+    == "Justin Bieber — SPEED DEMON (Dm/93)"
+)
+
+print("ok: catalog song_title")

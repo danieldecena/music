@@ -47,6 +47,26 @@ ANALYZE_RE = re.compile(
 )
 
 
+# Leading disc/track number on an Apple Music filename: "03 ", "1-01 ".
+TRACK_NUM_RE = re.compile(r"^\d+(?:-\d+)?[ .\-_]+")
+
+
+def song_title(name):
+    """Display form of a catalog name: no path, no extension, no track number.
+
+    Catalog names come from filenames, so they carry the numbering Apple Music
+    writes ("1-01 SPEED DEMON"). That sorts a folder but reads badly in a mix
+    listing. Strips one numeric prefix only, so a title that itself opens with a
+    number ("10 502 Come Up") keeps it. Falls back to the input when stripping
+    would leave nothing, so a track named "07" never renders blank.
+    """
+    if not name:
+        return ""
+    stem = Path(name).stem if Path(name).suffix.lower() in AUDIO_EXT else str(name)
+    stem = Path(stem).name
+    return TRACK_NUM_RE.sub("", stem).strip() or stem
+
+
 def now():
     return datetime.now().isoformat(timespec="seconds")
 
@@ -244,12 +264,21 @@ def index_track(con, name, bpm=None, key=None):
     con.commit()
 
 
-def backfill(con, limit=None):
-    """Fill BPM/key for already-deconstructed tracks that predate the index hook."""
+def backfill(con, limit=None, refresh=False):
+    """Fill BPM/key for already-deconstructed tracks that predate the index hook.
+
+    `refresh` re-analyzes every track with a source file instead, overwriting
+    values that are already there. Needed because the default only fills NULLs,
+    which cannot repair rows analyzed by a superseded estimator.
+    """
     init(con)
+    where = (
+        "source_path IS NOT NULL"
+        if refresh
+        else "model IS NOT NULL AND (bpm IS NULL OR key IS NULL) AND source_path IS NOT NULL"
+    )
     rows = con.execute(
-        "SELECT name, source_path FROM tracks "
-        "WHERE model IS NOT NULL AND (bpm IS NULL OR key IS NULL) AND source_path IS NOT NULL "
+        f"SELECT name, source_path FROM tracks WHERE {where} "
         "ORDER BY deconstructed_at DESC"
     ).fetchall()
     if limit:
@@ -307,7 +336,7 @@ def cmd_ready(con, limit, as_json):
     else:
         for o in out:
             print(
-                f"{o['track']}  —  {o['bpm'] or '?'} BPM  key {o['key'] or '?'}  "
+                f"{song_title(o['track'])}  —  {o['bpm'] or '?'} BPM  key {o['key'] or '?'}  "
                 f"[{o['stems']} stems, {o['kit']} kit, {o['oneshots']} one-shots, {o['chops']} chops, {o['vocals']} vocals]"
             )
         if not out:
@@ -415,7 +444,7 @@ def _search_rows(con, query):
 
 
 def _label(row):
-    title = row["name"]
+    title = song_title(row["name"])
     who = f"{row['artist']} / {title}" if row["artist"] else title
     bpm = f"{row['bpm']} BPM" if row["bpm"] else "? BPM"
     key = row["key"] or "?"
@@ -449,7 +478,7 @@ def cmd_search(con, query, as_json, menu):
 
 def _mix_track_label(t):
     who = f"{t['artist']} — " if t.get("artist") else ""
-    return f"{who}{t['name']} ({t['key']}/{t['bpm']})"
+    return f"{who}{song_title(t['name'])} ({t['key']}/{t['bpm']})"
 
 
 def _lyric_rerank(pairs):
@@ -578,6 +607,11 @@ def main(argv):
     p.add_argument("--json", action="store_true")
     p = sub.add_parser("backfill")
     p.add_argument("--limit", type=int)
+    p.add_argument(
+        "--refresh",
+        action="store_true",
+        help="re-analyze every track with a source file, overwriting existing bpm/key",
+    )
     p = sub.add_parser("search")
     p.add_argument("query", nargs="?", default="")
     p.add_argument("--json", action="store_true")
@@ -627,7 +661,7 @@ def main(argv):
         elif ns.cmd == "stats":
             cmd_stats(con, ns.json)
         elif ns.cmd == "backfill":
-            backfill(con, ns.limit)
+            backfill(con, ns.limit, ns.refresh)
         elif ns.cmd == "search":
             cmd_search(con, ns.query, ns.json, ns.menu)
         elif ns.cmd == "mix":
