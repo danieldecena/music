@@ -178,5 +178,36 @@ check(
     f"empty report explains itself: {empty!r}",
 )
 
+# --- preview command builder ------------------------------------------------
+
+import mix_preview as mp  # noqa: E402
+
+check(
+    abs(mp.atempo_ratio(128, 129) - 0.99224) < 0.0001,
+    f"ratio is a_bpm/b_bpm, got {mp.atempo_ratio(128, 129)}",
+)
+check(mp.atempo_ratio(128, 64) == 1.0, "a double-time partner folds to 1.0")
+check(0.5 <= mp.atempo_ratio(160, 40) <= 2.0, "extreme ratios fold into atempo's range")
+check(0.5 <= mp.atempo_ratio(40, 160) <= 2.0, "extreme ratios fold from below too")
+check(mp.atempo_ratio(0, 128) == 1.0, "a zero BPM degrades to no stretch")
+
+# Start at a section boundary when the analyzer found one, else 25% in.
+check(
+    mp.excerpt_start([30.0, 60.0, 90.0], 200.0) == 30.0, "first usable transition wins"
+)
+check(mp.excerpt_start([], 200.0) == 50.0, "no transitions -> 25% into the track")
+check(
+    mp.excerpt_start([190.0], 200.0) == 50.0,
+    "a transition too close to the end is skipped",
+)
+
+args = mp.preview_args("A.m4a", "B.m4a", 0.99224, "/tmp/p.wav", 40.0, 30.0)
+check("-vn" in args, "preview_args passes -vn (Apple Music files carry cover art)")
+check(args[0] == "ffmpeg", "preview_args builds an ffmpeg command")
+check("atempo=0.992240" in " ".join(args), f"atempo ratio is in the filter: {args}")
+check("acrossfade=d=8" in " ".join(args), "crossfade duration is set")
+check(args[-1] == "/tmp/p.wav", "output path is last")
+check(args.count("-i") == 2, "two inputs")
+
 print(f"\n{_passed} passed, {_failed} failed")
 sys.exit(1 if _failed else 0)
