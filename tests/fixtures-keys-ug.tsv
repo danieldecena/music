@@ -1,0 +1,16 @@
+# Independent key labels from Ultimate Guitar tab tonalities.
+# Deliberately NOT Echo Nest-derived -- see Scripts/key_oracle.py.
+# artist	title	key	weight	sources
+Frank Ocean	Nikes	Cm	8	Official
+Frank Ocean	Ivy	C	1203	Chords,Official,Pro,Tabs
+Frank Ocean	Pink + White	A	121	Official,Tabs
+Frank Ocean	Solo	Eb	1	Official
+Frank Ocean	Self Control	Ab	1173	Chords,Official,Ukulele Chords
+Frank Ocean	Nights	Ab	54	Official,Tabs,Ukulele Chords
+Frank Ocean	White Ferrari	C	1412	Chords,Official,Tabs
+Frank Ocean	Godspeed	F#	508	Chords
+Bryson Tiller	Exchange	C#m	1	Chords
+Bryson Tiller	Don't		0	
+Bryson Tiller	Rambo		0	
+Tory Lanez	The Color Violet	Bm	15	Official
+Justin Bieber	01 SPEED DEMON		0	

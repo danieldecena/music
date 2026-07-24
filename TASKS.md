@@ -2,10 +2,11 @@
 
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
-- [ ] Improve key detection accuracy — 2/13 exact, mix key relations need the ear
+- [ ] Fix the major/minor mode flip in detect_key — grade with key_oracle.py score
 
 ## Completed
 
+- [x] Independent key oracle (key_oracle.py) — grade detect_key off Ultimate Guitar
 - [x] Demote --lyrics to a tie-break inside the tempo bucket in _sort_key
 
 - [x] Mix report: rank tempo before key; fix key-only pair's false tempo claim — 483f45c

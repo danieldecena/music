@@ -205,9 +205,12 @@
   songbpm / getsongbpm / musicstax all re-display one pipeline). Their agreement
   is correlated, not corroboration, and they carry the same octave-error risk
   being measured. Rows ending `?` are already suspect.
-- Key detection is no longer degenerate but is still weak: 2/13 exact against
-  published keys, unchanged by the chroma rewrite. The rewrite fixed the
-  collapse (44% of baseline rows reported "F"), not the accuracy.
+- Key detection is weak but narrower than "2/13 exact" implied — that number was
+  against the correlated Echo Nest labels. Graded against the independent UG oracle
+  (`key_oracle.py score`): 4/10 exact but 6/10 share the pitch-class set, so the
+  dominant error is a major/minor mode flip (Ivy, Nights), not a wrong pitch. The
+  chroma rewrite fixed the old collapse (44% of baseline rows reported "F"); the
+  mode call is the remaining defect. See the decision log and the [code] item.
 - **Chord-analyzer accuracy is unverified by ear** — same caveat as tempo/key,
   and it inherits the weak key detection above (its diatonic prior leans on the
   detected key). On real "02 Let Em' Know" it reported key `A` while the chart
@@ -239,14 +242,12 @@
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
-- **[you] Pick a route to an independent key oracle** — the search itself is done
-  (see the decision log): Hooktheory TheoryTab is the right source, human by-ear
-  and covering the fixture tracks, but its public dump misses them 0/13 and its
-  live pages 403. What is left is a credential (an account for their API) or a
-  scraping decision — both yours. Untried and cheaper: Ultimate Guitar's chord
-  sheets, where the key falls out of the chord set. Do not touch `detect_key`
-  before one of these lands; every current label is Echo Nest-derived, so a better
-  `score` would be circular.
+- **[code] Fix the major/minor mode flip in `detect_key`** — now gradeable: the
+  independent oracle landed (`key_oracle.py`, see the decision log) and it says the
+  pitch-class detection is mostly right while the mode call is not. Ivy and Nights
+  are both exact-but-relative. That is one decision — which of a pitch-class set's
+  two tonics is home — and it is worth attacking before anything else in
+  `detect_key`. Grade with `key_oracle.py score`, not the Echo Nest fixtures.
 
 Full open list: `TASKS.md`.
 
@@ -260,22 +261,30 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-23
-- Found, not yet usable: **Hooktheory TheoryTab is a genuinely independent key
-  oracle, but reaching it needs a call from the user.** Every current fixture label
-  is Echo Nest-derived, so scoring `detect_key` against them is circular. TheoryTab
-  is the one source found that breaks that: ~73k songs transcribed *by ear* by
-  humans in Hookpad, with key and mode stated per song — a different pipeline, not
-  a re-display of the same one. Its live pages cover exactly the fixture tracks
-  (Ivy, Self Control, Pink + White, Nights, Godspeed all have tabs). Two dead ends
-  measured: the public data dump (`owencm/hooktheory-data`) is a stale 375-song
-  sample and overlaps the 13 fixtures **0/13**, though its XML has the right shape
-  (`<artist>`, `<title>`, `<key>`); and the live pages return **HTTP 403** to
-  WebFetch. So the remaining routes are (a) a Hooktheory account for the API — a
-  credential only the user can create, and the public API exposes chord-trend
-  endpoints, not lookup-by-title — or (b) driving a real browser at the pages,
-  which is a scraping decision, not a technical one. Not attempted either way.
-  Untried third option worth a look first: Ultimate Guitar's human-submitted chord
-  sheets, where the key is derivable from the chord set rather than stated.
+- Shipped: **an independent key oracle, and it reframes the key problem.**
+  `Scripts/key_oracle.py` grades `detect_key` against Ultimate Guitar tab
+  tonalities — human transcriptions, wrong in different ways than the Echo Nest
+  labels, which is the entire point. UG states `tonality_name` per tab, so no
+  chord inference was needed. Result on the 13 fixtures: **10 covered, 4 exact, 2
+  relative, 1 adjacent, 3 unrelated.** The headline is not 4/10 but **6/10 sharing
+  the pitch-class set**: Ivy (Am vs C) and Nights (Fm vs Ab) are major/minor mode
+  flips, not pitch errors. So "key detection is 2/13 exact" was always partly an
+  artifact of grading against a correlated source — the real, narrower defect is
+  which tonic of a correct pitch-class set gets called home. Three measured
+  gotchas, each of which silently costs coverage: most user tabs leave tonality
+  blank while `Official` (licensed) tabs fill it in and carry zero votes, so
+  weight is `votes + 1`; UG files "Pink + White" as "Pink Plus White", so titles
+  match on a variant set; and a cover band's tab can out-vote every real one, so
+  rows must match artist AND title. `urllib` gets a 404 from UG's search where
+  `curl` gets a 200, so the fetch shells out. Responses cache to
+  `Samples/KeyLabels/` (gitignored) — a re-run is offline; labels are committed at
+  `tests/fixtures-keys-ug.tsv`. Caveats: a tab's tonality can be a capo key, and
+  coverage is partial (Don't, Rambo, SPEED DEMON have no stated tonality anywhere).
+- Rejected on measurement: **Hooktheory TheoryTab**, despite being the better
+  source on paper — human by-ear, key and mode stated, tabs for the fixture
+  tracks. Its public dump (`owencm/hooktheory-data`) is a stale 375-song sample
+  overlapping the fixtures **0/13**, and its live pages return 403, leaving only
+  an account or a scrape. Ultimate Guitar needed neither and covered 10/13.
 - Decided (user's call): **lyric similarity is a tie-break, not a lead signal.**
   `_sort_key` had `lyric_sim` above the tempo gap, so `--lyrics` reordered across
   tempo buckets and undid the tempo-first ranking decided hours earlier: seeding

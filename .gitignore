@@ -44,3 +44,6 @@ Samples/Lyrics/
 catalog.sqlite
 catalog.sqlite-*
 .mcp.json
+
+# Key labels cache (fetched)
+Samples/KeyLabels/
