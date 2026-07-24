@@ -236,6 +236,17 @@
   left Logic with 0 windows (no tracks imported) yet returned its hardcoded
   "imported N stems" success string; the summary is unverified. Both filed in
   TASKS. Process for driving Logic off-screen saved to project memory.
+- Decided: **build.py now verifies the import before reporting** (logic-pro-mcp
+  1aa52b9). Two pure read-only script builders (`_track_count_script`,
+  `_window_count_script`) drive a before/after track-header count and a
+  window-count check: no window afterward -> `ToolError` (the exact 0-window
+  failure above); count didn't rise for the stems -> an explicitly *unverified*
+  summary instead of the old unconditional success; count rose -> reports the
+  verified track count, flagging any shortfall. Reads use bare `tell process`
+  (no activate) so verification never steals focus off-screen. Live-checked both
+  primitives against the running off-screen Logic (`window_count=1`,
+  `track_count=1`); did not re-run the full fragile build against the live
+  session. TDD (+2 pure-builder tests, 39 green).
 - Decided: track prompts accept a **typed title, not just a dragged path**
   (`Scripts/find_track.py`, stdlib difflib). Fuzzy so typos still match; a lone
   hit auto-resolves, several show a picker. Kept it out of the bass-stem and
