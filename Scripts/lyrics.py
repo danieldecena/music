@@ -114,15 +114,61 @@ _STOPWORDS = {
 }
 _WORD = re.compile(r"[a-z']+")
 
+# An .lrc line is either a metadata tag ([ar:...], [ti:...]) or a timestamped
+# lyric line. Timestamps carry 2 or 3 decimal places depending on the source.
+_LRC_TS = re.compile(r"\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]")
+_LRC_META = re.compile(r"^\[[a-z]+:[^\]]*\]$", re.IGNORECASE)
+
+
+def strip_lrc(text: str) -> str:
+    """Plain lyric text from .lrc content: metadata lines and timestamps removed."""
+    out = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if _LRC_META.match(line):
+            continue
+        line = _LRC_TS.sub("", line).strip()
+        if line:
+            out.append(line)
+    return "\n".join(out)
+
+
+def local_lyrics(source_path) -> str | None:
+    """Lyrics from a .lrc sidecar beside the audio file, or None.
+
+    Apple Music downloads ship these, so they beat both the cache and the
+    network: authoritative, offline, and present for tracks LRCLIB lacks.
+    """
+    if not source_path:
+        return None
+    p = Path(source_path)
+    if not p.is_absolute():
+        p = ROOT / p
+    try:
+        lrc = p.with_suffix(".lrc")
+        if lrc.is_file():
+            text = strip_lrc(lrc.read_text(encoding="utf-8", errors="ignore"))
+            return text.strip() or None
+    except OSError:
+        pass
+    return None
+
 
 def _slug(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     return s or "track"
 
 
-def fetch_lyrics(artist: str | None, title: str, timeout: float = 5.0) -> str | None:
-    """Plain lyrics for a track, or None. Prefers a cached/hand-dropped file;
-    otherwise queries LRCLIB once and caches the result. Never raises."""
+def fetch_lyrics(
+    artist: str | None, title: str, timeout: float = 5.0, source_path=None
+) -> str | None:
+    """Plain lyrics for a track, or None. Prefers a .lrc sidecar, then a
+    cached/hand-dropped file; otherwise queries LRCLIB once and caches the
+    result. Never raises."""
+    local = local_lyrics(source_path)
+    if local:
+        return local
+
     cache = CACHE_DIR / f"{_slug(title)}.txt"
     try:
         if cache.is_file():
