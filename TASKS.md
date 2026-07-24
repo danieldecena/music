@@ -3,6 +3,8 @@
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 - [ ] Improve detect_key pitch detection — 1/10 exact vs UG, error is pitch not mode
+- [x] Implement subharmonic-summation chroma fix (3rd/5th harmonic weighting in _chroma_projection)
+- [x] Verify chroma fix vs test-analysis.py + key_oracle.py score, update STATUS.md — negative result, oracle score unchanged
 
 ## Completed
 
@@ -77,7 +79,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-24 01:03.
+Plan approved 2026-07-24 04:50.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -86,7 +88,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 0a4e57bb-945a-4b15-95f3-1563d8f35895
+    claude --resume 7a69bf52-bec2-405a-a0ea-ab7ebf8958c0
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->

@@ -215,6 +215,23 @@
   it compared two reference label sets and never ran `detect_key`. Nights, for
   one, reads `F` major live (a pitch error vs UG `Ab`), not the `Fm` the fixture
   claims. See the decision log.
+  - **NEGATIVE RESULT (2026-07-24): subharmonic-summation chroma did not move
+    the oracle score.** Tried adding 3rd/5th-harmonic subharmonic votes to
+    `_chroma_projection` (each bin also casts a smaller vote for the pitch
+    class of freq/3 and freq/5, on the theory that a weak-fundamental
+    bass/guitar note's energy was piling into its harmonic's own pitch class
+    instead of the true tonic's — a plausible mechanism, and the standard
+    HPCP fix for it). Score unchanged: still 1/10 exact, 3/10 pitch-class
+    match, 7/10 unrelated, same tracks in each bucket. It did shift raw
+    labels for 3 tracks (Solo and Self Control C->F, Godspeed F->Dm) but none
+    crossed into a correct-pitch-class bucket. All 21 synthetic tests and all
+    26 chord tests still pass. Left shipped (harmless, mechanistically sound,
+    no regression) but the real defect is evidently elsewhere — the weak
+    fundamental / dominant-harmonic theory does not explain most of these
+    7 misses. Do not assume this mechanism again without new evidence; next
+    step is probably to look at whether the bass/other stem WEIGHTING
+    (0.6/1.0 in `analyze_stem_track`) or something in profile matching itself
+    is the real culprit, not the chroma projection.
 - **Chord-analyzer accuracy is unverified by ear** — same caveat as tempo/key,
   and it inherits the weak key detection above (its diatonic prior leans on the
   detected key). On real "02 Let Em' Know" it reported key `A` while the chart
@@ -266,6 +283,24 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-24
+- Tried and REVERTED-IN-SPIRIT (code kept, hypothesis rejected): **subharmonic-
+  summation chroma for detect_key.** `_chroma_projection` now also votes a
+  bin's energy toward the pitch class of freq/3 and freq/5 (weights 0.5/0.35),
+  on the theory that a fifth- or third-heavy harmonic spectrum (weak
+  fundamental, common on bass/guitar) was piling votes onto the harmonic's
+  own pitch class instead of the true tonic's — the standard HPCP mechanism
+  for exactly the "wrong pitch class, not mode" error the oracle measured.
+  Graded against `key_oracle.py score`: **no change** — still 1/10 exact,
+  3/10 pitch-class match, 7/10 unrelated, identical per-track buckets to the
+  pre-fix run (verified via `git stash`). 3 tracks' raw labels moved (Solo,
+  Self Control: C->F; Godspeed: F->Dm) but none crossed into a correct
+  bucket. All 21 `test-analysis.py` and 26 `test-chords.py` assertions still
+  pass, so nothing regressed — left shipped since it's mechanistically sound
+  and harmless, but it did not fix the measured problem. The weak-fundamental
+  theory is not the dominant cause of these 7 misses; next suspect is the
+  bass(0.6)/other+guitar+piano(1.0 each) stem-blend weighting in
+  `analyze_stem_track`, or the KS profile-matching step itself, not the
+  chroma projection.
 - Fixed: **`key_oracle.py score` was grading the wrong thing.** `_fixture_tracks`
   yielded fixtures-analysis.tsv **column 3** as "our_key" and `score` graded that
   against UG. But column 3 is the Echo Nest ground-truth reference (its header

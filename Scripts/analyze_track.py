@@ -267,6 +267,15 @@ def detect_tempo(sp: Spec) -> float:
     return round(60.0 * fps / best_lag, 1)
 
 
+# Subharmonic summation: a bin at n * f0 is evidence for f0's pitch class, not
+# just its own. n=2/4 are skipped -- they already fold to the same pitch class
+# as n=1 under octave equivalence, so voting there again adds no new signal.
+# n=3/5 are where a single-projection scheme is wrong: a fifth-heavy or
+# third-heavy harmonic spectrum (common on bass/guitar with a weak fundamental)
+# piles votes onto the harmonic's own pitch class instead of the true tonic's.
+_HARMONICS = ((1, 1.0), (3, 0.5), (5, 0.35))
+
+
 def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
     """Bin mask and (n_kept_bins, 12) pitch-class projection matrix.
 
@@ -277,13 +286,21 @@ def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
 
     The Gaussian weight favours roughly C3-C6, the register where pitch class is
     legible, instead of treating every octave as equally informative.
+
+    Each bin also casts a smaller vote for its 3rd- and 5th-subharmonic pitch
+    class (see `_HARMONICS`), so a bin that IS a 3rd/5th harmonic of some lower
+    fundamental reinforces that fundamental's pitch class instead of only its
+    own — the fix for detect_key's measured wrong-pitch-class bias.
     """
     freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
     keep = (freqs >= 55.0) & (freqs <= 2000.0)
     midi = 69 + 12 * np.log2(freqs[keep] / 440.0)
-    weight = np.exp(-0.5 * ((midi - 60.0) / 18.0) ** 2)
+    register = np.exp(-0.5 * ((midi - 60.0) / 18.0) ** 2)
     proj = np.zeros((keep.sum(), 12), np.float32)
-    proj[np.arange(keep.sum()), np.rint(midi).astype(int) % 12] = weight
+    idx = np.arange(keep.sum())
+    for n, w in _HARMONICS:
+        pc = np.rint(midi - 12 * np.log2(n)).astype(int) % 12
+        proj[idx, pc] += (register * w).astype(np.float32)
     return keep, proj
 
 
