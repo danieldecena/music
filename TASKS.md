@@ -4,9 +4,10 @@
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 - [ ] Improve key detection accuracy — 2/13 exact, mix key relations need the ear
 - [ ] Fix scan's filename-stem track collision (corrupt Exchange copy won)
-- [ ] Brainstorm + improve the mix-match report output
 
 ## Completed
+
+- [x] Seed-pivot mix report: .lrc lyrics, IDF word ranking, preview, TDD — d42d7da
 
 - [x] Re-index catalog bpm/key via backfill --refresh, clean song titles — 132b5ce
 

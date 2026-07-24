@@ -1,6 +1,14 @@
 # STATUS — music toolkit
 
 ## Confirmed working
+- **`Z) Mix report` / `./mix-report.sh` / `catalog.py mix --seed <title>`** — pivots
+  on one named track instead of dumping every library pair. Prints a verdict, a
+  why-line, rarest-first shared lyric words, and near misses; `--preview` renders
+  a tempo-matched crossfade of the top pair and plays it via `afplay`. Verified
+  against the live catalog for seed hits, near-miss-only seeds, nomatch (exit 1),
+  `--preview` without `--seed` (exit 1), `--json`, and the unchanged library-wide
+  path. Rendering is pure (`Scripts/mix_report.py`), as is the ffmpeg command
+  builder (`Scripts/mix_preview.py`); 52 assertions in `tests/test-mix-report.py`.
 - `music.sh` / `music` interactive menu (both `~/Bin` symlinks; `./music` from the
   repo also works). No `set -e` (a failed step returns to the prompt).
 - Menu options: 0 Guide, L Library (name filter, descends into track folders),
@@ -183,6 +191,20 @@
   row at the Deluxe file by hand and re-backfilled it (161 BPM, Am). The
   underlying collision is unfixed: the Deluxe album's other 17 tracks are indexed
   and the plain album's are shadowed. A track key should include the album.
+- Decided: **the mix report leads with tempo and hedges key** (spec `9ce8728`,
+  shipped `850f501`). Tempo is the reliable half of the analysis; key detection is
+  2/13 exact. A verdict line that led with the key relation would project
+  confidence the estimate has not earned, so the why-line states the BPM gap first
+  and marks the key claim "confirm by ear". Revisit the wording if key accuracy
+  improves — it is conservative phrasing, not a permanent verdict.
+- Decided: **IDF replaced the lyric stopword list on measured evidence.** Over the
+  repo's 56 `.lrc` files, ranking two songs' shared words by document frequency
+  puts `speed` and `fast` (4/56 each) 2nd and 3rd for SPEED DEMON x Skyline To
+  while `you`/`the`/`and` sink unaided — recovering mechanically the thematic
+  observation that looked like it needed a language model. That result is why the
+  report is deterministic rather than model-narrated. It also fixed a real
+  mis-ordering: flat Jaccard scored the winning pair 0.040 against a worse pair's
+  0.054, because a shared `you` counted as much as a shared `speed`.
 - **Mix-report caveats, for anything read off `catalog.py mix`.** BPM/key are
   estimates from this repo's analyzer. Tempo is the solid half; key is the weak
   half at 2/13 exact against published labels, so treat key relationships as a
