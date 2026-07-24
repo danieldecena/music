@@ -108,5 +108,75 @@ check(
     "similarity without an index stays in range",
 )
 
+# --- report rendering -------------------------------------------------------
+
+import mix_report as mr  # noqa: E402
+
+SEED = {"name": "03 YUKON", "artist": "Justin Bieber", "bpm": 128, "key": "Dm"}
+OTHER = {"name": "06 Skyline To", "artist": "Frank Ocean", "bpm": 129, "key": "F"}
+PAIR = {
+    "a": SEED,
+    "b": OTHER,
+    "tier": "strong",
+    "key_rel": "relative",
+    "tempo_gap": 1,
+    "half_double": False,
+    "lyric_sim": 0.04,
+}
+
+check(
+    mr.track_label(SEED) == "Justin Bieber — YUKON (Dm/128)",
+    f"track_label drops the track number, got {mr.track_label(SEED)!r}",
+)
+
+why = mr.why_line(PAIR)
+check(
+    why.lower().index("bpm") < why.lower().index("key"),
+    f"tempo fact precedes the key claim: {why!r}",
+)
+check("confirm by ear" in why, f"key claim carries its hedge: {why!r}")
+check("relative" in why, f"key relation is named: {why!r}")
+
+# A half/double pair must say so rather than reporting a huge tempo gap.
+HALF = dict(
+    PAIR,
+    half_double=True,
+    tempo_gap=64,
+    b={"name": "x", "artist": "y", "bpm": 64, "key": "F"},
+)
+check(
+    "half" in mr.why_line(HALF).lower(), f"half/double is named: {mr.why_line(HALF)!r}"
+)
+
+# Near-misses explain an empty result instead of returning nothing.
+LONE = {"name": "1-01 SPEED DEMON", "artist": "Justin Bieber", "bpm": 92.7, "key": "Dm"}
+misses = mr.near_misses(LONE, [OTHER], tol=0.06)
+check(
+    len(misses) == 1,
+    f"a key-compatible but tempo-far track is a near miss, got {misses}",
+)
+check(misses[0]["track"]["name"] == "06 Skyline To", "near miss names the track")
+check(mr.near_misses(LONE, [], tol=0.06) == [], "no candidates -> no near misses")
+check(len(mr.near_misses(LONE, [OTHER] * 9, tol=0.06)) == 3, "near misses cap at 3")
+
+report = mr.build_report(SEED, [PAIR], {id(PAIR): [("speed", 4), ("fast", 4)]}, [])
+check(report["seed"]["name"] == "03 YUKON", "report carries the seed")
+check(report["verdict"]["b"]["name"] == "06 Skyline To", "verdict names the winner")
+check(
+    report["pairs"][0]["shared_words"] == [["speed", 4], ["fast", 4]],
+    f"shared words are JSON-ready lists, got {report['pairs'][0]['shared_words']}",
+)
+
+text = mr.render_text(report)
+check("Best mix:" in text, f"text names a winner: {text!r}")
+check("speed" in text, "text lists the shared words")
+
+# No pairs at all must still produce readable output, not an empty string.
+empty = mr.render_text(mr.build_report(SEED, [], {}, []))
+check(
+    "no" in empty.lower() and len(empty) > 10,
+    f"empty report explains itself: {empty!r}",
+)
+
 print(f"\n{_passed} passed, {_failed} failed")
 sys.exit(1 if _failed else 0)
