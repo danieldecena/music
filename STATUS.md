@@ -160,6 +160,33 @@
     REVERTED — redundant with the grid penalty and it broke Pink + White into a
     2:1. Same caveat holds: this improves a correlated-label score, not proven by
     ear. Tap the four tracks to settle it.
+  - **Exchange resolved 2026-07-23 (grid lag search, 4300a1d).** The suspects
+    named above — the prior's sigma and the 3x harmonic multiplier — were both
+    wrong. The real cause was resolution: `_grid_support` laid a rigid tick comb
+    at exactly the candidate lag, and at short lags the autocorrelation cannot
+    express the right one (at lag 16 / 43 fps, adjacent integer lags are 160.8
+    and 152.0 BPM). `_refine_lag` got within ~0.5%, but rigid means that error
+    compounds — 0.076 frames/beat over 521 beats walked the grid 39.8 frames off
+    the music, 2.5 whole beat periods. Support for the true 160 candidate fell
+    1.14 -> 0.64 and it lost a near-tie to the 106.7 misread. Fix: search nine
+    lags across +/-2% jointly with the eight phase offsets, keep the best fit.
+    +/-2% cannot reach an octave (100%) or a 3:2 (50%), so the discrimination is
+    intact. Trusted labels: exact 7 -> 8, two-thirds 1 -> 0, double and
+    three-halves unchanged; the other 12 tracks byte-identical. Still open:
+    Godspeed (3:2 fast) and Self Control (2:1). Same standing caveat — a
+    correlated-label score, not the ear.
+- **The catalog's stored bpm/key are stale and the key column is not usable.**
+  All 20 analyzed rows carry one timestamp (2026-07-10T09:51:56), predating every
+  tempo/key change, and hold only two distinct keys across 20 tracks (F and Am).
+  Re-analyzing three at random: `07 Ten Nine Fourteen` F/70 -> C/105.0,
+  `13 Overtime` F/103 -> Dm/105.6, `06 Open Interlude` Am/62 -> Am/119.6. The
+  four rows overlapping the fixtures are all labelled `F` where the estimator
+  reads C, Am, D, A#, and Ivy's published label confirms Am. Consequence:
+  `catalog.py mix` returns pairs that are mechanically correct but built on bad
+  inputs — its near-universal "perfect" key verdict is an artifact of the flat
+  key distribution, not a real match. 38 of 58 tracks have no analysis at all.
+  `backfill` will not repair this: it only fills rows where bpm/key are NULL, so
+  it skips all 20. A re-index needs a refresh path that overwrites.
 - Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
   octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
   the candidate scoring only work together; refinement alone makes a widened

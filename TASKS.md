@@ -2,8 +2,11 @@
 
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
+- [ ] Re-index catalog bpm/key — all 20 rows are stale, 38 tracks unanalyzed
 
 ## Completed
+
+- [x] Fix the Exchange 3:2 misread by searching the grid's lag, not just phase — 4300a1d
 
 - [x] click_compare: auto-write locked BPM to fixtures + rerun score, TDD — 149a7aa
 
