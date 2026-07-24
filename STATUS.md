@@ -247,6 +247,15 @@
   primitives against the running off-screen Logic (`window_count=1`,
   `track_count=1`); did not re-run the full fragile build against the live
   session. TDD (+2 pure-builder tests, 39 green).
+- Decided: **click_compare writes the fixtures row itself** (149a7aa). On lock it
+  updates the matching `fixtures-analysis.tsv` row in place (dropping the `?`),
+  preserving path + key, and offers to rerun `score` — killing the copy-paste that
+  was the only friction left in the tempo-lock task. Pure `_apply_locked_bpm`
+  (update/nomatch/ambiguous), TDD. A standalone **tap-tempo tool was rejected as
+  redundant** (click_compare already auditions the octave/3:2 candidates by ear)
+  and **Logic Smart Tempo stays ruled out** (import into Logic unreliable). The
+  `LISTEN: Tempo lock` task stays open — still ear-blocked; only the paste friction
+  is gone.
 - Decided: track prompts accept a **typed title, not just a dragged path**
   (`Scripts/find_track.py`, stdlib difflib). Fuzzy so typos still match; a lone
   hit auto-resolves, several show a picker. Kept it out of the bass-stem and

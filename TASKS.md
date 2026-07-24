@@ -5,6 +5,8 @@
 
 ## Completed
 
+- [x] click_compare: auto-write locked BPM to fixtures + rerun score, TDD — 149a7aa
+
 - [x] Harden build.py live import: verify window + track-count before claiming success — logic-pro-mcp 1aa52b9
 
 - [x] Confirm restarting the MCP server clears the empty tempo read — fresh server returns bpm 120.0 via transport
@@ -60,7 +62,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-23 11:52.
+Plan approved 2026-07-23 17:47.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
