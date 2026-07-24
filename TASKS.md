@@ -2,10 +2,11 @@
 
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
-- [ ] Fix the major/minor mode flip in detect_key — grade with key_oracle.py score
+- [ ] Improve detect_key pitch detection — 1/10 exact vs UG, error is pitch not mode
 
 ## Completed
 
+- [x] Fix key_oracle to grade live detect_key vs UG, not Echo Nest column 3
 - [x] Independent key oracle (key_oracle.py) — grade detect_key off Ultimate Guitar
 - [x] Demote --lyrics to a tie-break inside the tempo bucket in _sort_key
 
@@ -76,7 +77,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-23 17:47.
+Plan approved 2026-07-24 01:03.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -85,7 +86,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 239c5ffd-663a-413c-80df-ac40363cdba8
+    claude --resume 0a4e57bb-945a-4b15-95f3-1563d8f35895
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->

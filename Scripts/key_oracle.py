@@ -153,7 +153,13 @@ def _fetch(query: str) -> str:
 
 
 def _fixture_tracks() -> list[tuple[str, str, str]]:
-    """(artist, title, our_key) per fixtures row."""
+    """(artist, title, audio_path) per fixtures row.
+
+    The third field is the track's source path -- NOT column 3. Column 3 is the
+    Echo Nest ground truth this oracle exists to bypass; grading it against UG
+    would only compare two reference sets. `_analyzer_key` runs the live analyzer
+    on this path, and that is what `score` grades.
+    """
     out = []
     for line in FIXTURES.read_text().splitlines():
         if not line.strip() or line.startswith("#"):
@@ -164,17 +170,39 @@ def _fixture_tracks() -> list[tuple[str, str, str]]:
             (
                 p.parts[1] if len(p.parts) > 1 else "",
                 _TRACK_NO.sub("", p.stem).strip(),
-                f[2].strip() if len(f) > 2 else "",
+                f[0],
             )
         )
     return out
+
+
+def _analyzer_key(path: str) -> str:
+    """Live `detect_key` on the track's audio -- the value being graded.
+
+    Returns "" if the audio is absent (it is gitignored, so a fresh clone has
+    none) or fails to decode, so a missing file scores as `no label` rather than
+    crashing the sweep. analyze_track is imported lazily to keep this module's
+    label helpers importable without numpy.
+    """
+    p = Path(path)
+    if not p.is_absolute():
+        p = ROOT / p
+    if not p.exists():
+        return ""
+    try:
+        import analyze_track as A  # noqa: E402
+
+        return A.detect_key(A.spectra(A.decode_mono(p, A.SR)))
+    except Exception:
+        return ""
 
 
 def fetch(limit: int | None = None, refresh: bool = False) -> int:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     rows = _fixture_tracks()[: limit or None]
     out = []
-    for artist, title, ours in rows:
+    for artist, title, path in rows:
+        ours = _analyzer_key(path)
         cache = CACHE_DIR / (
             re.sub(r"[^A-Za-z0-9]+", "-", f"{artist}-{title}") + ".json"
         )
@@ -207,9 +235,9 @@ def score() -> int:
     if not LABELS.exists():
         print(f"no {LABELS.relative_to(ROOT)} -- run `key_oracle.py fetch` first")
         return 1
-    ours = {norm(t): k for _, t, k in _fixture_tracks()}
+    ours = {norm(t): _analyzer_key(p) for _, t, p in _fixture_tracks()}
     tally: dict[str, int] = {}
-    print(f"{'track':24} {'ours':>5} {'UG':>6}  verdict")
+    print(f"{'track':24} {'live':>5} {'UG':>6}  verdict")
     for line in LABELS.read_text().splitlines():
         if not line.strip() or line.startswith("#"):
             continue

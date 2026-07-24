@@ -205,12 +205,16 @@
   songbpm / getsongbpm / musicstax all re-display one pipeline). Their agreement
   is correlated, not corroboration, and they carry the same octave-error risk
   being measured. Rows ending `?` are already suspect.
-- Key detection is weak but narrower than "2/13 exact" implied — that number was
-  against the correlated Echo Nest labels. Graded against the independent UG oracle
-  (`key_oracle.py score`): 4/10 exact but 6/10 share the pitch-class set, so the
-  dominant error is a major/minor mode flip (Ivy, Nights), not a wrong pitch. The
-  chroma rewrite fixed the old collapse (44% of baseline rows reported "F"); the
-  mode call is the remaining defect. See the decision log and the [code] item.
+- Key detection is WEAK — and worse than the roadmap believed. Graded against the
+  independent UG oracle with the oracle FIXED to run the live analyzer
+  (`key_oracle.py score`, 2026-07-24): **1/10 exact, 3/10 share the pitch-class
+  set, 7/10 unrelated.** The dominant error is a **wrong pitch class**, not a
+  mode flip — only Ivy and The Color Violet are relative flips. The prior "4/10
+  exact / mode-flip on Ivy+Nights" number was a MEASUREMENT BUG: `key_oracle`
+  graded fixtures-analysis.tsv column 3 (Echo Nest ground truth) against UG, so
+  it compared two reference label sets and never ran `detect_key`. Nights, for
+  one, reads `F` major live (a pitch error vs UG `Ab`), not the `Fm` the fixture
+  claims. See the decision log.
 - **Chord-analyzer accuracy is unverified by ear** — same caveat as tempo/key,
   and it inherits the weak key detection above (its diatonic prior leans on the
   detected key). On real "02 Let Em' Know" it reported key `A` while the chart
@@ -242,12 +246,13 @@
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
-- **[code] Fix the major/minor mode flip in `detect_key`** — now gradeable: the
-  independent oracle landed (`key_oracle.py`, see the decision log) and it says the
-  pitch-class detection is mostly right while the mode call is not. Ivy and Nights
-  are both exact-but-relative. That is one decision — which of a pitch-class set's
-  two tonics is home — and it is worth attacking before anything else in
-  `detect_key`. Grade with `key_oracle.py score`, not the Echo Nest fixtures.
+- **[code] Improve `detect_key` pitch detection** — the oracle is now trustworthy
+  (`key_oracle.py score` runs the live analyzer, fixed 2026-07-24) and it says
+  `detect_key` is 1/10 exact, 7/10 unrelated. The dominant error is **wrong pitch
+  class**, not the mode flip the roadmap assumed — the chroma/pitch stage is the
+  real problem. A relative-pair tie-break would help only ~2 tracks (Ivy, The
+  Color Violet); the pitch stage is the larger payoff. Grade with `key_oracle.py
+  score`. Direction on scope is open (measurement fixed first, per the user).
 
 Full open list: `TASKS.md`.
 
@@ -259,6 +264,25 @@ catalog (YAGNI — `scan` rebuilds `assets` every run). StudioTUI's 4 pre-existi
 dead-code warnings.
 
 ## Decision log
+
+### 2026-07-24
+- Fixed: **`key_oracle.py score` was grading the wrong thing.** `_fixture_tracks`
+  yielded fixtures-analysis.tsv **column 3** as "our_key" and `score` graded that
+  against UG. But column 3 is the Echo Nest ground-truth reference (its header
+  says so; `test-analysis.py` scores the live analyzer *against* it). So the
+  oracle compared two reference label sets and never ran `detect_key` — the
+  reported "4/10 exact, 6/10 share pitch-class, mode-flip on Ivy+Nights" measured
+  Echo-Nest-vs-UG, not the analyzer. Caught by reproducing: live `detect_key`
+  disagreed with column 3 on Nights (F vs Fm), Pink+White (Am vs A), Self Control
+  (C vs G#). Fix: added `_analyzer_key(path)` (lazy `analyze_track` import, ""
+  on missing/undecodable audio), and `score`/`fetch` now grade the live analyzer.
+- Reframed: **the real key defect is pitch, not mode.** Live `detect_key` vs UG
+  is **1/10 exact, 3/10 share the pitch-class set, 7/10 unrelated** — far worse
+  than believed, and only Ivy + The Color Violet are relative flips. The planned
+  relative-pair tie-break would touch ~2 tracks; the chroma/pitch stage is the
+  larger problem. Next-Up + the key-detection Known-broken bullet + CLAUDE.md's
+  key_oracle description all corrected. Direction on the pitch-stage rework is
+  open — user chose "fix the oracle first" so the roadmap measures reality.
 
 ### 2026-07-23
 - Shipped: **an independent key oracle, and it reframes the key problem.**
