@@ -297,13 +297,10 @@ def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
     than one semitone at the low end of the range, and `np.rint(midi) % 12`
     rounds each such bin to a single pitch class -- which pitch classes
     happen to catch the extra bins is an accident of where 55-2000 Hz lands
-    on the frequency grid, not anything about the audio. Measured: unweighted,
-    white noise (zero tonal content) still resolves to a specific key (`D`,
-    total column weight ~16.2 vs. ~11.3 for C#/D#) -- a content-independent
-    bias baked into every track's chroma. Equalizing collapses that bias
-    (white-noise chroma spread 0.030 -> 0.001) and, combined with the
-    subharmonic votes above, moved the independent UG key-oracle score from
-    1/10 exact to 4/10 exact, 7/10 sharing the pitch-class set.
+    on the frequency grid, not anything about the audio. Unweighted, this
+    biases detect_key toward whichever pitch classes catch the extra bins
+    regardless of what's playing (verified: pure white noise resolved to a
+    specific key). See the commit message for the measured before/after.
     """
     freqs = np.fft.rfftfreq(FRAME, 1.0 / SR)
     keep = (freqs >= 55.0) & (freqs <= 2000.0)
@@ -316,7 +313,6 @@ def _chroma_projection() -> tuple[np.ndarray, np.ndarray]:
         proj[idx, pc] += (register * w).astype(np.float32)
     totals = proj.sum(axis=0, keepdims=True)
     proj = np.divide(proj, totals, out=np.zeros_like(proj), where=totals > 0)
-    proj *= totals.mean()
     return keep, proj
 
 
