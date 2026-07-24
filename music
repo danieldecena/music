@@ -97,6 +97,7 @@ while true; do
     echo "    A  Stem levels            loudness / presence per stem"
     echo "    H  Chords                 bar-by-bar progression"
     echo "    X  Mix-match              catalog pairs that mix well"
+    echo "    Z  Mix report             what mixes with one track you name"
     echo "    T  Tempo lock             settle BPM by ear (click A/B)"
     echo "    M  Bass stem -> MIDI"
     echo "    R  Re-voice a melody      as another instrument"
@@ -213,6 +214,16 @@ GUIDE
     X|x)
       read "ly?Match lyric themes too? (slower, needs network) [y/N]> "
       if [[ "$ly" == (y|Y|yes) ]]; then mix_match --lyrics; else mix_match; fi
+      ;;
+    Z|z)
+      read "seed?Track title (typos OK)> "
+      [[ -z "$seed" ]] && continue
+      read "pv?Play a preview of the top pair? [y/N]> "
+      if [[ "$pv" == (y|Y|yes) ]]; then
+        mix_report "$seed" --lyrics --preview
+      else
+        mix_report "$seed" --lyrics
+      fi
       ;;
     T|t)
       INPUT=$(resolve_stems)

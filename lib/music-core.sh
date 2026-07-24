@@ -264,6 +264,15 @@ mix_match() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix "$@"
 }
 
+mix_report() {
+  # $1 = a track title (fuzzy). Ranks the rest of the catalog against that one
+  # track and prints a verdict, why it works, shared lyric words and near
+  # misses. Extra flags pass through to `catalog.py mix` (--lyrics, --preview,
+  # --limit N, --tempo-tol F, --json).
+  local seed="$1"; shift
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix --seed "$seed" "$@"
+}
+
 click_compare() {
   # $1 = an audio file or a Stems/<model>/<track> folder; extra flags pass
   # through (--bpm B, --label L, --dur S, --start S). Interactive: auditions
