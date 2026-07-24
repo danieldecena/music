@@ -239,10 +239,14 @@
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
-- **[code] Key detection is 2/13 exact** — but the open question is the oracle, not
-  the algorithm: every fixture label is Echo Nest-derived, so a better `score` is
-  necessary-not-sufficient. The untried autonomous path is an independent key
-  source to grade against; find one before touching `detect_key`.
+- **[you] Pick a route to an independent key oracle** — the search itself is done
+  (see the decision log): Hooktheory TheoryTab is the right source, human by-ear
+  and covering the fixture tracks, but its public dump misses them 0/13 and its
+  live pages 403. What is left is a credential (an account for their API) or a
+  scraping decision — both yours. Untried and cheaper: Ultimate Guitar's chord
+  sheets, where the key falls out of the chord set. Do not touch `detect_key`
+  before one of these lands; every current label is Echo Nest-derived, so a better
+  `score` would be circular.
 
 Full open list: `TASKS.md`.
 
