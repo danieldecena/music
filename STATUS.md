@@ -191,44 +191,20 @@
   row at the Deluxe file by hand and re-backfilled it (161 BPM, Am). The
   underlying collision is unfixed: the Deluxe album's other 17 tracks are indexed
   and the plain album's are shadowed. A track key should include the album.
-- Decided: **the mix report leads with tempo and hedges key** (spec `9ce8728`,
-  shipped `850f501`). Tempo is the reliable half of the analysis; key detection is
-  2/13 exact. A verdict line that led with the key relation would project
-  confidence the estimate has not earned, so the why-line states the BPM gap first
-  and marks the key claim "confirm by ear". Revisit the wording if key accuracy
-  improves — it is conservative phrasing, not a permanent verdict.
-- Decided: **IDF replaced the lyric stopword list on measured evidence.** Over the
-  repo's 56 `.lrc` files, ranking two songs' shared words by document frequency
-  puts `speed` and `fast` (4/56 each) 2nd and 3rd for SPEED DEMON x Skyline To
-  while `you`/`the`/`and` sink unaided — recovering mechanically the thematic
-  observation that looked like it needed a language model. That result is why the
-  report is deterministic rather than model-narrated. It also fixed a real
-  mis-ordering: flat Jaccard scored the winning pair 0.040 against a worse pair's
-  0.054, because a shared `you` counted as much as a shared `speed`.
 - **Mix-report caveats, for anything read off `catalog.py mix`.** BPM/key are
   estimates from this repo's analyzer. Tempo is the solid half; key is the weak
   half at 2/13 exact against published labels, so treat key relationships as a
   shortlist to confirm by ear rather than a verdict. The optional lyric score is
-  a word-set overlap after stopword removal — it finds shared vocabulary, not
-  shared meaning, so a high score means the two songs use the same words, not
-  that they are about the same thing.
-- ~~**The catalog's stored bpm/key are stale and the key column is not usable.**~~
-  **RESOLVED 2026-07-23 (132b5ce).** Kept for the mechanism:
-  All 20 analyzed rows carry one timestamp (2026-07-10T09:51:56), predating every
-  tempo/key change, and hold only two distinct keys across 20 tracks (F and Am).
-  Re-analyzing three at random: `07 Ten Nine Fourteen` F/70 -> C/105.0,
-  `13 Overtime` F/103 -> Dm/105.6, `06 Open Interlude` Am/62 -> Am/119.6. The
-  four rows overlapping the fixtures are all labelled `F` where the estimator
-  reads C, Am, D, A#, and Ivy's published label confirms Am. Consequence:
-  `catalog.py mix` returns pairs that are mechanically correct but built on bad
-  inputs — its near-universal "perfect" key verdict is an artifact of the flat
-  key distribution, not a real match. 38 of 58 tracks have no analysis at all.
-  `backfill` will not repair this: it only fills rows where bpm/key are NULL, so
-  it skips all 20. A re-index needs a refresh path that overwrites.
-  Fixed by `backfill --refresh`. After re-running: 55 analyzed tracks (was 20),
-  eight distinct keys (was two), and cross-artist pairs now surface where the
-  output had been almost entirely same-album. Lesson: a fill-NULLs-only backfill
-  silently freezes whatever the estimator believed the day a row was written.
+  an IDF-weighted word-set overlap — it finds shared vocabulary, not shared
+  meaning, so a high score means the two songs use the same words, not that they
+  are about the same thing.
+- **The mix report's ranking disagrees with how it reads.** `harmonic_mix._sort_key`
+  ranks key relation above tempo gap, so a perfect-key/4-BPM-apart pair outranks a
+  relative-key/1-BPM-apart one — the seed report then leads with the former as
+  "Best mix". Given key detection is the weak half (above) and 4 BPM is real
+  pitch-fader work, the tier order is probably backwards for actual beatmatching.
+  Left unchanged: `rank_pairs`' tier logic was explicitly out of scope for the
+  report work, so flipping it is a decision, not a fix.
 - Do NOT "simplify" the tempo fix to just sub-lag refinement. Measured: exact 3,
   octave 5 — WORSE than the original argmax (exact 5, octave 2). Refinement and
   the candidate scoring only work together; refinement alone makes a widened
@@ -267,32 +243,66 @@
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
 
 ## Next Up
-- **Settle 4 tracks by ear with the new click-comparator** (Exchange, Don't,
-  Rambo, Nikes): run `T) Tempo lock` (or `./click-compare.sh`) on each, pass the
-  analyzer reading as `--bpm` and the fixture label as `--label`, listen for the
-  click that locks, then put the values in `tests/fixtures-analysis.tsv`, drop the
-  `?`, and run `.venv/bin/python tests/test-analysis.py score`. The tool now exists;
-  this is a pure human-listen step (the last blocker) — no code left.
-- Live-verify the `P` Logic build (and StudioTUI's Logic tab / Build Logic Proj
-  action, same underlying `logic_cli.py`/`build_project.py`) with Logic open +
-  Accessibility granted; fix any moved selectors. Note Logic launches from
-  `/Applications/Logic Pro Creator Studio.app` — `open -a "Logic Pro"` fails,
-  and `pgrep -x "Logic Pro"` never matches (process is `Logic Pro Creator Studio`).
-- Re-record `tests/baseline-analysis.tsv`. The frozen one predates tasks 6-8, so
-  its ~65 per-stem rows are obsolete now that a Stems folder collapses to one
-  row. Keep the old file until the tempo question is settled — it is the only
-  record of pre-change behaviour.
-- Optional: one-shot -> Logic Quick Sampler instrument loader.
-- StudioTUI: `cargo build` still emits 4 pre-existing dead-code warnings
-  (unused `Focus::SeqBpm`, `fs::skip_dir`, `Theme.seq_pad_off`, unused `Theme`
-  style helpers) — harmless, not touched by the TUI-wiring work.
-- Optional (deferred from per-stem-analysis spec, YAGNI): per-stem loudness into
-  the catalog. `catalog.py scan` rebuilds `assets` every run, so per-asset
-  loudness would be recomputed/lost each scan — revisit only if a digest needs it.
-- Two design specs still pending a plan->build: none outstanding (resynth,
-  build-logic-project, stem-quality-profiles, per-stem-analysis all shipped).
+- **[code] Fix `scan`'s filename-stem track collision** — same-titled tracks on two
+  albums overwrite each other (see Known broken). The track key needs the album.
+  This is the top code-actionable item; the two tempo tasks above it are ear-blocked.
+- **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
+  now writes the fixtures row and reruns `score` itself, so this is a pure listen
+  step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
+  (incoherent on exactly these two), Logic Smart Tempo (ruled out).
+- **[code] Decide the mix report's tier order** — key-over-tempo may be backwards
+  (see Known broken). Needs a call, then a one-line change to `_sort_key`.
+
+Full open list: `TASKS.md`.
+
+**Parked, not scheduled:** live-verify the `P` Logic build with Logic open +
+Accessibility granted (selectors may have moved; Logic launches from
+`/Applications/Logic Pro Creator Studio.app`, and `pgrep -x "Logic Pro"` never
+matches). One-shot -> Logic Quick Sampler loader. Per-stem loudness into the
+catalog (YAGNI — `scan` rebuilds `assets` every run). StudioTUI's 4 pre-existing
+dead-code warnings.
+
+## Decision log
 
 ### 2026-07-23
+- Shipped: **seed-pivot mix report** (`9fa69b9..8156cdd`, 8 commits). `catalog.py mix
+  --seed <title>` pivots on one named track instead of dumping every library pair,
+  printing a verdict, a why-line, rarest-first shared lyric words, and near misses;
+  `--preview` renders a tempo-matched crossfade and plays it via `afplay`. Two
+  deviations from the plan, both because the plan was wrong: `shared_words` dropped
+  its `n_docs` parameter (sorting by raw document frequency is identical to sorting
+  by IDF, so it was dead weight), and `atempo_ratio` folds into `[1/sqrt2, sqrt2]`
+  rather than atempo's full `[0.5, 2.0]` — the planned version stretched a 128-vs-64
+  pair by 2x when those tracks already lock and need no stretch. A test caught the
+  latter. Also learned: ffmpeg's `wav muxer does not support more than one stream of
+  type audio` is what an embedded mjpeg cover art looks like — Apple Music `.m4a`
+  files carry one, so the preview needs `-vn`. The error text never says so.
+- Decided: **the mix report leads with tempo and hedges key** (spec `9ce8728`,
+  shipped `850f501`). Tempo is the reliable half of the analysis; key detection is
+  2/13 exact. A verdict line that led with the key relation would project
+  confidence the estimate has not earned, so the why-line states the BPM gap first
+  and marks the key claim "confirm by ear". Revisit the wording if key accuracy
+  improves — it is conservative phrasing, not a permanent verdict. Follow-on found
+  at wrap-up and NOT fixed: `_sort_key` still ranks key above tempo, so the report
+  hedges the key in prose while ordering by it. Filed in Known broken.
+- Decided: **IDF replaced the lyric stopword list on measured evidence.** Over the
+  repo's 56 `.lrc` files, ranking two songs' shared words by document frequency
+  puts `speed` and `fast` (4/56 each) 2nd and 3rd for SPEED DEMON x Skyline To
+  while `you`/`the`/`and` sink unaided — recovering mechanically the thematic
+  observation that looked like it needed a language model. That result is why the
+  report is deterministic rather than model-narrated. It also fixed a real
+  mis-ordering: flat Jaccard scored the winning pair 0.040 against a worse pair's
+  0.054, because a shared `you` counted as much as a shared `speed`. Measuring the
+  hypothesis before designing on it is what turned a guess into the architecture.
+- Resolved: **the catalog's stale bpm/key** (`132b5ce`). All 20 analyzed rows
+  carried one timestamp predating every tempo/key change and held two distinct keys
+  across 20 tracks, so `catalog.py mix`'s near-universal "perfect" key verdict was
+  an artifact of a flat key distribution, not a real match. `backfill` could not
+  repair it — it only filled rows where bpm/key were NULL, so it skipped all 20.
+  Added `--refresh` to overwrite: 55 analyzed tracks (was 20), eight distinct keys
+  (was two), cross-artist pairs where the output had been almost entirely
+  same-album. Lesson: a fill-NULLs-only backfill silently freezes whatever the
+  estimator believed the day each row was written.
 - Verified live (Logic off-screen on BetterDisplay VD): the **scoped Control Bar
   tempo/key reads work** — `logic_get_key` returned `C Major` via MCP; tempo
   returns `120.0` (<0.2s) via raw osascript, the shipped `_TEMPO_SCRIPT`, and the
@@ -485,95 +495,4 @@
   6-stem folder. Caveat carried to Known broken: real-track accuracy is
   ear-unverified and rides on the weak key detector.
 
-### 2026-07-21
-- Decided: build `music-menu/` — a new ratatui menu-launcher for the flip path in
-  the external "Ratatui Design" Claude Design system (navy/cream/yellow, JetBrains
-  Mono, box-drawing, yellow reversed-video selection). Chosen over restyling
-  StudioTUI so its LCD-Green/Phosphor look is untouched. Adapted the design kit's
-  `script-menu` template; reused StudioTUI's `worker::run_zsh` pattern (stdin
-  nulled, `sh_quote`) so it calls arg-driven `lib/music-core.sh` functions, never
-  the interactive `*.sh` wrappers (which read stdin and would hang the TUI).
-- Built warning-free (cargo build + clippy clean). Verified in tmux: renders to
-  the design, source picker discovers the real library, and running Tempo & key
-  streamed `analyze_track`'s live output + status. Note: analyze_track exits 0 but
-  prints "analysis failed" on `03 Exchange.m4a` (corrupt mvhd time scale in that
-  file) — a pre-existing pipeline/ffmpeg quirk, faithfully surfaced by the TUI,
-  not a menu bug.
-- Fixed the zsh `music` menu navigation the same session: Download (arm 1) now
-  auto-selects the fetched track; arms 1/8 accept a pasted URL (download->select);
-  "Need an audio file" now guides; blank Enter redraws. And logic-pro-mcp's
-  `_ensure_logic_running` launched `open -a "Logic Pro"` (wrong app on this
-  machine) and hung 30s — now launches `LOGIC_APP_NAME` (default "Logic Pro
-  Creator Studio", env-overridable) and fails fast. Both committed + pushed.
-- CORRECTION to the tmux-verification claim above: it was a false PASS. The
-  "analysis failed" line was NOT the Exchange mvhd quirk — it was a path bug that
-  broke EVERY source/stem step. `main.rs` took the CLI root arg raw; launched with
-  a relative `..` (the README's own `cargo run -- ..`), `find_sources` baked `../`
-  into every path while `run_zsh` also set cwd to `..`, so `../Apple Music/x`
-  resolved from the wrong dir -> "No such file or directory". The earlier verify
-  saw "analysis failed", pattern-matched it to the known mvhd issue, and never read
-  the actual error text — the exact "can't tell no-diff from not-shown" trap logged
-  on 2026-07-18. Reproduced on `01 Nikes.m4a` (a clean file), not just Exchange.
-- Fixed: `let root = root.canonicalize().unwrap_or(root);` in main.rs, so discovery
-  and run cwd are both absolute. Re-verified by driving the TUI with `..`:
-  `analyze_track` now runs the absolute path and returns `69.1 BPM key C` + ✓ done.
-  Also added 14 unit tests for the pure fns (sh_quote real-shell round-trip incl.
-  injection, build fns, short_label, display_val) — these don't cover the path/cwd
-  seam, which is why running the app caught what the tests couldn't.
-- Two UX rough edges found while driving (NOW FIXED, main.rs key routing): in a
-  filtered list the first Enter only committed the filter (a second opened the
-  step) — Enter in filter mode now calls `start_selected()`, so one Enter runs the
-  highlighted step. And Esc from a committed filter used to quit the app — menu-mode
-  Esc now clears a non-empty filter first and only quits when there's nothing left
-  to back out of. Re-verified in tmux: filter->Enter opens the step; Esc drops
-  Steps (2)->Steps (8) with the app still alive, second Esc quits.
-- Also unaddressed: the TUI marks a step `✓ done` purely on exit code, so a step
-  that self-reports failure while exiting 0 (like analyze_track on a bad file) still
-  reads green.
-
-### 2026-07-18
-- Decided: freeze a behavioural baseline BEFORE touching analyze_track.py. It
-  proved the old detector was degenerate in three independent ways that were
-  invisible without it: tempo railed at its 184.6 BPM ceiling on 28/120 rows
-  (49/120 sat on just 3 integer lags), key collapsed to "F" on 53/120, and
-  boundaries fired every 8s because the minimum-gap filter, not the threshold,
-  was doing the work.
-- Decided: do NOT commit the tempo octave fix until it is verified by ear. It is
-  objectively correct on synthetic signals (140 BPM read as 69.8 before, 140.3
-  after) and the sub-lag refinement is a genuine correctness fix -- at ~43
-  envelope fps, integer lags cannot represent 140 BPM at all. But against
-  published BPM it scored 6/13 both before and after, and the published values
-  are one algorithm with the same octave bias. Reasoning that sounds right is
-  not evidence.
-- Learned: the plan's diagnosis of octave errors as a *scoring* problem was
-  incomplete. The mechanism is lag quantization -- an 0.46-frame-per-beat error
-  accumulates to a full beat of drift in 30s, which collapses the evidence for
-  the FAST candidate while the slow one drifts half as fast. The resolution
-  asymmetry itself biases toward halving.
-- Learned: `entire contents of front window` returns ZERO elements for Logic
-  Pro 12.3 even when frontmost, so logic_dump_ui_hierarchy silently returned "".
-  Walk with `every UI element` and recurse through a handler parameter --
-  storing element refs in a list and mutating it invalidates them (-10000).
-- Learned: "simplify to only the provably-correct part" was itself falsified.
-  Sub-lag refinement alone scored exact 3 / octave 5, worse than the original
-  argmax (5/2), while refinement plus candidate scoring scored 6/1. The safe-
-  looking subset was the worst of three variants -- measuring it before shipping
-  it is the only reason that was caught.
-- Learned: a verification step that cannot distinguish "no differences" from "I
-  was not shown the differences" is worthless. Piping a replay through `tail -60`
-  silently dropped every full-mix row (source paths sort before Stems/), and a
-  confident drift summary was then built on the survivors. Same silent-failure
-  shape as the dump returning "" and deconstruct's sed writing to /dev/null --
-  three in one session. Counts now sum to a known total.
-
-### 2026-07-12
-- Decided: bundle stem quality as four named profiles (acapella/fast/6stem/hq)
-  instead of exposing raw demucs model names. htdemucs_ft excluded — it is
-  4-stem only and cannot produce guitar/piano, which is the user's goal; the
-  only path to those is htdemucs_6s, cleaned up with --shifts 2 --overlap 0.5
-  (the `hq` default). deconstruct kept on `fast` so the quick-prep path stays
-  fast-by-default; keeper-track quality lives in Separate.
-- Decided: per-stem analysis uses ffmpeg volumedetect (no new Python deps) and
-  writes a human-readable analysis.txt beside the stems rather than into the
-  catalog — the beside-stems report delivers the "which stems have audio" value
-  without fighting the catalog's rebuild-on-scan model.
+Older entries: `STATUS-ARCHIVE.md`.

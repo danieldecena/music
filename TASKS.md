@@ -4,6 +4,7 @@
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 - [ ] Improve key detection accuracy — 2/13 exact, mix key relations need the ear
 - [ ] Fix scan's filename-stem track collision (corrupt Exchange copy won)
+- [ ] Decide mix report tier order — _sort_key ranks key above tempo
 
 ## Completed
 
