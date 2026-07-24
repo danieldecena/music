@@ -149,8 +149,12 @@
     also samples the 1/3 and 2/3 offsets and penalizes a candidate whose thirds
     are as full as its beats — the signature of a 3:2 metrical misread, which the
     old on-vs-halfway test was blind to. Against the 10 trusted labels: 3:2 errors
-    3 -> 2 (Exchange recovered to exact), exact 6 -> 7, no new octave errors. Still
-    unfixed: Godspeed (3:2 fast), Don't (2:3 slow), Self Control (2:1). Research
+    3 -> 2, exact 6 -> 7, no new octave errors. Still
+    unfixed: Godspeed (3:2 fast), Exchange (2:3 slow), Self Control (2:1).
+    **Corrected 2026-07-23:** this entry originally said "Exchange recovered to
+    exact" and listed Don't as unfixed — the two are swapped. Re-running `score`
+    shows `Don't 96 -> 99.3 exact` and `Exchange 160 -> 106.7 two-thirds`. The
+    aggregate counts above were right; the named tracks were not. Research
     (research-analyst, cited) confirmed the mechanism: essentia's Percival sums
     only duple (2x/4x) harmonics. Dropping our 3x harmonic term was tried and
     REVERTED — redundant with the grid penalty and it broke Pink + White into a
@@ -247,6 +251,20 @@
   primitives against the running off-screen Logic (`window_count=1`,
   `track_count=1`); did not re-run the full fragile build against the live
   session. TDD (+2 pure-builder tests, 39 green).
+- Probed (ad-hoc, nothing landed in the repo): **`beat_this` as an independent
+  tempo cross-check.** madmom is a dead end — its PyPI release is from 2017, breaks
+  on Python >=3.10 and pins numpy <2 (we run 3.14.6 / numpy 2.5.0); git-main is
+  CI-tested only to 3.12 and last moved Aug 2024. BeatNet inherits that. `beat-this`
+  1.1.0 (CPJKU, transformer) installed clean on 3.14 with torch 2.13 — but needs
+  `soundfile` (its loader falls back to madmom otherwise). Results vs ours/label:
+  Don't 96.8/99.3/96 and Exchange 81.1/106.7/160 came back on **clean 4/4 bars**;
+  Nikes (120.0, 3.5-beat bars) and Rambo (176.5, 5.8-beat bars) came back
+  **incoherent** — it fails on exactly the two `?` rows, as the octave-ambiguity
+  caveat predicted. Value: confirmed Don't (3-way agreement, drop it from the ear
+  list) and caught the Exchange/Don't mixup above. Downbeat-spacing coherence, not
+  the BPM, is what made its output trustworthy or not. Not wired in — a multi-GB
+  torch dep for a 2-track gain isn't worth it; revisit if cross-checking every
+  track becomes routine.
 - Decided: **click_compare writes the fixtures row itself** (149a7aa). On lock it
   updates the matching `fixtures-analysis.tsv` row in place (dropping the `?`),
   preserving path + key, and offers to rerun `score` — killing the copy-paste that

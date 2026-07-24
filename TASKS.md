@@ -1,6 +1,6 @@
 ## Tasks
 
-- [ ] LISTEN: run T) Tempo lock on Exchange/Don't/Rambo/Nikes, update fixtures-analysis.tsv, drop ?, re-run score (pure human-ear step; tool built)
+- [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 
 ## Completed
