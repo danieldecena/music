@@ -183,14 +183,13 @@
     three-halves unchanged; the other 12 tracks byte-identical. Still open:
     Godspeed (3:2 fast) and Self Control (2:1). Same standing caveat — a
     correlated-label score, not the ear.
-- **`scan` keys tracks by filename stem, so same-titled tracks on two albums
-  collide.** Found 2026-07-23: `03 Exchange` exists in both `T R A P S O U L`
-  and `T R A P S O U L (Deluxe)`; one row won, and it pointed at the non-Deluxe
-  copy, which is **corrupt** (`ffprobe`: invalid mvhd time scale, no decodable
-  audio) — the sole failure in an otherwise clean 54/55 refresh. Repointed that
-  row at the Deluxe file by hand and re-backfilled it (161 BPM, Am). The
-  underlying collision is unfixed: the Deluxe album's other 17 tracks are indexed
-  and the plain album's are shadowed. A track key should include the album.
+- `scan` still keys tracks by filename stem, so two files with the same name are
+  one row — but the collision is now **resolved by decodability and reported**
+  rather than decided by iteration order (see the decision log). Keying by album
+  instead is not available: `Stems/` and `Samples/` folders on disk are named for
+  the bare stem, so an album-qualified key would orphan every derived asset from
+  its track. Renaming those folders is the real fix, and it is a migration, not a
+  patch. Today's library has exactly one collision.
 - **Mix-report caveats, for anything read off `catalog.py mix`.** BPM/key are
   estimates from this repo's analyzer. Tempo is the solid half; key is the weak
   half at 2/13 exact against published labels, so treat key relationships as a
@@ -243,9 +242,6 @@
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
 
 ## Next Up
-- **[code] Fix `scan`'s filename-stem track collision** — same-titled tracks on two
-  albums overwrite each other (see Known broken). The track key needs the album.
-  This is the top code-actionable item; the two tempo tasks above it are ear-blocked.
 - **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
@@ -265,6 +261,25 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-07-23
+- Fixed: **`scan`'s filename-stem collision now resolves by decodability, not by
+  iteration order.** New pure `pick_source(candidates, probe)`; `scan()` groups
+  source files by stem and returns the conflicts it resolved, which the CLI
+  prints (`indexed` / `shadowed`). Two things the data changed about the fix:
+  (1) The obvious rule — biggest file wins — is measurably an **anti-signal**.
+  The corrupt `03 Exchange` is 12.0 MB and the good Deluxe copy is 6.7 MB, so a
+  size rule picks exactly wrong on the only real collision in the library. I had
+  it backwards initially from an `ls -l` whose arguments ls had re-sorted, and
+  shipped a size rule that then picked the corrupt file on a live scan. Reading
+  sizes per-path in Python is what caught it. Decodability (one ffprobe, only on
+  a collision) is the honest discriminator; path breaks ties so a rescan is
+  stable. (2) The earlier note claimed "the Deluxe album's other 17 tracks are
+  indexed and the plain album's are shadowed" — wrong. The plain "album" holds a
+  single stray file, and the library has **1 collision in 56 sources**. Scoped
+  the fix to that. Keying tracks by album was rejected outright: `Stems/` and
+  `Samples/` folders are named for the bare stem, so an album-qualified key
+  orphans every derived asset. Live scan now indexes the Deluxe file and repairs
+  the inconsistent `album` the earlier hand-repair left behind, so the manual fix
+  is no longer needed. TDD, 6 new asserts.
 - Shipped: **seed-pivot mix report** (`9fa69b9..8156cdd`, 8 commits). `catalog.py mix
   --seed <title>` pivots on one named track instead of dumping every library pair,
   printing a verdict, a why-line, rarest-first shared lyric words, and near misses;

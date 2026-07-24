@@ -150,11 +150,60 @@ def _add_asset(con, track, kind, subtype, path: Path):
     )
 
 
+def _playable(rel_path):
+    """True if ffprobe can read a duration out of the file."""
+    try:
+        out = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "csv=p=0",
+                str(ROOT / rel_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        ).stdout.strip()
+        return float(out) > 0
+    except Exception:
+        return False
+
+
+def pick_source(candidates, probe=_playable):
+    """Choose one source file for a track name; return (winner, shadowed).
+
+    Two files collide when they share a filename stem -- the same song on two
+    albums, or a stray duplicate. The name has to stay the key: Stems/ and
+    Samples/ folders on disk are named for the bare stem, so keying tracks by
+    album instead would orphan every derived asset from its track. The choice
+    is only which file the name points at.
+
+    Decodability decides, and nothing else does. File size looks like the
+    obvious proxy and is measurably an anti-signal: the corrupt copy of
+    "03 Exchange" is the BIGGER one (12.0 MB against the good file's 6.7 MB),
+    so a size rule picks exactly wrong on the only real collision in the
+    library. Path breaks ties so a rescan never reshuffles the catalog.
+
+    Only ever called on a collision, so the ffprobe cost is rare. `probe` is
+    injected so the choice stays testable without ffmpeg.
+    """
+    if len(candidates) == 1:
+        return candidates[0], []
+    ordered = sorted(candidates, key=lambda c: (not probe(c["path"]), c["path"]))
+    return ordered[0], ordered[1:]
+
+
 def scan(con):
+    """Full rescan. Returns the list of filename-stem collisions it resolved."""
     init(con)
     con.execute("DELETE FROM assets")
 
     # --- source tracks ---
+    by_name = {}
     for d in SOURCE_DIRS:
         base = ROOT / d
         if not base.exists():
@@ -162,11 +211,37 @@ def scan(con):
         for f in base.rglob("*"):
             if f.is_file() and f.suffix.lower() in AUDIO_EXT:
                 parts = f.relative_to(base).parts
-                artist = parts[0] if len(parts) >= 2 else None
-                album = parts[1] if len(parts) >= 3 else None
-                _upsert_track(
-                    con, f.stem, source_path=_rel(f), artist=artist, album=album
+                try:
+                    size = f.stat().st_size
+                except OSError:
+                    size = 0
+                by_name.setdefault(f.stem, []).append(
+                    {
+                        "path": _rel(f),
+                        "size": size,
+                        "artist": parts[0] if len(parts) >= 2 else None,
+                        "album": parts[1] if len(parts) >= 3 else None,
+                    }
                 )
+
+    conflicts = []
+    for name in sorted(by_name):
+        win, shadowed = pick_source(by_name[name])
+        if shadowed:
+            conflicts.append(
+                {
+                    "name": name,
+                    "chosen": win["path"],
+                    "shadowed": [s["path"] for s in shadowed],
+                }
+            )
+        _upsert_track(
+            con,
+            name,
+            source_path=win["path"],
+            artist=win["artist"],
+            album=win["album"],
+        )
 
     # --- stems ---
     for model in STEM_MODELS:
@@ -222,6 +297,7 @@ def scan(con):
             _add_asset(con, f.stem, "midi", None, f)
 
     con.commit()
+    return conflicts
 
 
 def _analyze(source_rel):
@@ -760,10 +836,21 @@ def main(argv):
             init(con)
             print(f"initialized {DB}")
         elif ns.cmd == "scan":
-            scan(con)
+            conflicts = scan(con)
+            for c in conflicts:
+                print(f"note: two files are named {song_title(c['name'])!r}")
+                print(f"      indexed  {c['chosen']}")
+                for s in c["shadowed"]:
+                    print(f"      shadowed {s}")
             con.execute(
                 "INSERT INTO runs(ts,action,target,status,note) VALUES(?,?,?,?,?)",
-                (now(), "scan", "workspace", "ok", ""),
+                (
+                    now(),
+                    "scan",
+                    "workspace",
+                    "ok",
+                    f"{len(conflicts)} name collisions" if conflicts else "",
+                ),
             )
             con.commit()
             cmd_stats(con, False)
