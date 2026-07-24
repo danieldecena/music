@@ -142,6 +142,12 @@ def _refine_lag(ac: np.ndarray, i: int) -> float:
     return float(i) + float(delta)
 
 
+# How far _grid_support may nudge a candidate lag to find its true alignment.
+# Wide enough to absorb _refine_lag's error on short lags, far too narrow to
+# reach an octave (100%) or 3:2 (50%) neighbour.
+_GRID_LAG_TOL = 0.02
+
+
 def _grid_support(env: np.ndarray, lag: float) -> float:
     """Energy on the beat grid vs. the grids between beats — halves and thirds.
 
@@ -168,30 +174,41 @@ def _grid_support(env: np.ndarray, lag: float) -> float:
 
     The grid phase is searched, not assumed — starting at sample 0 would score a
     track with any pickup or leading silence against a misaligned grid.
+
+    The LAG is searched too, over a narrow band. The autocorrelation's resolution
+    is one frame, which at a short lag is enormous: at lag 16 (~160 BPM, 43 fps)
+    consecutive integer lags are 160.8 and 152.0 BPM, ~9 BPM apart. `_refine_lag`
+    interpolates between them but lands within only ~0.5%, and because this grid
+    is rigid across the whole track that error compounds — 0.076 frames/beat over
+    521 beats walks the grid 2.5 whole beats off the music, collapsing a true
+    candidate's score (measured on Exchange: 1.14 at the exact lag, 0.64 at the
+    refined one). Searching +/-2% recovers the alignment the AC was too coarse to
+    express. It cannot rescue a real 3:2 or octave misread, which is 50% or 100%
+    away, so the discrimination above is untouched.
     """
-    n = int(len(env) / lag)
-    if n < 8:
-        return 1.0
-    k = np.arange(n)
     best = 0.0
-    for phase in np.linspace(0.0, lag, 8, endpoint=False):
-        on_idx = np.rint(phase + k * lag).astype(int).clip(0, len(env) - 1)
-        off_idx = np.rint(phase + (k + 0.5) * lag).astype(int).clip(0, len(env) - 1)
-        t1_idx = (
-            np.rint(phase + (k + 1.0 / 3.0) * lag).astype(int).clip(0, len(env) - 1)
-        )
-        t2_idx = (
-            np.rint(phase + (k + 2.0 / 3.0) * lag).astype(int).clip(0, len(env) - 1)
-        )
-        on, off = env[on_idx].mean(), env[off_idx].mean()
-        tot = on + off
-        if tot <= 0:
+    for lag_try in lag * np.linspace(1.0 - _GRID_LAG_TOL, 1.0 + _GRID_LAG_TOL, 9):
+        n = int(len(env) / lag_try)
+        if n < 8:
             continue
-        third = 0.5 * (env[t1_idx].mean() + env[t2_idx].mean())
-        duple = on / (on + third) if on + third > 0 else 1.0
-        score = (0.5 + on / tot) * duple
-        if score > best:
-            best = score
+        k = np.arange(n)
+        for phase in np.linspace(0.0, lag_try, 8, endpoint=False):
+            base = phase + k * lag_try
+            on_idx = np.rint(base).astype(int).clip(0, len(env) - 1)
+            off_idx = np.rint(base + 0.5 * lag_try).astype(int).clip(0, len(env) - 1)
+            t1_idx = np.rint(base + lag_try / 3.0).astype(int).clip(0, len(env) - 1)
+            t2_idx = (
+                np.rint(base + 2.0 * lag_try / 3.0).astype(int).clip(0, len(env) - 1)
+            )
+            on, off = env[on_idx].mean(), env[off_idx].mean()
+            tot = on + off
+            if tot <= 0:
+                continue
+            third = 0.5 * (env[t1_idx].mean() + env[t2_idx].mean())
+            duple = on / (on + third) if on + third > 0 else 1.0
+            score = (0.5 + on / tot) * duple
+            if score > best:
+                best = score
     return best if best > 0 else 1.0
 
 
