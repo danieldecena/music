@@ -1,0 +1,8 @@
+{
+  "context_servers": {
+    "sqlite-catalog": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "catalog.sqlite"]
+    }
+  }
+}
