@@ -94,6 +94,22 @@ app and fire a pipeline step instead of moving the cursor.
 The driver waits for the pane to **settle** (two identical captures) rather than
 sleeping a fixed interval, so frames are never captured mid-redraw.
 
+It **exits non-zero when the app fails to launch or dies mid-run** — verified,
+not assumed:
+
+```bash
+MUSIC_TMUX=/nonexistent/tmux ./.claude/skills/run-music/driver.sh tui-start rust
+# -> tmux new-session failed — cannot start 'rust'   (exit 2)
+```
+
+Three env overrides, all for testing or concurrency:
+
+| Var | Purpose |
+|---|---|
+| `MUSIC_SESSION` | tmux session name (default `music-drv`). Set it to run two drivers at once — the state file follows the name. |
+| `MUSIC_TMUX` | path to the tmux binary. Point it at a bad path to prove the launch guard fires. |
+| `MUSIC_FIXTURE` | the Stems dir `smoke` runs chords against. |
+
 ### Menu map — `./music` (verified by driving it)
 
 **Main:** `1` Download · `8` Deconstruct · `2` Separate stems · `7` Tempo & key ·

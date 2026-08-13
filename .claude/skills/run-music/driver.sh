@@ -21,8 +21,9 @@ REPO="${0:A:h:h:h:h}"          # .../run-music/driver.sh -> up past skills/ and 
 cd "$REPO" || { print -u2 "cannot cd to repo root ($REPO)"; exit 2 }
 
 PY="$REPO/.venv/bin/python"
-SESSION="music-drv"
-STATEF="${TMPDIR:-/tmp}/music-drv.app"
+SESSION="${MUSIC_SESSION:-music-drv}"
+TMUXBIN="${MUSIC_TMUX:-tmux}"   # seam: point at a bad path to prove the launch guard fires
+STATEF="${TMPDIR:-/tmp}/${SESSION}.app"
 FIXTURE="${MUSIC_FIXTURE:-Stems/htdemucs_6s/02 Let Em' Know}"
 
 pass=0; fail=0
@@ -103,7 +104,7 @@ app_cmd() {
 settle() {
   local prev="" cur="" i
   for i in {1..25}; do
-    cur=$(tmux capture-pane -t "$SESSION" -p 2>/dev/null)
+    cur=$("$TMUXBIN" capture-pane -t "$SESSION" -p 2>/dev/null)
     [[ -n "$cur" && "$cur" == "$prev" ]] && { print -r -- "$cur"; return 0 }
     prev="$cur"; sleep 0.2
   done
@@ -115,8 +116,12 @@ tui_start() {
   cmd=$(app_cmd "$app") || return 2
   [[ "$app" != menu && ! -x "$cmd" ]] && {
     print -u2 "$cmd not built — run: (cd ${cmd%%/target/*} && cargo build)"; return 2 }
-  tmux has-session -t "$SESSION" 2>/dev/null && tmux kill-session -t "$SESSION"
-  tmux new-session -d -s "$SESSION" -x 200 -y 50 "cd ${(q)REPO} && $cmd"
+  "$TMUXBIN" has-session -t "$SESSION" 2>/dev/null && "$TMUXBIN" kill-session -t "$SESSION"
+  # Gate on the launch. Unchecked, a missing tmux / unwritable TMUX_TMPDIR / a
+  # stale session surviving the kill above all still printed "up" and returned 0
+  # (print was the last statement), so `tui_start || return` never fired.
+  "$TMUXBIN" new-session -d -s "$SESSION" -x 200 -y 50 "cd ${(q)REPO} && $cmd" || {
+    print -u2 "tmux new-session failed — cannot start '$app'"; return 2 }
   print -r -- "$app" > "$STATEF"
   settle >/dev/null
   print "$app up (tmux session '$SESSION')"
@@ -126,23 +131,23 @@ tui_start() {
 # ratatui apps read raw keypresses, where a stray Enter ACTIVATES the selected
 # row — sending it there fires a step instead of navigating.
 tui_send() {
-  tmux has-session -t "$SESSION" 2>/dev/null || { print -u2 "no session — run tui-start"; return 2 }
+  "$TMUXBIN" has-session -t "$SESSION" 2>/dev/null || { print -u2 "no session — run tui-start"; return 2 }
   local app="menu"; [[ -r "$STATEF" ]] && app=$(<"$STATEF")
   if [[ "$app" == menu ]]; then
-    tmux send-keys -t "$SESSION" "$1" Enter
+    "$TMUXBIN" send-keys -t "$SESSION" "$1" Enter
   else
-    tmux send-keys -t "$SESSION" "$1"
+    "$TMUXBIN" send-keys -t "$SESSION" "$1"
   fi
   settle >/dev/null
 }
 
 tui_screen() {
-  tmux has-session -t "$SESSION" 2>/dev/null || { print -u2 "no session — run tui-start"; return 2 }
-  tmux capture-pane -t "$SESSION" -p
+  "$TMUXBIN" has-session -t "$SESSION" 2>/dev/null || { print -u2 "no session — run tui-start"; return 2 }
+  "$TMUXBIN" capture-pane -t "$SESSION" -p
 }
 
 tui_stop() {
-  tmux has-session -t "$SESSION" 2>/dev/null && tmux kill-session -t "$SESSION"
+  "$TMUXBIN" has-session -t "$SESSION" 2>/dev/null && "$TMUXBIN" kill-session -t "$SESSION"
   rm -f "$STATEF"
   print "tui down"
 }
@@ -151,13 +156,18 @@ tui_stop() {
 tui_run() {
   local app="${1:-menu}"; shift 2>/dev/null || true
   tui_start "$app" || return 2
-  print "\n--- opening frame ---"; tui_screen
-  local k
+  # Track loop failures. tui_send/tui_screen print "no session" to stderr, but
+  # unchecked their exit codes vanished: tui_run ended on tui_stop (always 0), so
+  # an app that panicked mid-run looked exactly like every key landing.
+  local rc=0 k
+  print "\n--- opening frame ---"; tui_screen || rc=1
   for k in "$@"; do
-    tui_send "$k"
-    print "\n--- after '${k:-<enter>}' ---"; tui_screen
+    tui_send "$k" || rc=1
+    print "\n--- after '${k:-<enter>}' ---"; tui_screen || rc=1
   done
   tui_stop
+  (( rc == 0 )) || print -u2 "one or more keys/captures failed — the session died mid-run"
+  return $rc
 }
 
 # ------------------------------------------------------------------ cli
