@@ -366,6 +366,33 @@ dead-code warnings.
   outro genuinely slows. So "4 bars" is not a fixed duration, and a chop taken
   off this grid follows the performance rather than a click. Worth knowing before
   anyone "fixes" the apparent inconsistency.
+- **MusicUnderstanding runs in the iOS 27 Simulator.** It does not need device
+  ML hardware, which was an open risk. Flip (`App/`, xcodegen) installed and
+  launched headlessly on a booted iOS 27.0 simulator and analyzed a bundled 30s
+  clip in 2.27s against the Mac's 2.5s.
+- **But macOS and the iOS Simulator disagree by one section.** Same clip, same
+  bytes: BPM 116.597755 vs 116.596405, beats 58/58, bars 14/14, segments 5/5,
+  phrases 9/9, key C major both. **Sections 3 on macOS, 2 in the Simulator.**
+  Since segments and phrases are identical, boundary detection agrees and it is
+  the section-grouping step that differs -- consistent with a prediction sitting
+  on `structurePredictions.detectionThreshold` and falling the other way, nudged
+  by the 0.0014 BPM difference. Consequence to design around: section
+  containment feeds the loop scorer's bonus, so the Mac and the phone can rank
+  the same track's loops differently. Whether the *device* matches macOS or the
+  Simulator is untested -- the phone dropped off `devicectl` before the run.
+- **Two corrections from the radio reference scripts** (`~/developer/radio/
+  scripts/ios_run.sh`), which the `ios-build` skill points at and which had not
+  been read:
+  - A `generic/platform=iOS` build performs real device signing but produces
+    **no installable product for a specific device**. The device build needs
+    `-destination "id=<UDID>"`.
+  - `Simulator.app` is not missing from this Xcode. **Xcode 27 replaced it with
+    DeviceHub.app.** The cerebrum entry dated 2026-08-14 records this as a
+    stripped install with the GUI absent from disk; that diagnosis is wrong.
+- **The machine's slowness was Ollama, not the simulator.**
+  `qwen2.5-coder:14b-32k` held 15 GB of 24 GB with 3.8 GB swapped;
+  `ollama stop` took free memory from 13% to 70%. The whole simulator, 202
+  processes, was 0.5 GB.
 - **Escalation change on the two tempo tasks.** They were parked on the ear
   because every BPM source tried was Echo Nest-derived and therefore correlated.
   MusicUnderstanding is genuinely independent, and on all three suspect rows it
