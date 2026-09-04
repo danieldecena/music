@@ -1,0 +1,27 @@
+name: Flip
+options:
+  bundleIdPrefix: com.danieldecena
+  deploymentTarget:
+    iOS: "27.0"
+  createIntermediateGroups: true
+
+targets:
+  Flip:
+    type: application
+    platform: iOS
+    sources:
+      - path: Flip
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.danieldecena.flip
+        # The Team ID is the certificate's OU, never the code in the CN
+        # parentheses that `security find-identity` prints.
+        DEVELOPMENT_TEAM: 877MLS29T9
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Flip
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"

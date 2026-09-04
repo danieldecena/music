@@ -34,9 +34,17 @@ query, not a rewrite.
 - macOS 27.0 (26A5425a), Xcode 27 (27A5218g)
 - `MusicUnderstanding.framework` present in both `iPhoneOS27.0.sdk` and
   `MacOSX27.0.sdk`
-- iOS 27.0 simulator runtimes installed; **no physical iPhone connected**
-- Paid Developer Program, team **877MLS29T9**. A second team `FU9H8VF2PN` exists
-  on the icloud.com address; do not use it.
+- iOS 27.0 simulator runtimes installed. An iPhone 16 Pro on iOS 27.0 is paired
+  (this line previously said no device was connected)
+- Paid Developer Program. **There is exactly one team: `877MLS29T9`.** All five
+  signing identities carry `OU=877MLS29T9`. An earlier revision of this document
+  claimed a second team `FU9H8VF2PN` on the icloud.com address; that was wrong.
+  `FU9H8VF2PN` is the CN parenthetical on the Apple Development certificates and
+  is not a team identifier at all:
+  `/UID=F33K448PSH/CN=Apple Development: Daniel Decena (FU9H8VF2PN)/OU=877MLS29T9/...`
+  `security find-identity` prints only the CN, which is why the wrong code is the
+  obvious one to reach for. Passing it as `DEVELOPMENT_TEAM` yields
+  "No Account for Team".
 - iCloud Drive active
 
 ## Decisions taken

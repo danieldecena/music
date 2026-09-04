@@ -49,3 +49,7 @@ catalog.sqlite-*
 Samples/KeyLabels/
 Tools/mu-analyze
 Samples/Analysis/
+App/Flip.xcodeproj/
+App/build/
+App/DerivedData/
+App/Flip/Resources/*.m4a

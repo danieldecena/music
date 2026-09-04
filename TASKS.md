@@ -11,7 +11,8 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] (R1) Analysis probe and measurement [code] C
 - [x] (R2) Song database: schema and ingest [code] C
 - [x] (R3) Region scorers over the beat grid [code] C
-- [ ] (R4) Mac-to-phone seam: iCloud container and publish [code] C
+- [~] (R4a) Flip on device, analyzing a bundled track [code] C
+- [ ] (R4b) iCloud container and publish_to_icloud [code] C
 - [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
 - [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C
 - [ ] (R7) Verdict on old and lo-fi material [you] B
@@ -89,7 +90,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-09-03 16:38.
+Plan approved 2026-09-03 21:45.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
