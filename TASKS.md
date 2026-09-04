@@ -12,7 +12,7 @@
 - [x] Phase 1: three-way table Apple vs ours vs label
 - [ ] Phase 2: library browser over the iCloud container
 - [ ] Phase 2: track detail charts in Swift Charts
-- [ ] Phase 2: extend catalog schema with time-series + regions
+- [x] Phase 2: extend catalog schema with time-series + regions
 - [ ] Phase 2: loop region scorer over the beat grid
 - [ ] Phase 2: lyrics from the vocals stem via SpeechTranscriber
 - [ ] Phase 3: port chopping to AVFoundation and vDSP

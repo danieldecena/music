@@ -107,11 +107,75 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS idx_assets_track ON assets(track);
 CREATE INDEX IF NOT EXISTS idx_assets_kind ON assets(kind);
+
+-- Per-track time series, one row per event, written by `ingest` from the JSON
+-- Tools/mu-analyze produces. All times are seconds: MusicUnderstanding encodes
+-- CMTime as {epoch, flags, timescale, value}, so ingest divides before storing.
+CREATE TABLE IF NOT EXISTS beats (
+  track TEXT, idx INTEGER, t REAL, bar INTEGER, beat_in_bar INTEGER
+);
+CREATE TABLE IF NOT EXISTS bars (track TEXT, idx INTEGER, t REAL);
+CREATE TABLE IF NOT EXISTS sections (
+  track TEXT, idx INTEGER, label TEXT, start_s REAL, end_s REAL
+);
+CREATE TABLE IF NOT EXISTS key_ranges (
+  track TEXT, idx INTEGER, tonic TEXT, mode TEXT, start_s REAL, end_s REAL
+);
+-- momentary/short_term are NULL where the source reported a non-finite LUFS
+-- (digital silence); mu-analyze emits those as the strings "inf"/"-inf"/"nan".
+CREATE TABLE IF NOT EXISTS loudness (
+  track TEXT, t REAL, momentary REAL, short_term REAL
+);
+CREATE TABLE IF NOT EXISTS instrument_activity (
+  track TEXT, instrument TEXT, start_s REAL, end_s REAL, level REAL
+);
+CREATE TABLE IF NOT EXISTS lyrics (
+  track TEXT, start_s REAL, end_s REAL, text TEXT
+);
+
+-- One table for every product. A loop candidate, a social-clip hook, a
+-- vocal-free span and a safe cut point are all a scored, musically-aligned
+-- span; `kind` discriminates. A new product is a new kind and a new scorer,
+-- not a schema change.
+CREATE TABLE IF NOT EXISTS regions (
+  track TEXT, kind TEXT, start_s REAL, end_s REAL,
+  start_bar INTEGER, n_bars INTEGER, score REAL, meta_json TEXT
+);
+-- Cross-track compatibility, populated from harmonic_mix.rank_pairs.
+CREATE TABLE IF NOT EXISTS pairs (
+  a TEXT, b TEXT, tempo_ok INTEGER, tempo_ratio REAL,
+  key_relation TEXT, score REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_beats_track ON beats(track);
+CREATE INDEX IF NOT EXISTS idx_sections_track ON sections(track);
+CREATE INDEX IF NOT EXISTS idx_activity_track ON instrument_activity(track);
+CREATE INDEX IF NOT EXISTS idx_regions_track_kind ON regions(track, kind);
 """
+
+# Added to `tracks` after the fact. SQLite has no ADD COLUMN IF NOT EXISTS, so
+# init diffs against PRAGMA table_info rather than catching an error. The
+# original bpm/key columns stay alongside apple_bpm/apple_key on purpose:
+# tests/score_apple.py compares the two, and nothing is replaced before that
+# comparison says so.
+TRACK_ANALYSIS_COLUMNS = {
+    "duration_s": "REAL",
+    "apple_bpm": "REAL",
+    "apple_key": "TEXT",
+    "pace": "REAL",
+    "lufs_integrated": "REAL",
+    "true_peak": "REAL",
+    "analyzed_at": "TEXT",
+    "analysis_version": "TEXT",
+}
 
 
 def init(con):
     con.executescript(SCHEMA)
+    have = {r[1] for r in con.execute("PRAGMA table_info(tracks)")}
+    for col, decl in TRACK_ANALYSIS_COLUMNS.items():
+        if col not in have:
+            con.execute(f"ALTER TABLE tracks ADD COLUMN {col} {decl}")
     con.commit()
 
 
