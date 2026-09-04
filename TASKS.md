@@ -1,5 +1,6 @@
 ## Tasks
 
+- [ ] Prove it against a clean clone, then confirm PR #2's check goes green
 - [ ] (you) Amend silent-failure rule 10 in place, vs the byte budget
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
@@ -20,6 +21,8 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] Add App/ci_scripts/ci_post_clone.sh so Xcode Cloud can generate the project -- fc41f35
+- [x] Note the xcodegen-post-clone requirement in CLAUDE.md -- fc41f35
 - [x] Library browser over the iCloud container (R5 remainder) -- 276803d
 - [x] (R5) Claim the iCloud ubiquity container from the app -- e9e6591
 - [x] (R4b) Register the iCloud container on the App ID -- 448efb7
@@ -110,7 +113,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-09-03 21:45.
+Plan approved 2026-09-04 11:29.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -119,7 +122,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 8cc1b1a3-989d-40ee-a8e4-d7a12bfc0048
+    claude --resume 060c1574-c64b-475d-8ffd-6076377c8503
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->
