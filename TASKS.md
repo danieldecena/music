@@ -6,6 +6,9 @@
 - [ ] Backfill the bar grid for the 44 tracks without one
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
+- [ ] (you) Install Flip on the phone and read BPM/bars/lyrics off it
+- [ ] Decide whether loop playback should repeat past 8 iterations
+- [ ] Library browser over the iCloud container (R5 remainder)
 
 ## Roadmap — song database
 
@@ -30,6 +33,8 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] Build Tools/mu-analyze.swift, dump full analysis JSON -- 4209e42
 - [x] Verify analysis runs in the iOS 27 Simulator -- 692f964
 - [x] Batch-analyze the 13 fixture tracks to JSON -- cae6669
+- [x] Timeline tabs: activity chart, lyrics, loops, playback -- eb423b8
+- [x] Loop region scorer over the beat grid -- e5ed1ae
 
 - [x] Fix key_oracle to grade live detect_key vs UG, not Echo Nest column 3
 - [x] Independent key oracle (key_oracle.py) — grade detect_key off Ultimate Guitar

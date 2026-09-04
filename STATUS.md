@@ -308,6 +308,55 @@ dead-code warnings.
   demonstrate. The fix is a one-row edit to paper-system's hand-authored design
   canvas, which belongs to the session that owns that tooling.
 
+- Shipped: **the three timeline tabs, branch `flip-timeline-tabs`
+  (`cdf61dc..eb423b8`, 12 commits).** Analysis (four activity lanes on a bar grid,
+  section rules, top loop span shaded), Lyrics (timed `.lrc` against the same
+  grid), Loops (ranked candidates, each playable). `LoopScorer.swift` and
+  `TimedLyrics.swift` are ports of `Scripts/regions.py` and `Scripts/lyrics.py`
+  with parity tests pinned to the Python's current output. 31 tests in 4 suites.
+- Observed, by screenshot of the running simulator app: BPM 116.6, C major, 14
+  bars, 2 sections, lane peaks drum 0.09 / bass 0.35 / other 0.85 / vocal 0.82;
+  Lyrics 11 lines, "Back then" first at 0:02.32; Loops ranked 0.47 down to 0.27.
+- Decided: **Task 7's "confirm you hear audio" step replaced with an offline
+  assertion.** No device attached. The engine is driven through
+  `enableManualRenderingMode` and the test asserts non-zero RMS over rendered
+  frames plus repeat N starting at exactly `N * length`. `isPlaying == true` was
+  explicitly ruled insufficient: a transport running over silence is the failure
+  that step existed to catch. Audio session category, output routing and hardware
+  playback remain unverified and parked.
+- Found and fixed: **`LoopEngine` was not `@Observable` while `LoopList` read
+  `engine.isPlaying` in the view body.** Playback stopped correctly; the icon did
+  not update, so the control read as broken. Fixed in `eb423b8`. Worth noting how
+  it was caught -- no UI test and no driveable tap exist on this machine, and it
+  was still established with certainty by reading for the missing dependency edge.
+  "No interaction test" is not the same as "no evidence available".
+- RETRACTED, my error: **I claimed `App/Flip/Resources/README.md` recorded a stale
+  sha.** `shasum` defaults to SHA-1 (`111194ee...`); `shasum -a 256` gives
+  `1552377b...`, which is exactly what the README says. I compared the two and
+  wrote a "correction" into STATUS, a commit message (`b4cc47e`) and the plan. The
+  Task 5/6 implementer re-hashed, found its observation contradicted mine, refused
+  the edit and flagged it. `b4cc47e`'s message still carries the wrong claim;
+  commits are not amended, so this entry is the record.
+- RETRACTED, my error: **I concluded Simulator.app had no window and recommended
+  deleting its saved application state.** Both wrong.
+  `CGWindowListCopyWindowInfo` finds the `iPhone 17` window at
+  `(296,-1346,456,972)` -- inside the BetterDisplay virtual-display rect, i.e.
+  parked off-screen the whole time. `System Events` reporting 0 windows is an AX
+  blind spot for Simulator specifically. My control (ghostty reports 1 window)
+  proved Accessibility *permission* works; it did not prove Simulator *exposes*
+  windows through AX -- the wrong control for the claim (silent-failure rule 8).
+  The saved-state directory I proposed deleting does not exist, so that repair
+  would have been a no-op reported as a fix. Correct coordinates were then derived
+  (device origin `(323.5,-1271)` at 1:1 point scale, Loops tab at `(610,-441)`) and
+  `cliclick` still does not flip the tab, focused or not. Taps stay unavailable.
+- Process note: **subagents corrected me five times on this branch** -- a
+  non-existent second signing team, a fabricated xcodegen requirement for
+  pre-existing files, the sha above, an unfounded worry that the drift test had
+  stopped testing the real clip, and a test-count arithmetic conflict I had
+  created with my own ruling. One earlier instance had already produced a false
+  green (`TEST SUCCEEDED` with the file under test never compiled), which is why
+  the plan now requires checking the suite COUNT rather than the exit code.
+
 ### 2026-09-03
 
 - Observed: **both published artifacts are owned by the gmail account, whose
