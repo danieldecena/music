@@ -283,6 +283,42 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-09-03
+
+- Decided: two tracks are combined by cutting both on the persisted bar grid,
+  not by a BPM ratio. `Scripts/mix_render.py` (`449b195`) adds `layer` (both
+  sides at once, per stem) and `transition` (A into B). The repo previously had
+  no way to sound two sources together at all: grepping `amix`, `amerge`,
+  `layer` and `overlay` across `Scripts/` and `lib/` returned nothing, and
+  `mix_preview` only crossfades A then B at a section boundary. `stretch_for`
+  measures how long n bars actually take in each track and folds B's bar count
+  by octaves, so a double-tempo partner contributes twice the bars at no
+  stretch. A BPM ratio would only be right if both tempos were constant, and
+  Ivy alone runs 2.08s per bar early and 2.95s by the outro. Verified on audio,
+  not exit codes: Ivy's bass and other under Nikes' vocals over bars 111-115
+  rendered 11.859s against an 11.86s window, mean -18.3 dB, max -0.4 dB.
+- Decided: `deconstruct()` now runs `apple_analyze` (`76be55b`), so a new track
+  gets Apple's bar grid instead of only bpm/key from this repo's analyzer. Before
+  this, 13 of 58 catalogued tracks were mixable and nothing said so until a mix
+  was attempted. The three failure causes are kept distinct on purpose; an
+  earlier draft collapsed a mistyped path, an unsupported format and an unbuilt
+  binary into one "needs macOS 27" message, which reports a fabricated cause.
+  Proven against a known-good input as well as bad ones: "01 Intro (Difference)"
+  gained 40 bars, 5 sections, 7,356 activity points and 10 loop candidates.
+- Observed: device signing is retired with no hardware attached.
+  `build-for-testing` against `generic/platform=iOS` gives **TEST BUILD
+  SUCCEEDED**, and the product carries `application-identifier`
+  `877MLS29T9.com.danieldecena.flip`, `team-identifier` `877MLS29T9`, on a
+  profile valid to 2027-09-02. This settles the OU-vs-CN question empirically:
+  the build signs with `DEVELOPMENT_TEAM: 877MLS29T9` while the certificate's CN
+  reads "Apple Development: Daniel Decena (FU9H8VF2PN)". R4a's remaining half is
+  the phone.
+- Corrected: the plan records `App/Flip/Resources/testclip.m4a` at sha
+  `1552377b9407a32754e56e85`. The file actually bundled hashes
+  `111194ee858465c6f01f940f`, and source and built product agree, so Xcode
+  copies it verbatim and the plan's hash is stale (the file was rewritten at
+  21:41). The reference *readings* are unaffected and were re-derived from the
+  file that ships: **116.597755 BPM, 58 beats, 14 bars, 3 sections, 5 segments,
+  9 phrases, C major**. That is what the device must reproduce, not the hash.
 - Decided: build the flip toolkit's future around a **song database**, not a
   feature list. Apple's `MusicUnderstanding` (macOS/iOS 27) supplies rhythm, key,
   structure, loudness, pace and instrument activity on-device and free; loop
