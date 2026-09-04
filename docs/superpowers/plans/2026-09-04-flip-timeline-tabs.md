@@ -19,6 +19,7 @@
 - No third-party packages. The repo has none and adds none here.
 - `App/Flip/Resources/testclip.m4a` is **gitignored** — regenerate it per `App/Flip/Resources/README.md` before building. It is Ivy from 60s to 90s.
 - Ported logic must reproduce the Python's numbers exactly. Where it cannot, the plan says so and the test pins the difference rather than hiding it.
+- **Any task that ADDS a `.swift` file must run `cd App && xcodegen generate` before building.** xcodegen writes an explicit file list into the `.pbxproj`; a new file that has not been regenerated in is invisible to the build. This is not cosmetic: a test file the build cannot see contributes no tests and no compile error, so the suite reports `TEST SUCCEEDED` while proving nothing. Observed on 2026-09-04 — a Task 2 run went green with `LoopScorer.swift` absent because `LoopScorerTests.swift` was not yet in the project. Check the suite COUNT, not just the exit code.
 - Every `Scripts/*.py` invocation uses `.venv/bin/python` directly. Never bare `python3`.
 
 ## Known platform difference, carried into Task 2
@@ -296,7 +297,7 @@ git commit -m "Add a test target and port the timed lyric parser to Swift"
 
 **Interfaces:**
 - Consumes: nothing from Task 1.
-- Produces: `struct ActivitySample { let instrument: String; let start: Double; let end: Double; let level: Double }`, `struct Section { let start: Double; let end: Double }`, `struct Bar { let idx: Int; let t: Double }`, `struct LoopCandidate { let startBar: Int; let start: Double; let end: Double; let nBars: Int; let score: Double; let instruments: [String: Double] }`, and `enum LoopScorer { static func score(bars: [Bar], sections: [Section], activity: [ActivitySample], nBars: Int) -> [LoopCandidate] }`. Task 6 renders these; Task 4 shades their spans.
+- Produces: `struct ActivitySample { let instrument: String; let start: Double; let end: Double; let level: Double }`, `struct TrackSection { let start: Double; let end: Double }`, `struct Bar { let idx: Int; let t: Double }`, `struct LoopCandidate { let startBar: Int; let start: Double; let end: Double; let nBars: Int; let score: Double; let instruments: [String: Double] }`, and `enum LoopScorer { static func score(bars: [Bar], sections: [TrackSection], activity: [ActivitySample], nBars: Int) -> [LoopCandidate] }`. Task 6 renders these; Task 4 shades their spans.
 
 - [ ] **Step 1: Write the failing parity test**
 
@@ -317,7 +318,7 @@ struct LoopScorerTests {
     // platform difference instead of the port. Do not replace these with
     // whatever the device produced.
     let bars = (0...8).map { Bar(idx: $0, t: Double($0) * 2.0) }
-    let sections = [Section(start: 0.0, end: 8.0), Section(start: 8.0, end: 16.0)]
+    let sections = [TrackSection(start: 0.0, end: 8.0), TrackSection(start: 8.0, end: 16.0)]
     let activity = [
         ActivitySample(instrument: "vocal", start: 0.0, end: 8.0, level: 0.8),
         ActivitySample(instrument: "vocal", start: 8.0, end: 16.0, level: 0.0),
@@ -404,7 +405,7 @@ struct Bar: Equatable {
     let t: Double
 }
 
-struct Section: Equatable {
+struct TrackSection: Equatable {
     let start: Double
     let end: Double
 }
@@ -464,12 +465,12 @@ enum LoopScorer {
         }
     }
 
-    static func contained(_ sections: [Section],
+    static func contained(_ sections: [TrackSection],
                           _ start: Double, _ end: Double) -> Bool {
         sections.contains { $0.start <= start && end <= $0.end }
     }
 
-    static func score(bars: [Bar], sections: [Section],
+    static func score(bars: [Bar], sections: [TrackSection],
                       activity: [ActivitySample], nBars: Int) -> [LoopCandidate] {
         let ordered = bars.sorted { $0.t < $1.t }
         guard ordered.count > nBars else { return [] }
@@ -704,8 +705,8 @@ git commit -m "Add the bar grid that every timeline tab plots against"
 - Modify: `App/Flip/ContentView.swift`
 
 **Interfaces:**
-- Consumes: `Bar`, `Section`, `ActivitySample`, `LoopCandidate` (Task 2); `BarGrid` (Task 3); `LyricLine`, `TimedLyrics` (Task 1).
-- Produces: `struct TrackAnalysis { let bpm: Double; let key: String; let bars: [Bar]; let sections: [Section]; let activity: [ActivitySample]; let lyrics: [LyricLine]; let loops: [LoopCandidate]; let grid: BarGrid; let duration: Double }`. Tasks 5 and 6 read it.
+- Consumes: `Bar`, `TrackSection`, `ActivitySample`, `LoopCandidate` (Task 2); `BarGrid` (Task 3); `LyricLine`, `TimedLyrics` (Task 1).
+- Produces: `struct TrackAnalysis { let bpm: Double; let key: String; let bars: [Bar]; let sections: [TrackSection]; let activity: [ActivitySample]; let lyrics: [LyricLine]; let loops: [LoopCandidate]; let grid: BarGrid; let duration: Double }`. Tasks 5 and 6 read it.
 
 - [ ] **Step 1: Write the value type**
 
@@ -723,14 +724,14 @@ struct TrackAnalysis {
     let key: String
     let duration: Double
     let bars: [Bar]
-    let sections: [Section]
+    let sections: [TrackSection]
     let activity: [ActivitySample]
     let lyrics: [LyricLine]
     let loops: [LoopCandidate]
     let grid: BarGrid
 
     init(bpm: Double, key: String, duration: Double, bars: [Bar],
-         sections: [Section], activity: [ActivitySample], lyrics: [LyricLine]) {
+         sections: [TrackSection], activity: [ActivitySample], lyrics: [LyricLine]) {
         self.bpm = bpm
         self.key = key
         self.duration = duration
@@ -795,10 +796,10 @@ In `App/Flip/Analysis/MusicUnderstandingRunner.swift`, add this method to `Runne
 
         let structure = result["structure"] as? [String: Any] ?? [:]
         let sections = (structure["sections"] as? [[String: Any]] ?? [])
-            .compactMap { row -> Section? in
+            .compactMap { row -> TrackSection? in
                 guard let start = seconds(row["start"]),
                       let dur = seconds(row["duration"]) else { return nil }
-                return Section(start: start, end: start + dur)
+                return TrackSection(start: start, end: start + dur)
             }
 
         var activity: [ActivitySample] = []
