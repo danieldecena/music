@@ -390,6 +390,25 @@ dead-code warnings.
   the section-count split which it states outright. Because vocal is the one
   family that agrees, and vocal is what `clean` is computed from, loop-rank
   stability across the two platforms is an inference and not a measurement.
+- Shipped: **`catalog.py backfill-grid`, and the bar grid backfilled from 14
+  tracks to 55 of 58.** The grid, structure boundaries and activity signal come
+  from MusicUnderstanding alone -- `backfill` fills bpm/key from
+  `analyze_track.py` and cannot touch them -- so 44 tracks were invisible to the
+  region scorers. The new command runs `Tools/mu-analyze` for every track with
+  a source file and no bars, ingests the JSON, and keeps it under
+  `Samples/Analysis/` (gitignored, now 269 MB for 53 files). 40 tracks in 3m13s,
+  no failures. The remaining 3 have no `source_path` -- `Let Em Know`, `demo`
+  and `vocals`, artifacts of the filename-stem keying already in Known broken --
+  so there is nothing to analyze, which is the correct outcome and not a gap.
+- Two branches were written to fail loudly and both were observed failing, then
+  the same command was observed passing on a real analysis (six assertions in
+  `tests/test_catalog_ingest.py`, 24 passing): a missing `Tools/mu-analyze` is
+  an error naming the `swiftc` line, never a quiet "0 tracks needed a grid" --
+  the binary is gitignored, so absent is a fresh checkout's normal state; and an
+  analysis that ingests cleanly but carries no rhythm block is reported as no
+  bars rather than counted done. Found while writing them: a cached
+  `Samples/Analysis` JSON is reused as-is, so a bad one stays bad until
+  `--refresh`. Documented rather than fixed.
 - Observed: **the macOS/iOS structure split is one boundary, and it is peak
   competition rather than the detection threshold.** `structurePredictions`
   exposes the raw per-frame curve behind each level (`sections`, `segments`,
