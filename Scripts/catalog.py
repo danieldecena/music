@@ -179,6 +179,155 @@ def init(con):
     con.commit()
 
 
+def _secs(cmtime: dict) -> float:
+    """MusicUnderstanding serializes CMTime as {epoch, flags, timescale, value}.
+    Seconds are value/timescale -- the raw value is a 44100-per-second count."""
+    return cmtime["value"] / cmtime["timescale"]
+
+
+def apple_key_label(value: dict) -> str:
+    """Apple's {tonic, mode} to this repo's spelling ('C', 'Ab', 'C#m').
+
+    Apple preserves enharmonic spelling and writes it longhand ('aflat',
+    'csharp'); harmonic_mix.key_to_camelot already folds flats to sharps, so
+    only the longhand needs undoing.
+    """
+    tonic = value["tonic"].strip().lower()
+    if tonic.endswith("flat"):
+        root = tonic[:-4].upper() + "b"
+    elif tonic.endswith("sharp"):
+        root = tonic[:-5].upper() + "#"
+    else:
+        root = tonic.upper()
+    return root + ("m" if value["mode"].lower() == "minor" else "")
+
+
+def _finite(v) -> float | None:
+    """mu-analyze encodes non-finite loudness as the strings "inf"/"-inf"/"nan",
+    because JSON cannot carry them. Store NULL rather than a fabricated number:
+    an unknown is a distinct outcome from a zero."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if f == f and abs(f) != float("inf") else None
+
+
+INGEST_TABLES = (
+    "beats", "bars", "sections", "key_ranges",
+    "loudness", "instrument_activity",
+)
+
+
+def ingest(con, track: str, json_path: Path) -> dict:
+    """Load one mu-analyze JSON into the time-series tables.
+
+    Idempotent: every table is cleared for this track before inserting, so a
+    re-run replaces rather than appends.
+    """
+    env = json.loads(Path(json_path).read_text())
+    r = env["result"]
+
+    for tbl in INGEST_TABLES:
+        con.execute(f"DELETE FROM {tbl} WHERE track = ?", (track,))
+
+    rhythm = r.get("rhythm") or {}
+    beats = rhythm.get("beats") or []
+    bars = rhythm.get("bars") or []
+    bar_times = [_secs(b) for b in bars]
+
+    def bar_of(t: float) -> int:
+        # Index of the last bar starting at or before t.
+        lo, hi = 0, len(bar_times) - 1
+        if hi < 0 or t < bar_times[0]:
+            return -1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if bar_times[mid] <= t:
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo
+
+    rows = []
+    for i, b in enumerate(beats):
+        bt = _secs(b)
+        bi = bar_of(bt)
+        # Beat position within its bar, counted from the beats that share it.
+        rows.append((track, i, bt, bi, 0))
+    # Fill beat_in_bar by walking, cheaper than a query per beat.
+    counter: dict[int, int] = {}
+    filled = []
+    for (tr, i, bt, bi, _) in rows:
+        n = counter.get(bi, 0)
+        counter[bi] = n + 1
+        filled.append((tr, i, bt, bi, n))
+    con.executemany("INSERT INTO beats VALUES (?,?,?,?,?)", filled)
+    con.executemany(
+        "INSERT INTO bars VALUES (?,?,?)",
+        [(track, i, t) for i, t in enumerate(bar_times)],
+    )
+
+    # Apple reports structure as boundaries with no names -- there is no
+    # "verse"/"chorus" label -- so `label` carries the hierarchy level instead.
+    structure = r.get("structure") or {}
+    srows = []
+    for level in ("sections", "segments", "phrases"):
+        for i, s in enumerate(structure.get(level) or []):
+            start = _secs(s["start"])
+            srows.append((track, i, level[:-1], start, start + _secs(s["duration"])))
+    con.executemany("INSERT INTO sections VALUES (?,?,?,?,?)", srows)
+
+    krows = []
+    for i, kr in enumerate((r.get("key") or {}).get("ranges") or []):
+        start = _secs(kr["range"]["start"])
+        krows.append((track, i, kr["value"]["tonic"], kr["value"]["mode"],
+                      start, start + _secs(kr["range"]["duration"])))
+    con.executemany("INSERT INTO key_ranges VALUES (?,?,?,?,?,?)", krows)
+
+    loud = r.get("loudness") or {}
+    mom = {round(_secs(x["time"]), 4): _finite(x["value"])
+           for x in (loud.get("momentary") or [])}
+    sht = {round(_secs(x["time"]), 4): _finite(x["value"])
+           for x in (loud.get("shortTerm") or [])}
+    con.executemany(
+        "INSERT INTO loudness VALUES (?,?,?,?)",
+        [(track, t, mom.get(t), sht.get(t)) for t in sorted(set(mom) | set(sht))],
+    )
+
+    # The continuous 0..1 activity signal, not the sparse presence ranges: the
+    # loop scorer needs a level it can average over an arbitrary span. Each row
+    # covers one sample interval.
+    activity = (r.get("instrumentActivity") or {}).get("activity") or {}
+    arows = []
+    for instrument, series in activity.items():
+        times = [_secs(x["time"]) for x in series]
+        for j, x in enumerate(series):
+            end = times[j + 1] if j + 1 < len(times) else times[j]
+            arows.append((track, instrument, times[j], end, float(x["value"])))
+    con.executemany("INSERT INTO instrument_activity VALUES (?,?,?,?,?)", arows)
+
+    kranges = (r.get("key") or {}).get("ranges") or []
+    pranges = (r.get("pace") or {}).get("ranges") or []
+    _upsert_track(
+        con,
+        track,
+        duration_s=env.get("durationSeconds"),
+        apple_bpm=rhythm.get("beatsPerMinute"),
+        apple_key=apple_key_label(kranges[0]["value"]) if kranges else None,
+        pace=pranges[0]["value"] if pranges else None,
+        lufs_integrated=_finite((loud.get("integrated") or {}).get("value")),
+        true_peak=_finite((loud.get("peak") or {}).get("value")),
+        analyzed_at=datetime.now().isoformat(timespec="seconds"),
+        analysis_version="MusicUnderstanding/27.0",
+    )
+    con.commit()
+    return {
+        "beats": len(filled), "bars": len(bar_times), "structure": len(srows),
+        "key_ranges": len(krows), "activity": len(arows),
+    }
+
+
 def _rel(p: Path) -> str:
     try:
         return str(p.relative_to(ROOT))
@@ -871,6 +1020,10 @@ def main(argv):
     p.add_argument("name")
     p.add_argument("--bpm", type=int)
     p.add_argument("--key")
+    p = sub.add_parser("ingest")
+    p.add_argument("track")
+    p.add_argument("json_path")
+
     p = sub.add_parser("set-analysis")
     p.add_argument("name")
     p.add_argument("--bpm", type=int, required=True)
@@ -918,6 +1071,11 @@ def main(argv):
 
     con = connect()
     try:
+        if ns.cmd == "ingest":
+            counts = ingest(con, ns.track, Path(ns.json_path))
+            print(f"ingested {ns.track}: " +
+                  ", ".join(f"{k}={v}" for k, v in counts.items()))
+            return
         if ns.cmd == "init":
             init(con)
             print(f"initialized {DB}")

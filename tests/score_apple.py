@@ -25,6 +25,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "Scripts"))
 
+from catalog import apple_key_label  # noqa: E402
 from harmonic_mix import key_compatible  # noqa: E402
 
 # tests/test-analysis.py carries a hyphen and is not importable by name.
@@ -50,20 +51,9 @@ def as_float(v) -> float:
 
 
 def apple_key(value: dict) -> str:
-    """Apple's {tonic, mode} to this repo's spelling ('C', 'Ab', 'C#m').
-
-    Apple preserves enharmonic spelling and writes it out longhand ('aflat',
-    'csharp'); harmonic_mix.key_to_camelot already folds flats to sharps, so
-    only the longhand needs undoing here.
-    """
-    t = value["tonic"].strip().lower()
-    if t.endswith("flat"):
-        root = t[:-4].upper() + "b"
-    elif t.endswith("sharp"):
-        root = t[:-5].upper() + "#"
-    else:
-        root = t.upper()
-    return root + ("m" if value["mode"].lower() == "minor" else "")
+    """Delegates to catalog.apple_key_label so the ingest path and the scoring
+    path cannot drift apart."""
+    return apple_key_label(value)
 
 
 def key_class(ours: str, theirs: str) -> str:

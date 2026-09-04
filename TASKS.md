@@ -13,6 +13,7 @@
 - [ ] Phase 2: library browser over the iCloud container
 - [ ] Phase 2: track detail charts in Swift Charts
 - [x] Phase 2: extend catalog schema with time-series + regions
+- [x] Phase 2: ingest analysis JSON into the catalog
 - [ ] Phase 2: loop region scorer over the beat grid
 - [ ] Phase 2: lyrics from the vocals stem via SpeechTranscriber
 - [ ] Phase 3: port chopping to AVFoundation and vDSP
