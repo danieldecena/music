@@ -21,6 +21,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] (R5) Claim the iCloud ubiquity container from the app -- e9e6591
 - [x] (R4b) Register the iCloud container on the App ID -- 448efb7
 - [x] (R4b) iCloud container and publish_to_icloud -- Mac half, 6bac72d
 - [x] Decide whether loop playback should repeat past 8 iterations -- 3d06275
