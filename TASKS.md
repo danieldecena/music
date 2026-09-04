@@ -3,7 +3,7 @@
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
 - [ ] Phase 0: scaffold Flip iOS app (Xcode 27, iOS 27 target)
-- [ ] Phase 0: build Tools/mu-analyze and dump analysis JSON
+- [x] Phase 0: build Tools/mu-analyze and dump analysis JSON - 4209e42
 - [ ] Phase 0: verdict on structure + instrument activity quality
 - [ ] Phase 0: verify analysis runs in the iOS 27 Simulator
 - [ ] Phase 0: iCloud container entitlement + Mac-to-phone sync
