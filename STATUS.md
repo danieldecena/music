@@ -394,6 +394,36 @@ dead-code warnings.
   the section-count split which it states outright. Because vocal is the one
   family that agrees, and vocal is what `clean` is computed from, loop-rank
   stability across the two platforms is an inference and not a measurement.
+- Shipped: **the Mac half of R4b -- `publish_to_icloud` and `icloud_container`.**
+  `publish_to_icloud <track>` copies `Stems/<model>/<track>/` plus that track's
+  analysis into the container as `Tracks/<track>/{*.wav,analysis.json}`, with
+  `rsync -a --delete` so a republish after a different stem profile does not
+  leave the previous model's stems behind for the phone to show as real. A
+  path-shaped track name is refused before anything is deleted. Several models
+  holding one track picks the newest and says which. `deconstruct` publishes at
+  the end when a container exists and says so when one does not -- a deconstruct
+  that quietly did not publish is indistinguishable from one that did.
+  16 new assertions in `tests/test-core.sh`.
+- The prune assertion was proved able to fail: dropping `--delete` was confirmed
+  applied (`grep -c` 0), the test then failed naming the stale `bass.wav`, and
+  restoring brought it back. Without that pair it would be a check that cannot
+  fail.
+- Changed on the way: **`apple_analyze` keeps its JSON instead of writing a temp
+  file and deleting it.** It now writes `Samples/Analysis/<track>.json`, which is
+  where `score_apple.py`, `tests/test_catalog_ingest.py` and `backfill-grid`
+  already look, and publish has nothing to hand the phone without it. Verified by
+  deleting `02 Ivy.json`, re-running `apple_analyze`, and observing the file back.
+- Measured, and it changes the R5 design: **one published track is ~174 MB.**
+  Four uncompressed 44 MB stems plus a 6.7 MB analysis, observed end-to-end for
+  `02 Ivy` with `MUSIC_ICLOUD_DIR` pointed at a temp dir. The whole 55-track
+  catalog would be ~9.6 GB into iCloud. Publishing every deconstruct at that size
+  is a decision R5 has to make, not one this function should settle -- compressed
+  stems, or the analysis alone with stems fetched on demand.
+- Still open, and it is account state rather than code: **the container does not
+  exist.** `~/Library/Mobile Documents/` has no `iCloud~com~danieldecena~flip`,
+  because the Flip app carries no iCloud Documents entitlement and nothing this
+  repo runs can create one. That needs the capability on the App ID, which is a
+  developer-account change and Daniel's to authorize.
 - Decided (Daniel, asked): **loop playback repeats until stopped, not 8 times.**
   Auditioning a loop ends when you stop it; 66 seconds was an arbitrary cliff
   inherited from the plan's sample code and never chosen. `LoopEngine.play`'s
