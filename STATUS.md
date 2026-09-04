@@ -309,9 +309,9 @@ dead-code warnings.
   canvas, which belongs to the session that owns that tooling.
 
 - Shipped: **the three timeline tabs, branch `flip-timeline-tabs`
-  (`cdf61dc..eb423b8`, 12 commits).** Analysis (four activity lanes on a bar grid,
-  section rules, top loop span shaded), Lyrics (timed `.lrc` against the same
-  grid), Loops (ranked candidates, each playable). `LoopScorer.swift` and
+  (`cdf61dc..eb423b8`, 12 commits).** Analysis (four activity lanes on a bar grid
+  with section rules), Lyrics (timed `.lrc` against the same grid), Loops (ranked
+  candidates, each playable). `LoopScorer.swift` and
   `TimedLyrics.swift` are ports of `Scripts/regions.py` and `Scripts/lyrics.py`
   with parity tests pinned to the Python's current output. 31 tests in 4 suites.
 - Observed, by screenshot of the running simulator app: BPM 116.6, C major, 14
@@ -356,6 +356,34 @@ dead-code warnings.
   created with my own ruling. One earlier instance had already produced a false
   green (`TEST SUCCEEDED` with the file under test never compiled), which is why
   the plan now requires checking the suite COUNT rather than the exit code.
+
+- CORRECTED, same night: **an earlier version of the entry above said the
+  Analysis tab shows the "top loop span shaded". On a fresh launch it shades
+  nothing.** `TimelineTabs.swift:5` declares `@State private var selectedLoop:
+  LoopCandidate?` with no initial value and nothing assigns it on appear, and
+  `ActivityChart` draws the span only `if let loop = selectedLoop`. The final
+  reviewer caught the committed claim contradicting the code.
+  The mechanism is worth recording because the reviewer guessed it wrong and the
+  screenshots settle it: my 01:45 capture really does show filled yellow
+  rectangles across all four lanes, and my 02:14 captures of the same build,
+  after I relaunched the app, show none. The reviewer supposed I had mistaken a
+  section `RuleMark` for the span; I had not. The earlier instance had been
+  tapped by the Task 5/6 implementer, which set the selection, so I photographed
+  a tapped state and described it as the launch state. A real observation of the
+  wrong moment (silent-failure rule 7), not a misread mark.
+  Being fixed by assigning `selectedLoop = analysis.loops.first` on appear, which
+  makes the claim true rather than merely deleting it.
+- Known limit, not a defect: **`LoopEngine.play()` schedules exactly 8 repeats**,
+  inherited from the plan's own sample code rather than chosen. At this clip's
+  ~8.2s window that is about 66 seconds, after which playback stops with no UI
+  change. Tracked as its own decision rather than patched blind.
+- Recorded so it survives a `git clean`: **instrument activity diverges between
+  macOS and iOS as well as section count.** Drum peaks 2.25x and bass 2.69x
+  higher on iOS for identical bytes; vocal agrees within 4%. STATUS carries both
+  sets of numbers in different entries but had never said they disagree, unlike
+  the section-count split which it states outright. Because vocal is the one
+  family that agrees, and vocal is what `clean` is computed from, loop-rank
+  stability across the two platforms is an inference and not a measurement.
 
 ### 2026-09-03
 
