@@ -1,8 +1,6 @@
 ## Tasks
 
-- [ ] Repoint the design canvas row from ace836b3 to c5d0c33b (check 29 RED)
 - [ ] (you) Amend silent-failure rule 10 in place, vs the byte budget
-- [ ] Reconcile the macOS/iOS section-count split before trusting loop ranks
 - [ ] Backfill the bar grid for the 44 tracks without one
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
@@ -26,6 +24,8 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] Reconcile the macOS/iOS section-count split before trusting loop ranks
+- [x] Repoint the design canvas row from ace836b3 to c5d0c33b -- paper-system 3cf3622
 - [x] Add tests/score_apple reusing existing classifiers -- cae6669
 - [x] Three-way table Apple vs ours vs label -- cae6669
 - [x] Extend catalog schema: time-series + regions tables -- c37f02b

@@ -264,6 +264,12 @@
 - `R` on a full-length track is slow (autocorrelation over the whole file) — feed
   it short mono loops, not whole songs.
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
+- **A loop ranking is platform-dependent and stays that way.** MusicUnderstanding
+  produces materially different structure-prediction curves on macOS and iOS
+  (max |delta| 0.056 to 0.176 across levels), which flips which of two adjacent
+  candidate boundaries it emits. Measured on `testclip.m4a` the effect is
+  confined to ranks 7-10 and the top pick is unchanged, but that is one clip.
+  Reconciled 2026-09-04, not fixed -- mechanism and numbers in the decision log.
 
 ## Next Up
 - **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
@@ -384,6 +390,51 @@ dead-code warnings.
   the section-count split which it states outright. Because vocal is the one
   family that agrees, and vocal is what `clean` is computed from, loop-rank
   stability across the two platforms is an inference and not a measurement.
+- Observed: **the macOS/iOS structure split is one boundary, and it is peak
+  competition rather than the detection threshold.** `structurePredictions`
+  exposes the raw per-frame curve behind each level (`sections`, `segments`,
+  `phrases`; float32 base64, shape [1,600] at `predictionResolution` 0.05s for
+  the 30s clip) alongside `detectionThreshold` 0.33. Decoding both platforms'
+  curves for `testclip.m4a`:
+  - The curves themselves diverge well past float rounding -- max |delta| 0.056
+    on sections, 0.098 on segments, 0.176 on phrases, differing in ~598 of 600
+    frames. This is the model producing different numbers per platform, not a
+    different rule applied to the same numbers.
+  - The entire structural difference is ONE boundary. macOS puts it at 10.131s,
+    iOS at 12.199s. Segments and phrases substitute it, which is why their
+    counts (5 and 9) matched and read as "identical everywhere" -- they are not.
+    Sections drop it outright on iOS, which is the whole of 3 versus 2.
+  - Both candidates clear the threshold on both platforms at segment and phrase
+    level, and each platform emits exactly one, so the selection has a spacing
+    rule beyond thresholding. The higher peak wins and the platforms rank the
+    two oppositely, consistently across two independent levels: segments
+    mac 0.648 vs 0.602 and iOS 0.616 vs 0.652; phrases mac 0.616 vs 0.582 and
+    iOS 0.578 vs 0.620. Margins of 0.03-0.05 -- inside the divergence measured
+    above, so the flip is fully explained by it.
+  - `detectionThreshold` is NOT the knob, and the correlation runs backwards:
+    the sections curve at the disputed boundary is 0.306 on macOS (under 0.33)
+    and 0.335 on iOS (over), and it is macOS that emits the boundary. The
+    section level plausibly requires a coinciding segment boundary -- iOS has
+    none near 10.2s -- but that rule was not closed and is inference.
+- Measured, not inferred: **what the split does to loop ranks.** Holding the
+  macOS bars and activity fixed and swapping only the section set, `score_loops`
+  at 4 bars gives 10 windows. Ranks 1-6 are identical in order and in score,
+  the top pick included (bar 6, 14.270s, 0.4922). Ranks 7-10 reorder: bars 1, 2
+  and 3 straddle macOS's 10.131s boundary and take the 0.75x penalty, but sit
+  inside iOS's single 0-28.651s section and lose it, so they climb over bar 0.
+  So on this clip the split moves the tail of the ranking and not the pick.
+  Bounded deliberately: one clip, and it isolates the section variable only --
+  iOS's own bars and vocal activity differ slightly on top of this.
+- Consequence: **no code change.** A design change off n=1 would be premature,
+  and the top pick is stable where it was measured. The standing instruction is
+  unchanged: do not treat a loop ranking as platform-independent. The comment
+  in `LoopScorerTests.swift` pinning the test's sections by hand is the guard.
+- Method note, cost a run: **no iOS 27 simulator device existed on this Mac**,
+  so `xcodebuild test` against any named simulator fails with a deployment-target
+  mismatch against every iOS 26.5 device. Created `Flip-iOS27` (iPhone 17 Pro,
+  iOS 27.0) and kept it; the 32 tests in 4 suites pass on it. Two iOS 27.0
+  runtimes are installed (24A5355p and 24A5380i) and they share one runtime
+  identifier, so `simctl create` cannot choose between them.
 
 ### 2026-09-03
 
@@ -459,6 +510,12 @@ dead-code warnings.
   to a window that falls inside one section, so the phone and the Mac can rank
   the same track's loops differently. Not yet reconciled; do not treat a loop
   ranking as platform-independent until it is.
+  - **Reconciled and partly corrected 2026-09-04** -- see that date's entry.
+    Two claims here are wrong. Segments and phrases are identical in COUNT
+    only; their boundary TIMES differ, which a count comparison cannot see.
+    And `detectionThreshold` is not the knob: at the disputed boundary the
+    sections curve reads 0.306 on macOS (under the 0.33 threshold) and 0.335
+    on iOS (over it), yet macOS is the platform that emits the boundary.
 - Confirmed: **MusicUnderstanding reports four instrument families and only
   four** -- `bass`, `drum`, `other`, `vocal` -- and that is the framework's
   fixed taxonomy, not a detection that happened to find four. `other` is the
