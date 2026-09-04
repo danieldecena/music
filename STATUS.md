@@ -284,6 +284,33 @@ dead-code warnings.
 
 ### 2026-09-03
 
+- Observed: **both published artifacts are owned by the gmail account, whose
+  subscription is temporary.** `~/.claude.json` and `~/.claude-work/.claude.json`
+  both hold danieldecena10@gmail.com, uuid ffd06fee -- the same account and uuid,
+  so the config files do not distinguish them at all and only the directory
+  differs. That makes `ace836b3` (Flip Stem Map) and `c4d78867` (iOS Build
+  Runbook) gmail-owned. A switch back to icloud is planned, which inverts which
+  set of pointers resolves; eight other recorded pointers are already unreachable
+  from gmail. Inventory kept by another session at
+  `~/Archive/account-switch-20260903/NOTES.md`.
+- Observed: **invariants check 36 cannot see an artifact that becomes
+  unreachable.** It hashes a local file against a sha recorded at publish time
+  and makes no network call, so a lapsed artifact and a healthy one are
+  byte-identical from where it stands: `Artifacts/stem-map` will keep reading OK
+  after the URL changes hands. This is the same blind direction the check already
+  documents for "published ahead of local", widened to everything server-side.
+  The artifact register is therefore not a safety net for the account switch.
+  Not restamped or repointed ahead of the switch -- a binding recording a url the
+  user cannot open is his call, not something to rewrite quietly.
+- Corrected: an earlier reading here found `firing-audit: off` in
+  `~/.claude/settings.json`. That was accurate when taken and is now false --
+  `55ba939` added the override and `cf902f8` removed it mid-session, so the skill
+  is live. A third session diagnosed the disagreement as this session having read
+  `~/.claude-work/settings.json` instead; it had not, and two config files
+  carrying the same key name is what made that cause plausible. The record is
+  "the override was removed mid-session", and nothing in this session edited
+  `settings.json`.
+
 - Decided: **two sessions were editing `~/.claude/skills/ios-build/` at once.
   Tooling is owned; the runbook is not.** Corrected within the hour: an earlier
   version of this entry handed that session all of `~/.claude`, which was an

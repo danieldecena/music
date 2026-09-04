@@ -98,6 +98,7 @@ while true; do
     echo "    H  Chords                 bar-by-bar progression"
     echo "    X  Mix-match              catalog pairs that mix well"
     echo "    Z  Mix report             what mixes with one track you name"
+    echo "    C  Combine two tracks      layer or transition, cut on the bar grid"
     echo "    T  Tempo lock             settle BPM by ear (click A/B)"
     echo "    M  Bass stem -> MIDI"
     echo "    R  Re-voice a melody      as another instrument"
@@ -223,6 +224,30 @@ GUIDE
         mix_report "$seed" --lyrics --preview
       else
         mix_report "$seed" --lyrics
+      fi
+      ;;
+    C|c)
+      # Cuts both tracks on their persisted bar grids. Needs a bar grid on each,
+      # which deconstruct now records; a track analyzed before that reports it.
+      read "ta?Track A, the one that keeps its timing (typos OK)> "
+      [[ -z "$ta" ]] && continue
+      read "abar?Start A at which bar? (see Z's loop candidates)> "
+      [[ -z "$abar" ]] && continue
+      read "tb?Track B, stretched onto A's grid> "
+      [[ -z "$tb" ]] && continue
+      read "bbar?Start B at which bar?> "
+      [[ -z "$bbar" ]] && continue
+      read "nb?How many bars? [8]> "; : "${nb:=8}"
+      read "md?1) layer both at once  2) transition A into B  [1]> "
+      if [[ "$md" == 2 ]]; then
+        mix_render transition --a "$ta" --a-bar "$abar" --b "$tb" --b-bar "$bbar" \
+          --bars "$nb" --out "Exports/mix.wav" --play
+      else
+        read "ast?Stems from A (mix, or e.g. drums,bass) [mix]> "; : "${ast:=mix}"
+        read "bst?Stems from B (mix, or e.g. vocals) [mix]> "; : "${bst:=mix}"
+        mix_render layer --a "$ta" --a-bar "$abar" --a-stems "$ast" \
+          --b "$tb" --b-bar "$bbar" --b-stems "$bst" \
+          --bars "$nb" --out "Exports/mix.wav" --play
       fi
       ;;
     T|t)

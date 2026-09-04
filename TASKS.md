@@ -1,5 +1,7 @@
 ## Tasks
 
+- [ ] (you) Decide artifact ownership before the gmail subscription lapses
+- [ ] (you) Amend silent-failure rule 10 in place, vs the byte budget
 - [ ] Reconcile the macOS/iOS section-count split before trusting loop ranks
 - [ ] Backfill the bar grid for the 44 tracks without one
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
