@@ -22,7 +22,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
-- [x] (R4b) publish_to_icloud and icloud_container, the Mac half
+- [x] (R4b) iCloud container and publish_to_icloud -- Mac half, 6bac72d
 - [x] Decide whether loop playback should repeat past 8 iterations -- 3d06275
 - [x] Backfill the bar grid for the 44 tracks without one -- 5bdb181
 - [x] Reconcile the macOS/iOS section-count split before trusting loop ranks -- fc8f6cf
