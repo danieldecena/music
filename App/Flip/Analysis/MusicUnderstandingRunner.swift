@@ -59,28 +59,38 @@ enum Runner {
         let data = try encoder.encode(result)
         let obj = (try JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
 
-        var s = Summary()
+        var s = summarize(obj, duration: duration)
         s.elapsed = elapsed
         s.jsonBytes = data.count
         s.jsonData = data
-        s.duration = duration
+        return s
+    }
 
-        if let r = obj["rhythm"] as? [String: Any] {
+    /// The flat fields, read off an already-decoded payload.
+    ///
+    /// Split out of `analyze(url:)` so a track published by the Mac can be
+    /// summarized from its file without re-running a session on the phone.
+    /// Both callers must read the same field names or the two surfaces drift,
+    /// which is the whole reason this is one function and not two.
+    static func summarize(_ result: [String: Any], duration: TimeInterval) -> Summary {
+        var s = Summary()
+        s.duration = duration
+        if let r = result["rhythm"] as? [String: Any] {
             s.bpm = r["beatsPerMinute"] as? Double ?? 0
             s.beats = (r["beats"] as? [Any])?.count ?? 0
             s.bars = (r["bars"] as? [Any])?.count ?? 0
         }
-        if let st = obj["structure"] as? [String: Any] {
+        if let st = result["structure"] as? [String: Any] {
             s.sections = (st["sections"] as? [Any])?.count ?? 0
             s.segments = (st["segments"] as? [Any])?.count ?? 0
             s.phrases = (st["phrases"] as? [Any])?.count ?? 0
         }
-        if let k = obj["key"] as? [String: Any],
+        if let k = result["key"] as? [String: Any],
            let ranges = k["ranges"] as? [[String: Any]],
            let value = ranges.first?["value"] as? [String: Any] {
             s.key = "\(value["tonic"] ?? "?") \(value["mode"] ?? "?")"
         }
-        if let ia = obj["instrumentActivity"] as? [String: Any],
+        if let ia = result["instrumentActivity"] as? [String: Any],
            let activity = ia["activity"] as? [String: Any] {
             s.instruments = activity.keys.sorted()
         }
@@ -103,10 +113,28 @@ enum Runner {
         // output FILE, which adds them around the same payload. Reading
         // `root["result"]` in-app yields an empty dictionary and every array
         // below comes back empty — with no error, because every cast is
-        // optional with a `?? [:]` fallback.
+        // optional with a `?? [:]` fallback. `PublishedAnalysis` is the side
+        // that unwraps; this side must not.
         let result = try JSONSerialization
             .jsonObject(with: s.jsonData) as? [String: Any] ?? [:]
 
+        var lyrics: [LyricLine] = []
+        if let name = lyricsResource,
+           let lrc = Bundle.main.url(forResource: name, withExtension: "lrc"),
+           let text = try? String(contentsOf: lrc, encoding: .utf8) {
+            lyrics = TimedLyrics.parse(text)
+        }
+        return (try assemble(result, summary: s, lyrics: lyrics), s)
+    }
+
+    /// Turns a decoded payload into the geometry the tabs draw.
+    ///
+    /// Takes the payload rather than a URL so the live session and a file the
+    /// Mac published go through exactly the same parsing — including the
+    /// taxonomy check at the end, which a second parser would have quietly
+    /// omitted.
+    static func assemble(_ result: [String: Any], summary s: Summary,
+                         lyrics: [LyricLine]) throws -> TrackAnalysis {
         // CMTime encodes as {epoch, flags, timescale, value}; seconds are
         // value / timescale. Timescale is 44100 in practice but is read rather
         // than assumed, because a different source file could carry another.
@@ -151,13 +179,6 @@ enum Runner {
             }
         }
 
-        var lyrics: [LyricLine] = []
-        if let name = lyricsResource,
-           let lrc = Bundle.main.url(forResource: name, withExtension: "lrc"),
-           let text = try? String(contentsOf: lrc, encoding: .utf8) {
-            lyrics = TimedLyrics.parse(text)
-        }
-
         let ta = TrackAnalysis(bpm: s.bpm, key: s.key,
                                bars: bars, sections: sections,
                                activity: activity, lyrics: lyrics)
@@ -177,6 +198,6 @@ enum Runner {
                                                           expected: ta.instruments)
         }
 
-        return (ta, s)
+        return ta
     }
 }

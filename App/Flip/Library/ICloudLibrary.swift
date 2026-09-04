@@ -54,6 +54,15 @@ enum ICloudLibrary {
     /// because setting up iCloud takes a nontrivial amount of time. Hence the
     /// detached task here rather than a note asking callers to remember.
     static func claim() async -> ContainerStatus {
+        // The same escape hatch `MUSIC_ICLOUD_DIR` gives the Mac half, and for
+        // the same reason: it is how the browser is exercised against real
+        // published files without a registered container or a signed-in device.
+        // A simulator can read a Mac path directly, so pointing this at one is
+        // a genuine end-to-end run, not a stub.
+        if let override = ProcessInfo.processInfo.environment["FLIP_LIBRARY_DIR"],
+           !override.isEmpty {
+            return .ready(URL(filePath: override))
+        }
         guard FileManager.default.ubiquityIdentityToken != nil else { return .noAccount }
         return await Task.detached(priority: .utility) {
             status(hasAccount: true,

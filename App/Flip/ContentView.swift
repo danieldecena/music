@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var error: String?
     @State private var running = false
     @State private var icloud: ContainerStatus?
+    @State private var showLibrary = false
 
     var body: some View {
         NavigationStack {
@@ -36,6 +37,18 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Flip")
+            // A toolbar entry rather than a new root, so the bundled-clip run
+            // that the device smoke test reads stays exactly as it was.
+            .toolbar {
+                if case .ready = icloud {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Library") { showLibrary = true }
+                    }
+                }
+            }
+            .sheet(isPresented: $showLibrary) {
+                if case .ready(let docs) = icloud { LibraryView(documents: docs) }
+            }
             // Runs once on appear so a headless simulator or device launch
             // produces the FLIP-RESULT line without needing a tap.
             .task { if analysis == nil && !running { run() } }

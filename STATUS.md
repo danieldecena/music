@@ -301,6 +301,41 @@ dead-code warnings.
 
 ### 2026-09-04
 
+- Decided: **the browser reuses the analysis parser rather than growing a second
+  copy.** `analyzeFull` held the only JSON -> geometry mapping, so reading a
+  published file meant either duplicating it or splitting it out.
+  `Runner.summarize` (flat fields) and `Runner.assemble` (bars, sections,
+  activity, and the instrument-taxonomy check) are now the shared halves, and
+  the live session and a Mac-published file go through both. A second parser
+  would have silently skipped the taxonomy check, which is the thing standing
+  between a shifted payload and four lanes reading peak 0.00.
+- The load-bearing difference between the two callers: **the file wraps the
+  payload in `result` and the app encodes it bare.** Every cast below a wrong
+  root is optional with an empty fallback, so reading the top level of a
+  published file yields zero bars, zero sections and no error at all.
+  `PublishedAnalysis.load` therefore `guard ... else throw`s on both `result`
+  and `durationSeconds` -- duration is not defaulted to 0 because it closes the
+  final activity sample, and a zero would truncate the last lane segment to
+  nothing. Two tests cover exactly those refusals.
+- Observed against real data, not only fixtures: `02 Ivy` published into a fake
+  container decoded to `bpm=113.00256 bars=118 sections=14 loops=114`, matching
+  an independent `python3` read of the same 6.4 MB file field for field
+  (`bar[1]=2.15059`, `section[0].end=33.009297`, key `c major`), and the index
+  listed both published tracks with their four stems each. That check was a
+  throwaway -- the fixture is gitignored and 6.4 MB, too big to commit -- so the
+  committed suite covers the same paths against synthetic JSON: 44 tests in 6
+  suites, `** TEST SUCCEEDED **`.
+- `FLIP_LIBRARY_DIR` is the app-side twin of `MUSIC_ICLOUD_DIR`, and it is how
+  the `.ready` branch was finally exercised: `FLIP-ICLOUD ready
+  .../fake-container/Documents`. A simulator reads Mac paths directly, so
+  pointing it at a real published folder is a genuine end-to-end run, not a
+  stub. **What is still unobserved is the real container** -- only a signed-in
+  device produces that.
+- Scope note: the library is a toolbar sheet, not a new root, so the bundled-clip
+  run the device smoke test reads is untouched. Opening a track from the list has
+  not been exercised by hand -- a CLI-only project has no UI-tap coverage, and
+  this is one of the places that shows.
+
 - Observed: **the claim's live path fires correctly, re-run on a device built
   from scratch.** `FLIP-ICLOUD no iCloud account on this device`, alongside
   `FLIP-RESULT bpm=116.59659 ... bars=14 sections=2`. `timeout` returning 124 is
