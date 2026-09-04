@@ -15,13 +15,13 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] (R2) Song database: schema and ingest [code] C
 - [x] (R3) Region scorers over the beat grid [code] C
 - [x] (R4a) Flip on device, analyzing a bundled track [you] C
-- [ ] (R4b) Register the iCloud container in Xcode, then mirror it to project.yml [you] C
 - [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
 - [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C
 - [ ] (R7) Verdict on old and lo-fi material [you] B
 
 ## Completed
 
+- [x] (R4b) Register the iCloud container -- entitlement in project.yml, profile issued
 - [x] (R4b) iCloud container and publish_to_icloud -- Mac half, 6bac72d
 - [x] Decide whether loop playback should repeat past 8 iterations -- 3d06275
 - [x] Backfill the bar grid for the 44 tracks without one -- 5bdb181

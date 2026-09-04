@@ -450,6 +450,10 @@ icloud_container() {
     print -r -- "$MUSIC_ICLOUD_DIR"
     return 0
   fi
+  # Existence is enough of a test: ~/Library/Mobile Documents is not writable
+  # by hand (mkdir there is Permission denied), so only `bird` can have made
+  # this, and a stray local folder cannot pose as a synced container. The
+  # directory appears once an entitled process claims the container at runtime.
   local c="$HOME/Library/Mobile Documents/iCloud~com~danieldecena~flip/Documents"
   [[ -d "$c" ]] || return 1
   print -r -- "$c"

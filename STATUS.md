@@ -272,18 +272,16 @@
   Reconciled 2026-09-04, not fixed -- mechanism and numbers in the decision log.
 
 ## Next Up
-- **[you] Register the iCloud container in Xcode.** The single unblock for R5,
-  R6 and the library browser: `open App/Flip.xcodeproj`, select the Flip target,
-  Signing & Capabilities, `+ Capability` -> iCloud, tick **iCloud Documents**,
-  `+` a container named `iCloud.com.danieldecena.flip`. That writes the
-  capability to the App ID and creates
-  `~/Library/Mobile Documents/iCloud~com~danieldecena~flip/Documents` on this
-  Mac. Decided 2026-09-04 to do it by hand rather than have a signing build ask
-  Apple for it, because capability writes on this account are recorded as hard
-  to reverse. Afterwards: mirror the entitlement into `App/project.yml` so
-  `xcodegen generate` stops dropping it, and drop `MUSIC_ICLOUD_DIR` from any
-  local publish. Verify with `publish_to_icloud "02 Ivy"` -- it prints the
-  destination and the file count, and fails rather than reporting a publish it
+- **[code] Have the app claim the ubiquity container (R5's first slice).** The
+  capability is registered and signed, but
+  `~/Library/Mobile Documents/iCloud~com~danieldecena~flip/` still does not
+  exist, and `mkdir` there is refused -- only `bird` makes containers. It
+  appears when an entitled process calls
+  `FileManager.default.url(forUbiquityContainerIdentifier:)` on a machine signed
+  into the account, which means the app, on the phone. That single call is the
+  cheapest next step and it unblocks `publish_to_icloud` for real; verify with
+  `publish_to_icloud "02 Ivy"` with `MUSIC_ICLOUD_DIR` unset -- it prints the
+  destination and a file count of 5, and fails rather than reporting a publish it
   did not make.
 - **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
@@ -432,11 +430,36 @@ dead-code warnings.
   catalog would be ~9.6 GB into iCloud. Publishing every deconstruct at that size
   is a decision R5 has to make, not one this function should settle -- compressed
   stems, or the analysis alone with stems fetched on demand.
-- Still open, and it is account state rather than code: **the container does not
-  exist.** `~/Library/Mobile Documents/` has no `iCloud~com~danieldecena~flip`,
-  because the Flip app carries no iCloud Documents entitlement and nothing this
-  repo runs can create one. That needs the capability on the App ID, which is a
-  developer-account change and Daniel's to authorize.
+- Shipped, and done entirely on the CLI at Daniel's instruction: **the iCloud
+  capability is registered and signed.** The entitlement lives in
+  `App/project.yml` under the Flip target -- so `xcodegen generate` no longer
+  drops it, confirmed by regenerating and getting a byte-identical pbxproj --
+  and `xcodebuild -destination 'generic/platform=iOS' -allowProvisioningUpdates
+  build-for-testing` returned `** TEST BUILD SUCCEEDED **`, which is Apple
+  issuing a profile that carries the container.
+- Verified by reading the products rather than the exit code:
+  `codesign -d --entitlements` on the signed `Flip.app` shows
+  `com.apple.developer.{icloud-container,ubiquity-container}-identifiers` =
+  `iCloud.com.danieldecena.flip` and `icloud-services` = `CloudDocuments`; the
+  profile `iOS Team Provisioning Profile: com.danieldecena.flip` carries the
+  container and expires 2027-09-04, a year out, matching a paid team
+  (`isFreeProvisioningTeam = 0`). The 33-test simulator suite stays green with
+  the entitlement in place.
+- `FlipTests.xctest` carries no entitlements at all, which is the placement the
+  `ios-build` skill's scar is about. Proved with a control: the same
+  `codesign -d --entitlements -` prints a `[Dict]` for `Flip.app` and nothing for
+  the xctest. An earlier attempt at this check globbed a path that did not exist,
+  read empty stdin and printed "correct" -- a failed lookup rendered as a pass,
+  silent-failure rule 5, caught before it was written down.
+- Still open, and no longer account state: **the Mac-side container directory
+  does not exist yet.** `~/Library/Mobile Documents` refuses `mkdir`
+  (Permission denied -- only `bird` creates containers there), so nothing this
+  repo runs can conjure it and, usefully, no stray folder can pose as a synced
+  container either. `icloud_container`'s directory test is therefore safe by
+  construction. The directory materializes when an entitled process claims the
+  container at runtime, which means the app calling
+  `URLForUbiquityContainerIdentifier` -- R5 work, on a device signed into the
+  same iCloud account.
 - Decided (Daniel, asked): **loop playback repeats until stopped, not 8 times.**
   Auditioning a loop ends when you stop it; 66 seconds was an arbitrary cliff
   inherited from the plan's sample code and never chosen. `LoopEngine.play`'s

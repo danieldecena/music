@@ -13,6 +13,18 @@ targets:
       - path: Flip
         excludes:
           - "Resources/README.md"
+    # On the app target only. Set at PROJECT level it is inherited by FlipTests,
+    # whose bundle id has no iCloud capability, and a device build then fails on
+    # an entitlement that target was never entitled to.
+    entitlements:
+      path: Flip/Flip.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.danieldecena.flip
+        com.apple.developer.ubiquity-container-identifiers:
+          - iCloud.com.danieldecena.flip
+        com.apple.developer.icloud-services:
+          - CloudDocuments
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.danieldecena.flip
