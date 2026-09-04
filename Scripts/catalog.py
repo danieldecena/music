@@ -328,6 +328,48 @@ def ingest(con, track: str, json_path: Path) -> dict:
     }
 
 
+def ingest_lyrics(con, track: str | None = None) -> dict:
+    """Load timed lyric lines from .lrc sidecars into the lyrics table.
+
+    Apple Music downloads ship an .lrc beside the audio, timestamped per line.
+    `lyrics.py` already reads them but throws the timing away, because the mix
+    report only wants a word set -- so the table has been sitting empty with
+    start_s/end_s columns shaped for exactly this. Timed lines are what let a
+    lyric be placed against the bar grid rather than listed as a block.
+
+    Rows are replaced per track, not appended, so re-running is idempotent.
+    Returns {track: line_count} for tracks that had a sidecar; a track with no
+    .lrc is absent from the result rather than present with zero, because those
+    are different states and only one is a fault.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from lyrics import timed_lrc
+
+    rows = con.execute(
+        "SELECT name, source_path FROM tracks WHERE source_path IS NOT NULL"
+        + (" AND name=?" if track else ""),
+        (track,) if track else ()).fetchall()
+
+    out = {}
+    for name, source in rows:
+        p = Path(source)
+        if not p.is_absolute():
+            p = ROOT / p
+        lrc = p.with_suffix(".lrc")
+        if not lrc.is_file():
+            continue
+        lines = timed_lrc(lrc.read_text(encoding="utf-8", errors="replace"))
+        if not lines:
+            continue
+        con.execute("DELETE FROM lyrics WHERE track=?", (name,))
+        con.executemany(
+            "INSERT INTO lyrics (track, start_s, end_s, text) VALUES (?,?,?,?)",
+            [(name, s, e, txt) for s, e, txt in lines])
+        out[name] = len(lines)
+    con.commit()
+    return out
+
+
 def compute_regions(con, track: str, kind: str = "loop", n_bars: int = 4,
                     limit: int = 0) -> list[dict]:
     """Score and store the regions of one track. Replaces this track's rows of
@@ -1064,6 +1106,9 @@ def main(argv):
     p.add_argument("track")
     p.add_argument("json_path")
 
+    p = sub.add_parser("ingest-lyrics")
+    p.add_argument("track", nargs="?", help="one track, or every track if omitted")
+
     p = sub.add_parser("set-analysis")
     p.add_argument("name")
     p.add_argument("--bpm", type=int, required=True)
@@ -1123,6 +1168,16 @@ def main(argv):
                                 sorted(r["instruments"].items()))
                 print(f"{r['start_s']:8.1f} {r['end_s']:8.1f} "
                       f"{r['start_bar']:5d} {r['score']:6.3f}  {inst}")
+            return
+        if ns.cmd == "ingest-lyrics":
+            got = ingest_lyrics(con, ns.track)
+            if not got:
+                print("no .lrc sidecar found for "
+                      + (repr(ns.track) if ns.track else "any catalogued track"))
+                return
+            for name, n in sorted(got.items()):
+                print(f"{n:5d} lines  {name}")
+            print(f"{len(got)} track(s), {sum(got.values())} lines")
             return
         if ns.cmd == "ingest":
             counts = ingest(con, ns.track, Path(ns.json_path))

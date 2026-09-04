@@ -44,6 +44,39 @@ def strip_lrc(text: str) -> str:
     return "\n".join(out)
 
 
+def timed_lrc(text: str) -> list[tuple[float, float | None, str]]:
+    """(start_s, end_s, line) per timestamped .lrc line, in time order.
+
+    `strip_lrc` throws the timing away because the mix report only wants a word
+    set. This keeps it, so a line can be placed against the bar grid. Separate
+    function rather than a flag: the two callers want genuinely different
+    things, and changing strip_lrc's return shape would break the mix report.
+
+    A line's end is the next line's start, so gaps between sung phrases belong
+    to the line before them rather than to nothing. The last line has no end --
+    None, not the track duration, which this function has no way to know.
+    One timestamp may carry several lines, and a line may carry several
+    timestamps (a repeated chorus); both are emitted once per pairing.
+    """
+    rows = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or _LRC_META.match(line):
+            continue
+        stamps = _LRC_TS.findall(line)
+        body = _LRC_TS.sub("", line).strip()
+        if not stamps or not body:
+            continue
+        for s in stamps:
+            mm, _, rest = s[1:-1].partition(":")
+            rows.append((int(mm) * 60 + float(rest), body))
+    rows.sort(key=lambda r: r[0])
+    return [
+        (start, rows[i + 1][0] if i + 1 < len(rows) else None, body)
+        for i, (start, body) in enumerate(rows)
+    ]
+
+
 def local_lyrics(source_path) -> str | None:
     """Lyrics from a .lrc sidecar beside the audio file, or None.
 
