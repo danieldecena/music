@@ -7,9 +7,9 @@
 - [ ] Phase 0: verdict on structure + instrument activity quality
 - [ ] Phase 0: verify analysis runs in the iOS 27 Simulator
 - [ ] Phase 0: iCloud container entitlement + Mac-to-phone sync
-- [ ] Phase 1: batch-analyze the 13 fixture tracks to JSON
-- [ ] Phase 1: add tests/score_apple reusing existing classifiers
-- [ ] Phase 1: three-way table Apple vs ours vs label
+- [x] Phase 1: batch-analyze the 13 fixture tracks to JSON
+- [x] Phase 1: add tests/score_apple reusing existing classifiers
+- [x] Phase 1: three-way table Apple vs ours vs label
 - [ ] Phase 2: library browser over the iCloud container
 - [ ] Phase 2: track detail charts in Swift Charts
 - [ ] Phase 2: extend catalog schema with time-series + regions
