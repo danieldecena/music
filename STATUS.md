@@ -272,6 +272,19 @@
   Reconciled 2026-09-04, not fixed -- mechanism and numbers in the decision log.
 
 ## Next Up
+- **[you] Register the iCloud container in Xcode.** The single unblock for R5,
+  R6 and the library browser: `open App/Flip.xcodeproj`, select the Flip target,
+  Signing & Capabilities, `+ Capability` -> iCloud, tick **iCloud Documents**,
+  `+` a container named `iCloud.com.danieldecena.flip`. That writes the
+  capability to the App ID and creates
+  `~/Library/Mobile Documents/iCloud~com~danieldecena~flip/Documents` on this
+  Mac. Decided 2026-09-04 to do it by hand rather than have a signing build ask
+  Apple for it, because capability writes on this account are recorded as hard
+  to reverse. Afterwards: mirror the entitlement into `App/project.yml` so
+  `xcodegen generate` stops dropping it, and drop `MUSIC_ICLOUD_DIR` from any
+  local publish. Verify with `publish_to_icloud "02 Ivy"` -- it prints the
+  destination and the file count, and fails rather than reporting a publish it
+  did not make.
 - **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`

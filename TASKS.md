@@ -15,7 +15,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] (R2) Song database: schema and ingest [code] C
 - [x] (R3) Region scorers over the beat grid [code] C
 - [x] (R4a) Flip on device, analyzing a bundled track [you] C
-- [ ] (R4b) (you) Register the iCloud container on the App ID [you] C
+- [ ] (R4b) Register the iCloud container in Xcode, then mirror it to project.yml [you] C
 - [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
 - [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C
 - [ ] (R7) Verdict on old and lo-fi material [you] B
