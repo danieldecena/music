@@ -1,8 +1,12 @@
 {
-  "url": "https://claude.ai/code/artifact/ace836b3-f197-4c5e-8b8f-b5ab648db6b3",
-  "source": "stem_map.html",
+  "url": "https://claude.ai/code/artifact/c5d0c33b-93ab-4a2f-8b14-4b72c5e27dc9",
+  "source": "flip-stem-map.html",
   "title": "Flip Stem Map",
-  "published": "2026-09-03",
-  "note": "Generated -- never hand-edit stem_map.html. Edit template.html, then run .venv/bin/python Scripts/build_stem_map.py. Republish passing this url, then artifact-stamp.sh this file in the same turn.",
+  "account": "danieldecena@icloud.com",
+  "published": "2026-09-04",
+  "note": "Generated -- never hand-edit flip-stem-map.html. Edit template.html, then run .venv/bin/python Scripts/build_stem_map.py. Republish passing this url, then artifact-stamp.sh this file in the same turn.",
+  "retired": {
+    "https://claude.ai/code/artifact/ace836b3-f197-4c5e-8b8f-b5ab648db6b3": "Published 2026-09-03 under danieldecena10@gmail.com, whose subscription is temporary. Unreachable from the icloud account (reads as public non-member), so it can never be updated again from here. Recorded so the url stays claimed and nobody mistakes it for free."
+  },
   "sha256": "43306caaa3bc9d7305a0161064a2736293b9b7cd7bb1b08818501f68ad6010d7"
 }

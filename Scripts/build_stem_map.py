@@ -73,7 +73,7 @@ def collect(con: sqlite3.Connection) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--out", default=str(HERE / "stem_map.html"))
+    ap.add_argument("--out", default=str(HERE / "flip-stem-map.html"))
     a = ap.parse_args(argv)
 
     if not DB.exists():

@@ -282,6 +282,32 @@ dead-code warnings.
 
 ## Decision log
 
+### 2026-09-04
+
+- Decided: **the stem map is republished under the icloud account and the gmail
+  url is retired.** Daniel switched the CLI login to danieldecena@icloud.com
+  (uuid 1414539c); `~/.claude-work/.claude.json` still holds the gmail account,
+  so the two directories now genuinely differ where earlier today they did not.
+  New url `c5d0c33b`, owned by the account that persists.
+- Observed: **the old artifact cannot be updated from here, and the failure is
+  explicit rather than silent.** A republish was refused ("could not verify the
+  target page is not a review page"), and a direct read of `ace836b3` returns
+  "served to you as a public (non-member) reader". `Artifact list` under icloud
+  shows 15 artifacts, none of them tonight's two -- and it does include
+  `db42c89c`, which another session had guessed was icloud-owned, so that guess
+  is now confirmed rather than assumed.
+- Mechanism worth knowing: an artifact is bound to (conversation, file path), so
+  a republish of the same path keeps trying to reach the old page. Minting under
+  the new account required a new path, which is why the generated page is now
+  `flip-stem-map.html`. The content is byte-identical -- it restamped to the same
+  `43306caaa3bc`, which is the determinism property doing its job.
+- Consequence, currently RED and not mine to fix: **invariants check 29 fails**
+  with "binding not on the register: c5d0c33b / on the register but not bound
+  anywhere: ace836b3". That is the check working -- it caught a url change the
+  same night it was widened, which is the discrimination its author wanted to
+  demonstrate. The fix is a one-row edit to paper-system's hand-authored design
+  canvas, which belongs to the session that owns that tooling.
+
 ### 2026-09-03
 
 - Observed: **both published artifacts are owned by the gmail account, whose
