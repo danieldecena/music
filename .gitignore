@@ -48,3 +48,4 @@ catalog.sqlite-*
 # Key labels cache (fetched)
 Samples/KeyLabels/
 Tools/mu-analyze
+Samples/Analysis/
