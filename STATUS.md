@@ -301,6 +301,29 @@ dead-code warnings.
 
 ### 2026-09-04
 
+- Observed: **the claim's live path fires correctly, re-run on a device built
+  from scratch.** `FLIP-ICLOUD no iCloud account on this device`, alongside
+  `FLIP-RESULT bpm=116.59659 ... bars=14 sections=2`. `timeout` returning 124 is
+  the console detaching, not a failure.
+- Gotcha, and it cost a confusing minute: **this Mac carries two iOS 27 runtimes
+  that share one identifier** -- `24A5355p` and `24A5380i`, both
+  `com.apple.CoreSimulator.SimRuntime.iOS-27-0`. A device's `device.plist`
+  records only that ambiguous identifier plus `runtimePolicy: System`, so which
+  runtime actually ran is not pinned by the device and not recoverable from a
+  shut-down one. Read it off a *booted* device instead:
+  `xcrun simctl getenv booted SIMULATOR_RUNTIME_BUILD_VERSION`.
+- And the `Flip-iOS27` device **vanished between 06:56 and 07:18** with no action
+  taken against it, leaving a cached UUID answering `Invalid device`. Recreate by
+  name (`simctl create Flip-iOS27 ...iPhone-17 ...iOS-27-0`) and address it as
+  `booted`; never cache the UUID. This is the skill's stale-UUID rule showing up
+  for real rather than in the abstract.
+- Unattributed, deliberately: the same bundled clip read `bpm=116.597046 /
+  bytes=406870` at 06:56 and `bpm=116.59659 / bytes=406869` at 07:24 on
+  `24A5380i`. The first run's device is deleted, so its runtime cannot be
+  recovered and the difference cannot be pinned on the runtime split. Worth
+  knowing next time loop ranks are compared across machines -- it is the same
+  shape as the macOS/iOS section-count divergence, at a much smaller magnitude.
+
 - Decided: **`url(forUbiquityContainerIdentifier:)`'s `nil` is split into two
   answers, not reported as one.** Apple documents that single `nil` for two
   different worlds -- "iCloud storage is unavailable for the current user or
