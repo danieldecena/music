@@ -48,4 +48,6 @@ Apple Music/ (or SoundCloud/, Downloads/)      [downloads are .m4a]
 
 **Trust boundary.** `download_url`'s Apple Music branch interpolates `$url`/`$cookies`/`$am_out` into an `expect` heredoc that spawns a shell command. This is safe only because URLs reach it via trusted interactive paste — do not route untrusted or programmatically-sourced URLs through this path without escaping.
 
+**The iOS app's project file is generated, and that reaches CI.** `App/Flip.xcodeproj/` and `App/Flip/Flip.entitlements` are both gitignored and written by `xcodegen` from `App/project.yml`, so a fresh clone has no project to open. Any CI must regenerate before building — `App/ci_scripts/ci_post_clone.sh` is that step for Xcode Cloud (Apple requires the `ci_scripts` directory to sit beside the `.xcodeproj`, so it lives under `App/`, not the repo root). `App/Flip/Resources/testclip.m4a` is also absent from a clone by design (copyrighted audio; `App/Flip/Resources/README.md` has the regeneration command), which is why CI builds but does not test: `App/FlipTests/LoopPlayerTests.swift` requires that clip.
+
 **Design docs.** `docs/superpowers/specs/` and `docs/superpowers/plans/` hold the spec-driven-development artifacts this codebase was built from (unified CLI design, folder-structure design, an in-progress Logic Pro MCP design). Check these before large structural changes.
