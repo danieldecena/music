@@ -288,6 +288,14 @@
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
 
+- **[blocked, not on Daniel] Amend silent-failure rule 10.** Measured 2026-09-04:
+  the always-loaded set is 36806 of 36864 bytes, so any amendment must be net
+  <=58 bytes or something else has to shrink. That is the easy half. The hard
+  half is that **what the amendment was meant to say did not survive
+  compaction** -- only the task title did. Re-derive it from
+  `rules/silent-failure.md` rule 10 and the cases behind it before editing, or
+  drop the task; do not guess at it.
+
 Full open list: `TASKS.md`.
 
 **Parked, not scheduled:** live-verify the `P` Logic build with Logic open +
