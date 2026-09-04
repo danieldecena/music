@@ -23,6 +23,9 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] Add tests/score_apple reusing existing classifiers -- cae6669
+- [x] Three-way table Apple vs ours vs label -- cae6669
+- [x] Extend catalog schema: time-series + regions tables -- c37f02b
 - [x] Scaffold Flip iOS app (Xcode 27, iOS 27 target) -- eda7938
 - [x] Build Tools/mu-analyze.swift, dump full analysis JSON -- 4209e42
 - [x] Verify analysis runs in the iOS 27 Simulator -- 692f964
