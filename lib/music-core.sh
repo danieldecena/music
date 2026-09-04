@@ -273,6 +273,39 @@ mix_report() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix --seed "$seed" "$@"
 }
 
+apple_analyze() {
+  # $1 = audio file. Runs Tools/mu-analyze, ingests the result and scores loop
+  # regions, so the track gains the bar grid mix_render cuts on. Separate from
+  # analyze_track: that estimates BPM/key from this repo's own analyzer, while
+  # this persists Apple's beats, bars, sections and instrument activity.
+  local file="$1" track="${1:t:r}"
+  local mu="$MUSIC_DIR/Tools/mu-analyze" py="$MUSIC_DIR/.venv/bin/python"
+  if [[ ! -x "$mu" ]]; then
+    echo "apple_analyze: Tools/mu-analyze is not built -- mix-render needs its bar grid" >&2
+    return 1
+  fi
+  if [[ ! -f "$file" ]]; then
+    echo "apple_analyze: no such audio file: '$file'" >&2
+    return 1
+  fi
+  # Keep mu-analyze's own stderr: a missing file and an unsupported OS are
+  # different failures, and collapsing both into one guess is how a wrong
+  # cause gets written down as fact.
+  local json="${TMPDIR:-/tmp}/mu-analyze-$$.json" err
+  if ! err=$("$mu" "$file" 2>&1 >"$json"); then
+    rm -f "$json"
+    echo "apple_analyze: mu-analyze failed on '$file': ${err:-no error text}" >&2
+    return 1
+  fi
+  if ! "$py" "$MUSIC_DIR/Scripts/catalog.py" ingest "$track" "$json" >/dev/null; then
+    rm -f "$json"
+    echo "apple_analyze: could not ingest the analysis for '$track'" >&2
+    return 1
+  fi
+  rm -f "$json"
+  "$py" "$MUSIC_DIR/Scripts/catalog.py" regions "$track" --bars 4 >/dev/null
+}
+
 mix_render() {
   # $1 = mode (layer|transition). Remaining args pass through to
   # Scripts/mix_render.py, which cuts both tracks on their persisted bar grids.
@@ -437,5 +470,14 @@ deconstruct() {
   _key=$(print -r -- "$_analysis" | sed -nE 's/.*[Kk]ey[[:space:]]+([A-Ga-g][b#]?m?).*/\1/p' | head -1)
   if [[ -x "$MUSIC_DIR/.venv/bin/python" ]]; then
     "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" index-track "$track" ${_bpm:+--bpm $_bpm} ${_key:+--key $_key} >/dev/null 2>&1
+  fi
+  # Apple's bar grid, so the track is mixable. Reported rather than swallowed:
+  # without it mix_render has nothing to cut on, and a silent skip would leave
+  # that discoverable only when a mix is attempted much later.
+  echo "→ Bar grid & loop candidates…"
+  if apple_analyze "$file"; then
+    echo "  Loop candidates: catalog.py regions \"$track\""
+  else
+    echo "  (no bar grid -- mix-render will not accept this track yet)" >&2
   fi
 }
