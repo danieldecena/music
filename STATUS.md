@@ -329,6 +329,44 @@ dead-code warnings.
   does **not** unlock decodable Apple Music audio — that boundary stands — but it
   does unlock MusicKit metadata, and ISRC gives a stable track identity that
   would properly fix the filename-stem collision recorded below.
+- Sliced the work into a lettered roadmap in `TASKS.md` per
+  `executor-review-roadmap`. Reconciliation worth recording: that skill wants
+  roadmap lines to grow into compressed changelogs carrying SHAs and evidence,
+  but this machine's `CLAUDE.md` says `TASKS.md` is titles only, under 60 chars
+  and free of `.` and `#`, because `session-start.sh` truncates at the first
+  period. CLAUDE.md wins, so the lettered structure and the `[code]`/`[you]` and
+  behavior tags live in `TASKS.md` and the evidence lives here.
+  - **R1 Analysis probe and measurement — DONE.** `Tools/mu-analyze.swift` plus
+    `tests/test-mu-analyze.sh` (`555debc`, 3/3, and observed failing 0/3 with the
+    binary absent). `tests/score_apple.py` plus 15 assertions (`cae6669`).
+  - **R2 Song database: schema and ingest — DONE.** Schema `c37f02b`
+    (`test_catalog_schema.py` 15/15, fails 10/15 without it; the live catalog
+    upgraded with 58 tracks and 3923 assets unchanged). Ingest `4308a19`
+    (`test_catalog_ingest.py` 14/14, fails 13/14 without it; all 13 fixture
+    tracks loaded).
+  - **R3 Region scorers — IN PROGRESS.** Unblocked for modern material: querying
+    the live catalog for the quietest vocal bars in Ivy returns bars 110-117
+    (227-248s), its instrumental outro. Not yet written.
+  - **R7 stays `[you]`, and this is what was tried.** Whether structure holds up
+    on old and lo-fi records cannot be settled here: all 56 files in the library
+    are contemporary and well-produced. This is not an ear question, it is a
+    missing-input question, and it needs such records in the crate first.
+- **Escalation change on the two tempo tasks.** They were parked on the ear
+  because every BPM source tried was Echo Nest-derived and therefore correlated.
+  MusicUnderstanding is genuinely independent, and on all three suspect rows it
+  agrees with our own analyzer and against the label: Nights 80.0 vs ours 80.2
+  against a labelled 90, Nikes 69.0 vs ours 69.1 against 137, Rambo 92.9 vs ours
+  89.7 against 181. Two uncorrelated detectors converging to within 0.2 BPM is
+  the corroboration STATUS said was missing, so the ear is now an optional
+  confirmation rather than a gate. Nights in particular has a mid-song beat
+  switch, so a single BPM for the whole track is a malformed question and no
+  detector will ever settle it.
+- **Apple does not replace the analyzer, and should not.** On the 10 trusted
+  labels both score 8 exact; ours has fewer octave errors (1 vs 2). They fail on
+  different tracks -- Apple gets Self Control and Godspeed where ours reads a 2:1
+  and a 3:2; ours gets Exchange and Pink + White where Apple halves and doubles.
+  The follow-up worth building is an ensemble that prefers agreement, not a
+  swap. Key: Apple 5/13 exact, 6/13 sharing the pitch-class set.
 - Ruled out, so it is not re-investigated: `MediaIntelligence` looks apt because
   `HighlightAnalysisRequest` finds "the most engaging segments", but it is
   video-only with no audio path. `SoundAnalysis` is largely redundant with

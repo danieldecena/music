@@ -1,26 +1,20 @@
 ## Tasks
 
-- [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
-- [ ] Re-record replay baseline after tempo change settled (ear-blocked)
-- [ ] Phase 0: scaffold Flip iOS app (Xcode 27, iOS 27 target)
-- [x] Phase 0: build Tools/mu-analyze and dump analysis JSON - 4209e42
-- [ ] Phase 0: verdict on structure + instrument activity quality
-- [ ] Phase 0: verify analysis runs in the iOS 27 Simulator
-- [ ] Phase 0: iCloud container entitlement + Mac-to-phone sync
-- [x] Phase 1: batch-analyze the 13 fixture tracks to JSON
-- [x] Phase 1: add tests/score_apple reusing existing classifiers
-- [x] Phase 1: three-way table Apple vs ours vs label
-- [ ] Phase 2: library browser over the iCloud container
-- [ ] Phase 2: track detail charts in Swift Charts
-- [x] Phase 2: extend catalog schema with time-series + regions
-- [x] Phase 2: ingest analysis JSON into the catalog
-- [ ] Phase 2: loop region scorer over the beat grid
-- [ ] Phase 2: lyrics from the vocals stem via SpeechTranscriber
-- [ ] Phase 3: port chopping to AVFoundation and vDSP
-- [ ] Add publish_to_icloud to lib/music-core
-- [x] Improve detect_key pitch detection — fixed chroma column-normalization bug + subharmonic votes, 1/10 -> 4/10 exact vs UG
-- [x] Implement subharmonic-summation chroma fix (3rd/5th harmonic weighting in _chroma_projection)
-- [x] Verify chroma fix vs test-analysis.py + key_oracle.py score, update STATUS.md — combined with normalization fix, 4/10 exact
+- [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
+- [ ] Re-record replay baseline after the tempo question settles
+
+## Roadmap — song database
+
+Tags: [code] I can move it, [you] needs you. B = behavior-preserving,
+C = changes behavior. Evidence and SHAs live in STATUS's decision log.
+
+- [x] (R1) Analysis probe and measurement [code] C
+- [x] (R2) Song database: schema and ingest [code] C
+- [~] (R3) Region scorers over the beat grid [code] C
+- [ ] (R4) Mac-to-phone seam: iCloud container and publish [code] C
+- [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
+- [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C
+- [ ] (R7) Verdict on old and lo-fi material [you] B
 
 ## Completed
 
