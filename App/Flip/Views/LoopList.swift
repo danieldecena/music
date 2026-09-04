@@ -5,6 +5,7 @@ import SwiftUI
 struct LoopList: View {
     let analysis: TrackAnalysis
     @Binding var selected: LoopCandidate?
+    @State private var engine = LoopEngine()
 
     var body: some View {
         List(analysis.loops.prefix(12)) { loop in
@@ -25,13 +26,28 @@ struct LoopList: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    if loop.id == selected?.id {
-                        Image(systemName: "checkmark").foregroundStyle(.yellow)
+                    Button {
+                        if engine.isPlaying && loop.id == selected?.id {
+                            engine.stop()
+                        } else {
+                            selected = loop
+                            try? engine.play(loop)
+                        }
+                    } label: {
+                        Image(systemName: engine.isPlaying && loop.id == selected?.id
+                              ? "stop.fill" : "play.fill")
+                            .foregroundStyle(.yellow)
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .buttonStyle(.plain)
         }
         .listStyle(.plain)
+        .task {
+            if let url = Bundle.main.url(forResource: "testclip", withExtension: "m4a") {
+                try? engine.load(url: url)
+            }
+        }
     }
 }
