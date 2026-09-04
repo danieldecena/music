@@ -10,7 +10,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 - [x] (R1) Analysis probe and measurement [code] C
 - [x] (R2) Song database: schema and ingest [code] C
-- [~] (R3) Region scorers over the beat grid [code] C
+- [x] (R3) Region scorers over the beat grid [code] C
 - [ ] (R4) Mac-to-phone seam: iCloud container and publish [code] C
 - [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
 - [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C

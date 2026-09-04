@@ -351,6 +351,21 @@ dead-code warnings.
     on old and lo-fi records cannot be settled here: all 56 files in the library
     are contemporary and well-produced. This is not an ear question, it is a
     missing-input question, and it needs such records in the crate first.
+- **R3 loop scorer shipped.** `Scripts/regions.py` `score_loops` slides an
+  n-bar window over the bar grid and scores each as (1 - mean vocal activity)
+  times a section-containment multiplier; `catalog.py regions <track>` stores and
+  ranks them. The continuous 0-1 activity signal is what makes this principled
+  rather than hand-tuned -- mean vocal level over a span *is* its cleanliness.
+  Levels are duration-weighted, because the activity rows are sample intervals
+  and an unweighted mean would let a run of short rows outvote a long one.
+  Verified on Ivy: the top eight candidates all land in the 218-249s outro at
+  vocal 0.04-0.22 and bass 0.00-0.33, which is the sparse guitar section.
+  `tests/test_regions.py` 9/9 and it fails to import without the module.
+- **Apple's bar grid tracks the music, it is not a fixed ruler.** Ivy's bars run
+  ~2.08s (115 BPM) through bar 109 and ~2.95s (81 BPM) from bar 110, because the
+  outro genuinely slows. So "4 bars" is not a fixed duration, and a chop taken
+  off this grid follows the performance rather than a click. Worth knowing before
+  anyone "fixes" the apparent inconsistency.
 - **Escalation change on the two tempo tasks.** They were parked on the ear
   because every BPM source tried was Echo Nest-derived and therefore correlated.
   MusicUnderstanding is genuinely independent, and on all three suspect rows it

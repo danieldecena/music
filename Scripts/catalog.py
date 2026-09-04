@@ -328,6 +328,40 @@ def ingest(con, track: str, json_path: Path) -> dict:
     }
 
 
+def compute_regions(con, track: str, kind: str = "loop", n_bars: int = 4,
+                    limit: int = 0) -> list[dict]:
+    """Score and store the regions of one track. Replaces this track's rows of
+    that kind, so a re-run with different n_bars does not accumulate."""
+    import regions as _regions
+
+    def rows(sql, *a):
+        return [dict(zip([c[0] for c in cur.description], r))
+                for cur in [con.execute(sql, a)] for r in cur.fetchall()]
+
+    beats = rows("SELECT idx, t, bar, beat_in_bar FROM beats WHERE track=? ORDER BY idx", track)
+    bars = rows("SELECT idx, t FROM bars WHERE track=? ORDER BY idx", track)
+    sections = rows(
+        "SELECT label, start_s, end_s FROM sections WHERE track=? AND label='section'",
+        track)
+    activity = rows(
+        "SELECT instrument, start_s, end_s, level FROM instrument_activity WHERE track=?",
+        track)
+
+    scored = _regions.score_loops(beats, bars, sections, activity, n_bars=n_bars)
+    scored.sort(key=lambda r: r["score"], reverse=True)
+    if limit:
+        scored = scored[:limit]
+
+    con.execute("DELETE FROM regions WHERE track=? AND kind=?", (track, kind))
+    con.executemany(
+        "INSERT INTO regions VALUES (?,?,?,?,?,?,?,?)",
+        [(track, kind, r["start_s"], r["end_s"], r["start_bar"], r["n_bars"],
+          r["score"], json.dumps(r["instruments"])) for r in scored],
+    )
+    con.commit()
+    return scored
+
+
 def _rel(p: Path) -> str:
     try:
         return str(p.relative_to(ROOT))
@@ -1020,6 +1054,12 @@ def main(argv):
     p.add_argument("name")
     p.add_argument("--bpm", type=int)
     p.add_argument("--key")
+    p = sub.add_parser("regions")
+    p.add_argument("track")
+    p.add_argument("--kind", default="loop")
+    p.add_argument("--bars", type=int, default=4)
+    p.add_argument("--limit", type=int, default=10)
+
     p = sub.add_parser("ingest")
     p.add_argument("track")
     p.add_argument("json_path")
@@ -1071,6 +1111,19 @@ def main(argv):
 
     con = connect()
     try:
+        if ns.cmd == "regions":
+            found = compute_regions(con, ns.track, ns.kind, ns.bars, ns.limit)
+            if not found:
+                print(f"no {ns.kind} regions for {ns.track!r} "
+                      "-- is it ingested? (catalog.py ingest)")
+                sys.exit(1)
+            print(f"{'start':>8} {'end':>8} {'bar':>5} {'score':>6}  instruments")
+            for r in found:
+                inst = " ".join(f"{k}={v:.2f}" for k, v in
+                                sorted(r["instruments"].items()))
+                print(f"{r['start_s']:8.1f} {r['end_s']:8.1f} "
+                      f"{r['start_bar']:5d} {r['score']:6.3f}  {inst}")
+            return
         if ns.cmd == "ingest":
             counts = ingest(con, ns.track, Path(ns.json_path))
             print(f"ingested {ns.track}: " +
