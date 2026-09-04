@@ -33,7 +33,8 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] Build Tools/mu-analyze.swift, dump full analysis JSON -- 4209e42
 - [x] Verify analysis runs in the iOS 27 Simulator -- 692f964
 - [x] Batch-analyze the 13 fixture tracks to JSON -- cae6669
-- [x] Timeline tabs: activity chart, lyrics, loops, playback -- eb423b8
+- [x] Track detail charts in Swift Charts -- eb423b8
+- [x] Lyrics and loops tabs with bar-accurate playback -- eb423b8
 - [x] Loop region scorer over the beat grid -- e5ed1ae
 
 - [x] Fix key_oracle to grade live detect_key vs UG, not Echo Nest column 3
