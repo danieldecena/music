@@ -273,6 +273,15 @@ mix_report() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix --seed "$seed" "$@"
 }
 
+mix_render() {
+  # $1 = mode (layer|transition). Remaining args pass through to
+  # Scripts/mix_render.py, which cuts both tracks on their persisted bar grids.
+  # Unlike mix_report's preview this writes a real file: `layer` plays both
+  # sides at once so one track's stems sit under the other's.
+  local mode="$1"; shift
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/mix_render.py" "$mode" "$@"
+}
+
 click_compare() {
   # $1 = an audio file or a Stems/<model>/<track> folder; extra flags pass
   # through (--bpm B, --label L, --dur S, --start S). Interactive: auditions
