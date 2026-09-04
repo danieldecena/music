@@ -166,7 +166,7 @@ struct TimedLyricsTests {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "error:|Testing failed|TEST (SUCCEEDED|FAILED)" /tmp/flip-test.log | head -20
 echo "rc=$rc"
@@ -251,7 +251,7 @@ enum TimedLyrics {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "Test run with|TEST (SUCCEEDED|FAILED)" /tmp/flip-test.log | tail -5
 echo "rc=$rc"
@@ -384,7 +384,7 @@ struct LoopScorerTests {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "error:|cannot find" /tmp/flip-test.log | head -5
 echo "rc=$rc"
@@ -492,7 +492,7 @@ enum LoopScorer {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "Test run with|TEST (SUCCEEDED|FAILED)" /tmp/flip-test.log | tail -3
 echo "rc=$rc"
@@ -588,7 +588,7 @@ struct BarGridTests {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "error:|cannot find" /tmp/flip-test.log | head -5
 echo "rc=$rc"
@@ -675,7 +675,7 @@ struct BarGrid {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "Test run with|TEST (SUCCEEDED|FAILED)" /tmp/flip-test.log | tail -3
 echo "rc=$rc"
@@ -962,7 +962,7 @@ Tasks 5 and 6 create `LyricsLane` and `LoopList`, so this step expects those two
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData build > /tmp/flip-build.log 2>&1; rc=$?
 grep -E "error:" /tmp/flip-build.log | head -10
 echo "rc=$rc"
@@ -1042,7 +1042,7 @@ struct LyricsLane: View {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData build > /tmp/flip-build.log 2>&1; rc=$?
 grep -E "error:" /tmp/flip-build.log | head -5
 echo "rc=$rc"
@@ -1117,7 +1117,7 @@ struct LoopList: View {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData build > /tmp/flip-build.log 2>&1; rc=$?
 grep -cE "error:" /tmp/flip-build.log
 echo "rc=$rc"
@@ -1129,7 +1129,7 @@ Expected: `0` errors, rc=0.
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "Test run with|TEST (SUCCEEDED|FAILED)" /tmp/flip-test.log | tail -3
 echo "rc=$rc"
@@ -1284,7 +1284,7 @@ struct LoopPlayerTests {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "error:|cannot find" /tmp/flip-test.log | head -5
 echo "rc=$rc"
@@ -1387,7 +1387,7 @@ final class LoopEngine {
 
 ```bash
 cd App && xcodebuild -project Flip.xcodeproj -scheme Flip \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
   -derivedDataPath DerivedData test > /tmp/flip-test.log 2>&1; rc=$?
 grep -E "Test run with|TEST (SUCCEEDED|FAILED)" /tmp/flip-test.log | tail -3
 echo "rc=$rc"
