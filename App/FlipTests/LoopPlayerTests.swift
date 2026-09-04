@@ -200,7 +200,11 @@ struct LoopPlayerTests {
 
         let samples = try renderOffline(engine, frames: AVAudioFrameCount(length * repeats),
                                         format: file.processingFormat)
-        #expect(samples.count == length * repeats)
+        // `try #require` rather than `#expect`: a short render must stop the
+        // test here, not fall through into `samples[base + k]` below and trap
+        // out of bounds, taking the whole process down instead of failing
+        // one test.
+        try #require(samples.count == length * repeats)
 
         // Repeat 0 carries the varispeed unit's own warm-up transient — its
         // internal state is empty before any audio has passed through it, an

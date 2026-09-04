@@ -18,6 +18,21 @@ struct Summary: Sendable, Equatable {
     var duration: TimeInterval = 0
 }
 
+/// Thrown when the analyzed payload disagrees with an assumption the UI
+/// hardcodes. Surfaces through `ContentView`'s existing error display rather
+/// than drawing a plausible, wrong chart.
+enum RunnerError: Error, CustomStringConvertible {
+    case instrumentTaxonomyMismatch(reported: [String], expected: [String])
+
+    var description: String {
+        switch self {
+        case let .instrumentTaxonomyMismatch(reported, expected):
+            return "instrument taxonomy mismatch: MusicUnderstanding reported "
+                + "\(reported.sorted()), but the UI hardcodes \(expected.sorted())"
+        }
+    }
+}
+
 enum Runner {
     /// Runs all six analyses and flattens the result.
     ///
@@ -143,9 +158,25 @@ enum Runner {
             lyrics = TimedLyrics.parse(text)
         }
 
-        let ta = TrackAnalysis(bpm: s.bpm, key: s.key, duration: s.duration,
+        let ta = TrackAnalysis(bpm: s.bpm, key: s.key,
                                bars: bars, sections: sections,
                                activity: activity, lyrics: lyrics)
+
+        // `s.instruments` are the real keys MusicUnderstanding reported
+        // (computed above in `analyze(url:)`, and otherwise discarded here).
+        // `ta.instruments` is the four-name taxonomy hardcoded across
+        // `TrackAnalysis`, `ActivityChart`'s color map, and `LoopList`'s stat
+        // line. If the payload's taxonomy ever shifts, every lane would
+        // silently read peak 0.00 and `clean` would read 1.0 for every
+        // window — plausible, wrong, no error, the same class of bug as the
+        // `result` and `start` parsing traps noted above. Fail loudly
+        // instead: this throws into the same error path `ContentView` already
+        // surfaces on screen.
+        if Set(s.instruments) != Set(ta.instruments) {
+            throw RunnerError.instrumentTaxonomyMismatch(reported: s.instruments,
+                                                          expected: ta.instruments)
+        }
+
         return (ta, s)
     }
 }

@@ -10,9 +10,14 @@ struct FrameRange: Equatable {
 enum LoopPlayer {
     /// The frame range a loop occupies in a file at `sampleRate`.
     ///
-    /// Clipped to the file rather than refused, because the last scored window
-    /// can reach one bar past the final downbeat — that is a real loop, just a
-    /// short one. Returns nil only when there is genuinely nothing to play.
+    /// Clipped to the file rather than refused. NOT because a scored loop
+    /// window can land past the final downbeat — `LoopScorer.score` only ever
+    /// emits windows ending at an existing bar index. The real reason:
+    /// converting a legitimate `loop.end` to frames at `sampleRate` can round
+    /// to one frame past the file's actual `totalFrames`, and refusing an
+    /// otherwise-valid loop over a sub-sample rounding difference would be
+    /// worse than trimming it by one frame. Returns nil only when there is
+    /// genuinely nothing to play.
     static func frames(for loop: LoopCandidate, sampleRate: Double,
                        totalFrames: AVAudioFramePosition) -> FrameRange? {
         guard sampleRate > 0, loop.end > loop.start else { return nil }
@@ -40,14 +45,29 @@ final class LoopEngine {
     // sample code had these `private`. This does widen the class's surface:
     // anything in the app target can now call `engine.stop()` or push
     // buffers to `player` directly, bypassing `LoopEngine`'s own `stop()`
-    // and desyncing `isPlaying` from the real transport (the same class of
+    // and desyncing `playingID` from the real transport (the same class of
     // bug `@Observable` alone doesn't prevent). No call site outside the
     // test target does this today, but nothing stops one from starting to.
     let engine = AVAudioEngine()
     let player = AVAudioPlayerNode()
     private let varispeed = AVAudioUnitVarispeed()
     private var file: AVAudioFile?
-    private(set) var isPlaying = false
+
+    /// The `LoopCandidate.id` currently playing, or nil when nothing is.
+    ///
+    /// This used to be `isPlaying: Bool` — "is something playing" rather than
+    /// "which loop is playing". That conflated every row's stop button with
+    /// whichever loop actually had audio running (tapping another row's
+    /// non-play area, which only updates `selected`, made THAT row look like
+    /// the one playing) and never cleared on natural completion, since
+    /// `scheduleSegment` was called with `completionHandler: nil`. A row now
+    /// compares its own `loop.id` against this instead of a single shared flag.
+    private(set) var playingID: Int?
+
+    /// Bumped by `stop()` (including the implicit one at the top of `play()`)
+    /// so a completion handler from an already-superseded `play()` call can
+    /// tell it is stale and must not clear a NEWER `playingID`.
+    private var playToken = 0
 
     init() {
         engine.attach(player)
@@ -77,18 +97,28 @@ final class LoopEngine {
         try AVAudioSession.sharedInstance().setCategory(.playback)
         try AVAudioSession.sharedInstance().setActive(true)
 
-        for _ in 0..<repeats {
+        let token = playToken
+        let onLastSegmentDone: @Sendable () -> Void = { [weak self] in
+            _ = Task { @MainActor in
+                guard let self, self.playToken == token else { return }
+                self.playingID = nil
+            }
+        }
+        for i in 0..<repeats {
+            // Only the LAST segment needs a completion handler: that's the
+            // one moment "this loop finished all its repeats" is true.
             player.scheduleSegment(file, startingFrame: range.start,
-                                   frameCount: range.length,
-                                   at: nil, completionHandler: nil)
+                                   frameCount: range.length, at: nil,
+                                   completionHandler: i == repeats - 1 ? onLastSegmentDone : nil)
         }
         if !engine.isRunning { try engine.start() }
         player.play()
-        isPlaying = true
+        playingID = loop.id
     }
 
     func stop() {
         player.stop()
-        isPlaying = false
+        playToken += 1
+        playingID = nil
     }
 }

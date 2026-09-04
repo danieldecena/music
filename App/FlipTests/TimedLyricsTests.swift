@@ -56,6 +56,15 @@ struct TimedLyricsTests {
         #expect(r.map(\.text) == ["first", "second"])
     }
 
+    @Test("a tie on the timestamp keeps file order, matching Python's stable sort")
+    func tieKeepsFileOrder() {
+        // Scripts/lyrics.py:timed_lrc relies on Python's list.sort being
+        // stable. Swift's Array.sort makes no such guarantee, so this pins
+        // that the port's explicit index tiebreak reproduces it.
+        let r = TimedLyrics.parse("[00:05.00]alpha\n[00:05.00]beta")
+        #expect(r.map(\.text) == ["alpha", "beta"])
+    }
+
     @Test("degenerate inputs return empty rather than crashing")
     func degenerate() {
         #expect(TimedLyrics.parse("").isEmpty)

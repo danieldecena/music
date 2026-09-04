@@ -29,6 +29,10 @@ struct LoopScorerTests {
     @Test("scores match the Python exactly")
     func parity() {
         let expected = [0.200000, 0.300000, 0.450000, 0.600000, 1.000000]
+        // zip stops at the shorter sequence, so a `scored` that came back
+        // short (or empty) would pass this loop trivially. Assert the count
+        // explicitly rather than relying on the loop to notice.
+        #expect(scored.count == expected.count)
         for (got, want) in zip(scored, expected) {
             #expect(abs(got.score - want) < 1e-9,
                     "bar \(got.startBar): got \(got.score), want \(want)")

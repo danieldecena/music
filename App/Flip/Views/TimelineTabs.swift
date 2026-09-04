@@ -22,6 +22,16 @@ struct TimelineTabs: View {
                 LoopList(analysis: analysis, selected: $selectedLoop)
             }
         }
+        // A fresh launch had nothing shaded on the Analysis tab: the loop
+        // review that reported yellow rectangles across all four lanes was
+        // reading a stale selection left over from a previous session's tap,
+        // not this view's default state. Select the best-scored loop so the
+        // chart has something shaded from the very first frame.
+        .onAppear {
+            if selectedLoop == nil {
+                selectedLoop = analysis.loops.first
+            }
+        }
     }
 
     private var header: some View {

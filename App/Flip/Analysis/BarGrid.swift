@@ -21,8 +21,13 @@ struct BarGrid {
     var lastBar: Double { indices.last ?? 0 }
 
     /// Seconds per bar at the end of the track, used to extrapolate past the
-    /// final downbeat. A scored window can reach one bar beyond it, and
-    /// clamping there would silently shorten the drawing.
+    /// final downbeat. NOT because a scored loop window can reach past it —
+    /// `LoopScorer.score` only ever emits windows ending at an existing bar
+    /// index (it iterates `0..<(ordered.count - nBars)`). The real reason:
+    /// instrument-activity samples run to the track's actual duration, which
+    /// is typically later than the beat tracker's last detected downbeat (an
+    /// outro fades out after tracking gives up), so plotting them needs a bar
+    /// position beyond the last known one.
     private var tailGap: Double {
         guard times.count > 1 else { return 2.0 }
         return times[times.count - 1] - times[times.count - 2]

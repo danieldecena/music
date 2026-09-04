@@ -7,7 +7,12 @@ struct LyricLine: Equatable, Identifiable {
     let start: Double
     let end: Double?
     let text: String
-    var id: String { "\(start)-\(text)" }
+    /// Position in the final, sorted line order. `"\(start)-\(text)"` was not
+    /// unique when a line carried a duplicated stamp (two identical repeated
+    /// lines at the same timestamp), which `List` treats as undefined — a
+    /// sequential index is unique by construction.
+    let index: Int
+    var id: Int { index }
 }
 
 /// Port of `Scripts/lyrics.py:timed_lrc`. Kept separate from any plain-text
@@ -52,11 +57,21 @@ enum TimedLyrics {
             }
         }
 
-        rows.sort { $0.0 < $1.0 }
-        return rows.enumerated().map { i, row in
+        // Swift's `Array.sort` is not guaranteed stable, unlike Python's
+        // `list.sort` (which `Scripts/lyrics.py:timed_lrc` relies on for tie
+        // order). Sorting the enumerated pairs and breaking ties on the
+        // original index reproduces that stability explicitly rather than
+        // hoping the current implementation happens to agree.
+        let ordered = rows.enumerated()
+            .sorted { a, b in
+                a.element.0 != b.element.0 ? a.element.0 < b.element.0 : a.offset < b.offset
+            }
+            .map(\.element)
+        return ordered.enumerated().map { i, row in
             LyricLine(start: row.0,
-                      end: i + 1 < rows.count ? rows[i + 1].0 : nil,
-                      text: row.1)
+                      end: i + 1 < ordered.count ? ordered[i + 1].0 : nil,
+                      text: row.1,
+                      index: i)
         }
     }
 }
