@@ -23,3 +23,17 @@ from `Tools/mu-analyze` on the Mac:
 
 The device must reproduce those numbers. A number merely appearing on screen is
 not the check — a plausible wrong one is the failure this catches.
+
+Regenerate the matching lyrics file the same way:
+
+```sh
+.venv/bin/python -c "
+import sys; sys.path.insert(0,'Scripts')
+from lyrics import timed_lrc
+rows = timed_lrc(open('Apple Music/Frank Ocean/Blonde/02 Ivy.lrc').read())
+for s,e,t in rows:
+    if 60.0 <= s < 90.0:
+        s -= 60.0
+        print(f'[{int(s//60):02d}:{s%60:05.2f}]{t}')
+" > App/Flip/Resources/testclip.lrc
+```
