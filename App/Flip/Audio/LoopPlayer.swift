@@ -1,5 +1,6 @@
 import AVFAudio
 import Foundation
+import Observation
 
 struct FrameRange: Equatable {
     let start: AVAudioFramePosition
@@ -31,8 +32,17 @@ enum LoopPlayer {
 /// `.loops` option: built-in looping accumulates floating-point drift, so the
 /// loop walks off the beat over repeats. Apple's own clip-launcher sample
 /// avoids it for the same reason.
+@Observable
 @MainActor
 final class LoopEngine {
+    // Internal rather than private so LoopPlayerTests can drive
+    // AVAudioEngine's manual (offline) rendering mode directly — the brief's
+    // sample code had these `private`. This does widen the class's surface:
+    // anything in the app target can now call `engine.stop()` or push
+    // buffers to `player` directly, bypassing `LoopEngine`'s own `stop()`
+    // and desyncing `isPlaying` from the real transport (the same class of
+    // bug `@Observable` alone doesn't prevent). No call site outside the
+    // test target does this today, but nothing stops one from starting to.
     let engine = AVAudioEngine()
     let player = AVAudioPlayerNode()
     private let varispeed = AVAudioUnitVarispeed()
