@@ -14,6 +14,8 @@ struct Summary: Sendable, Equatable {
     var instruments: [String] = []
     var elapsed: TimeInterval = 0
     var jsonBytes = 0
+    var jsonData = Data()
+    var duration: TimeInterval = 0
 }
 
 enum Runner {
@@ -25,6 +27,7 @@ enum Runner {
     /// keeps this file and that one reading the same thing by construction.
     static func analyze(url: URL) async throws -> Summary {
         let asset = AVURLAsset(url: url)
+        let duration = try await asset.load(.duration).seconds
         let session = try await MusicUnderstandingSession(asset: asset)
 
         let started = Date()
@@ -44,6 +47,8 @@ enum Runner {
         var s = Summary()
         s.elapsed = elapsed
         s.jsonBytes = data.count
+        s.jsonData = data
+        s.duration = duration
 
         if let r = obj["rhythm"] as? [String: Any] {
             s.bpm = r["beatsPerMinute"] as? Double ?? 0
@@ -65,5 +70,72 @@ enum Runner {
             s.instruments = activity.keys.sorted()
         }
         return s
+    }
+
+    /// The full analysis, not just the counts. Reads fields back out of the
+    /// encoded JSON for the same reason `analyze(url:)` does: the JSON shape is
+    /// already verified against `Tools/mu-analyze`, so going through it keeps
+    /// the two reading the same thing by construction.
+    static func analyzeFull(url: URL, lyricsNamed lyricsResource: String?)
+        async throws -> TrackAnalysis {
+        let s = try await analyze(url: url)
+        // NOTE the shape. `analyze(url:)` encodes `SessionResult` directly, so
+        // rhythm/structure/key sit at the TOP level here. The `result` wrapper,
+        // and `durationSeconds` beside it, exist only in `Tools/mu-analyze`'s
+        // output FILE, which adds them around the same payload. Reading
+        // `root["result"]` in-app yields an empty dictionary and every array
+        // below comes back empty — with no error, because every cast is
+        // optional with a `?? [:]` fallback.
+        let result = try JSONSerialization
+            .jsonObject(with: s.jsonData) as? [String: Any] ?? [:]
+
+        // CMTime encodes as {epoch, flags, timescale, value}; seconds are
+        // value / timescale. Timescale is 44100 in practice but is read rather
+        // than assumed, because a different source file could carry another.
+        func seconds(_ any: Any?) -> Double? {
+            guard let d = any as? [String: Any],
+                  let v = d["value"] as? Double,
+                  let ts = d["timescale"] as? Double, ts != 0 else { return nil }
+            return v / ts
+        }
+
+        let rhythm = result["rhythm"] as? [String: Any] ?? [:]
+        let barTimes = (rhythm["bars"] as? [[String: Any]] ?? [])
+            .compactMap { seconds($0["start"] ?? $0) }
+        let bars = barTimes.enumerated().map { Bar(idx: $0.offset, t: $0.element) }
+
+        let structure = result["structure"] as? [String: Any] ?? [:]
+        let sections = (structure["sections"] as? [[String: Any]] ?? [])
+            .compactMap { row -> TrackSection? in
+                guard let start = seconds(row["start"]),
+                      let dur = seconds(row["duration"]) else { return nil }
+                return TrackSection(start: start, end: start + dur)
+            }
+
+        var activity: [ActivitySample] = []
+        let ia = result["instrumentActivity"] as? [String: Any] ?? [:]
+        for (name, rows) in (ia["activity"] as? [String: [[String: Any]]] ?? [:]) {
+            let parsed = rows.compactMap { row -> (Double, Double)? in
+                guard let t = seconds(row["time"]),
+                      let level = row["value"] as? Double else { return nil }
+                return (t, level)
+            }.sorted { $0.0 < $1.0 }
+            for (i, p) in parsed.enumerated() {
+                let end = i + 1 < parsed.count ? parsed[i + 1].0 : s.duration
+                activity.append(ActivitySample(instrument: name, start: p.0,
+                                               end: end, level: p.1))
+            }
+        }
+
+        var lyrics: [LyricLine] = []
+        if let name = lyricsResource,
+           let lrc = Bundle.main.url(forResource: name, withExtension: "lrc"),
+           let text = try? String(contentsOf: lrc, encoding: .utf8) {
+            lyrics = TimedLyrics.parse(text)
+        }
+
+        return TrackAnalysis(bpm: s.bpm, key: s.key, duration: s.duration,
+                             bars: bars, sections: sections,
+                             activity: activity, lyrics: lyrics)
     }
 }
