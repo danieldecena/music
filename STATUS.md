@@ -1,6 +1,11 @@
 # STATUS — music toolkit
 
 ## Confirmed working
+- **`Tools/mu-analyze`** (gitignored binary, source `Tools/mu-analyze.swift`) — a
+  macOS CLI over Apple's `MusicUnderstanding` framework. Dumps rhythm, key,
+  structure, loudness, pace and instrument activity for one audio file as JSON.
+  Build: `swiftc -parse-as-library -O -o Tools/mu-analyze Tools/mu-analyze.swift`.
+  Observed on `02 Ivy.m4a`: exit 0, 6.4 MB JSON, 57.4s for a 249s track.
 - **`Z) Mix report` / `./mix-report.sh` / `catalog.py mix --seed <title>`** — pivots
   on one named track instead of dumping every library pair. Prints a verdict, a
   why-line, rarest-first shared lyric words, and near misses; `--preview` renders
@@ -276,6 +281,58 @@ catalog (YAGNI — `scan` rebuilds `assets` every run). StudioTUI's 4 pre-existi
 dead-code warnings.
 
 ## Decision log
+
+### 2026-09-03
+- Decided: build the flip toolkit's future around a **song database**, not a
+  feature list. Apple's `MusicUnderstanding` (macOS/iOS 27) supplies rhythm, key,
+  structure, loudness, pace and instrument activity on-device and free; loop
+  finding, mixing two tracks, and social-clip extraction are all then *queries*
+  over one `regions(track, kind, start_s, end_s, start_bar, n_bars, score)` table
+  rather than three separate features. Design:
+  `docs/superpowers/specs/2026-09-03-song-database-design.md`. Executable plan for
+  Phases 0-2: `docs/superpowers/plans/2026-09-03-song-database.md`.
+- **Phase 0 probe: the framework works, and the data is good.** `Tools/mu-analyze`
+  compiled first try and ran on `02 Ivy.m4a` (249s). Observations, not inferences:
+  - **Timing:** 57.4s warm, about 4.3x faster than realtime. The first run took
+    6m38s at 4% CPU — that was one-time model provisioning, not analysis cost.
+  - **Structure is bar-aligned.** 14 sections, 31 segments, 64 phrases. At the
+    detected 113.0 BPM one bar is 2.12s, so 8 bars is 17.0s. Observed section
+    lengths 16.5 / 16.7 / 16.2 / 16.5 / 16.5 (8 bars), 8.3 twice (4 bars), and
+    32.9 / 30.9 / 35.0 (16 bars). Boundaries land on musical units.
+  - **Instrument activity uses the demucs taxonomy:** `bass`, `drum`, `other`,
+    `vocal`, as a continuous 0.0-1.0 signal sampled every 0.05s (20 Hz, 4984
+    points). Consequence worth acting on: **finding** vocal-free regions needs no
+    stem separation at all, only **extracting** an isolated stem does. That
+    loosens the "Mac must run demucs first" constraint for the loop-hunting half.
+  - **BPM 113.007** against a published 116 and our 118. Within
+    `_bpm_class`'s 4.5% tolerance, so it scores exact. **Key `C major`** against
+    a published `Am` — the relative, i.e. the right pitch-class set but the wrong
+    tonic. On this one track our analyzer's `Am` is closer than Apple's. Apple's
+    key detection is not automatically better; Phase 1 measures it properly.
+- Gotchas recorded so they are not rediscovered:
+  - `SessionResult` is `Encodable`, so the whole analysis serializes with a plain
+    `JSONEncoder`. No hand-written mapping needed.
+  - **Loudness reports `-inf` LUFS for digital silence and `JSONEncoder` throws
+    `EncodingError.invalidValue` on it.** Fixed with
+    `nonConformingFloatEncodingStrategy = .convertToString(...)`, so downstream
+    consumers see either a number or the strings `"inf"` / `"-inf"` / `"nan"`.
+  - **All times are `CMTime` encoded as `{epoch, flags, timescale, value}`,**
+    timescale 44100. Seconds are `value / timescale`. Ingest must convert.
+  - `result` carries an eighth key the docs do not list, `structurePredictions`,
+    holding raw tensor output (`scalarType`, `scalars`, `shape`, `strides`) plus
+    `detectionThreshold` and `predictionResolution`.
+- Decided: **iOS ingest is not Files-import-only.** `MPMediaItem.assetURL`
+  (MediaPlayer) yields a URL an `AVAsset` can read for the user's own library
+  items; it is nil only for DRM-protected content. So the app can enumerate and
+  analyze anything DRM-free the user owns. A paid Developer Program membership
+  (team 877MLS29T9, confirmed via `Developer ID` + `Apple Distribution` certs)
+  does **not** unlock decodable Apple Music audio — that boundary stands — but it
+  does unlock MusicKit metadata, and ISRC gives a stable track identity that
+  would properly fix the filename-stem collision recorded below.
+- Ruled out, so it is not re-investigated: `MediaIntelligence` looks apt because
+  `HighlightAnalysisRequest` finds "the most engaging segments", but it is
+  video-only with no audio path. `SoundAnalysis` is largely redundant with
+  `instrumentActivity`.
 
 ### 2026-07-24
 - Fixed: **mix preview crossfaded at fixed offsets, not real section boundaries.**

@@ -2,6 +2,21 @@
 
 - [ ] LISTEN: run T) Tempo lock on Nikes + Rambo (the two `?` rows), auto-write, re-run score
 - [ ] Re-record replay baseline after tempo change settled (ear-blocked)
+- [ ] Phase 0: scaffold Flip iOS app (Xcode 27, iOS 27 target)
+- [ ] Phase 0: build Tools/mu-analyze and dump analysis JSON
+- [ ] Phase 0: verdict on structure + instrument activity quality
+- [ ] Phase 0: verify analysis runs in the iOS 27 Simulator
+- [ ] Phase 0: iCloud container entitlement + Mac-to-phone sync
+- [ ] Phase 1: batch-analyze the 13 fixture tracks to JSON
+- [ ] Phase 1: add tests/score_apple reusing existing classifiers
+- [ ] Phase 1: three-way table Apple vs ours vs label
+- [ ] Phase 2: library browser over the iCloud container
+- [ ] Phase 2: track detail charts in Swift Charts
+- [ ] Phase 2: extend catalog schema with time-series + regions
+- [ ] Phase 2: loop region scorer over the beat grid
+- [ ] Phase 2: lyrics from the vocals stem via SpeechTranscriber
+- [ ] Phase 3: port chopping to AVFoundation and vDSP
+- [ ] Add publish_to_icloud to lib/music-core
 - [x] Improve detect_key pitch detection — fixed chroma column-normalization bug + subharmonic votes, 1/10 -> 4/10 exact vs UG
 - [x] Implement subharmonic-summation chroma fix (3rd/5th harmonic weighting in _chroma_projection)
 - [x] Verify chroma fix vs test-analysis.py + key_oracle.py score, update STATUS.md — combined with normalization fix, 4/10 exact
@@ -79,7 +94,7 @@
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-07-24 04:50.
+Plan approved 2026-09-03 16:38.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -88,7 +103,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 7a69bf52-bec2-405a-a0ea-ab7ebf8958c0
+    claude --resume 8cc1b1a3-989d-40ee-a8e4-d7a12bfc0048
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->
