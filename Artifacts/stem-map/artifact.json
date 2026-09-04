@@ -1,0 +1,8 @@
+{
+  "url": "https://claude.ai/code/artifact/ace836b3-f197-4c5e-8b8f-b5ab648db6b3",
+  "source": "stem_map.html",
+  "title": "Flip Stem Map",
+  "published": "2026-09-03",
+  "note": "Generated -- never hand-edit stem_map.html. Edit template.html, then run .venv/bin/python Scripts/build_stem_map.py. Republish passing this url, then artifact-stamp.sh this file in the same turn.",
+  "sha256": "43306caaa3bc9d7305a0161064a2736293b9b7cd7bb1b08818501f68ad6010d7"
+}

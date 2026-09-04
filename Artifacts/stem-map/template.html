@@ -1,0 +1,398 @@
+<title>Flip Stem Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#12100E; --panel:#1A1714; --raised:#221E1A;
+  --rule:#302A25; --rule-hi:#463D35;
+  --ink:#EDE6DA; --ink-dim:#9A8F83; --ink-faint:#6B6259;
+  --bass:#C96A28; --drum:#D6483C; --other:#3E8E9C; --vocal:#B08CE0;
+  --loop:#E3B341;
+  --f-display:"Familjen Grotesk","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --f-body:"Public Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-body);
+     font-size:14px;line-height:1.55;padding:30px 22px 52px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+/* ---- crate picker ---- */
+.crate{display:flex;flex-direction:column;gap:9px}
+.crate h2,.shelf h2,.stage-hd h2{
+  font-family:var(--f-mono);font-size:11px;font-weight:500;margin:0;
+  letter-spacing:.15em;text-transform:uppercase;color:var(--ink-dim);
+}
+.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:5px}
+.chip{
+  flex:0 0 auto;background:var(--panel);border:1px solid var(--rule);
+  padding:8px 13px;cursor:pointer;color:var(--ink-dim);font:inherit;
+  text-align:left;transition:border-color .13s,color .13s,background .13s;
+}
+.chip:hover{border-color:var(--rule-hi);color:var(--ink)}
+.chip[aria-pressed="true"]{border-color:var(--loop);background:var(--raised);color:var(--ink)}
+.chip .n{display:block;font-size:13px;white-space:nowrap}
+.chip .m{
+  display:block;font-family:var(--f-mono);font-size:10.5px;color:var(--ink-faint);
+  font-variant-numeric:tabular-nums;margin-top:1px;
+}
+.chip:focus-visible{outline:2px solid var(--loop);outline-offset:2px}
+
+/* ---- masthead ---- */
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px}
+.id h1{font-family:var(--f-display);font-weight:700;font-size:38px;line-height:1;
+       margin:0;letter-spacing:-.02em;text-wrap:balance}
+.id .artist{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;
+            text-transform:uppercase;color:var(--ink-dim);margin:0 0 8px}
+.readout{display:flex;border:1px solid var(--rule);background:var(--panel)}
+.readout div{padding:9px 15px;border-right:1px solid var(--rule)}
+.readout div:last-child{border-right:0}
+.readout dt{font-family:var(--f-mono);font-size:10px;letter-spacing:.13em;
+            text-transform:uppercase;color:var(--ink-faint);margin:0 0 2px}
+.readout dd{margin:0;font-family:var(--f-mono);font-size:17px;font-weight:500;
+            font-variant-numeric:tabular-nums}
+.note{color:var(--ink-dim);max-width:64ch;margin:0;
+      border-left:2px solid var(--rule-hi);padding-left:14px}
+.note b{color:var(--ink);font-weight:500}
+
+/* ---- the instrument ---- */
+.stage{border:1px solid var(--rule);background:var(--panel);position:relative}
+.stage-hd{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+          padding:11px 16px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+.legend{display:flex;gap:14px;flex-wrap:wrap}
+.legend span{font-family:var(--f-mono);font-size:11px;color:var(--ink-dim);
+             display:inline-flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;display:block}
+.canvas-wrap{position:relative;overflow-x:auto}
+canvas{display:block;width:100%;height:340px}
+.tip{position:absolute;top:8px;pointer-events:none;opacity:0;background:var(--raised);
+     border:1px solid var(--rule-hi);padding:8px 11px;font-family:var(--f-mono);
+     font-size:11px;white-space:nowrap;transition:opacity .12s;z-index:3;
+     font-variant-numeric:tabular-nums}
+.tip .r{display:flex;justify-content:space-between;gap:14px;color:var(--ink-dim)}
+.tip .r b{color:var(--ink);font-weight:500}
+.tip .hd{color:var(--ink);margin-bottom:5px;font-weight:500}
+
+/* ---- loop shelf ---- */
+.shelf p{margin:5px 0 13px;color:var(--ink-dim);max-width:64ch}
+.loops{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:10px}
+.loop{display:grid;grid-template-columns:auto 1fr;gap:0 13px;align-items:center;
+      background:var(--panel);border:1px solid var(--rule);padding:12px 14px;
+      cursor:pointer;text-align:left;color:inherit;font:inherit;
+      transition:border-color .13s,background .13s}
+.loop:hover{border-color:var(--rule-hi);background:var(--raised)}
+.loop[aria-pressed="true"]{border-color:var(--loop);background:var(--raised)}
+.loop:focus-visible{outline:2px solid var(--loop);outline-offset:2px}
+.loop .rank{grid-row:1/3;font-family:var(--f-mono);font-size:22px;
+            color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.loop[aria-pressed="true"] .rank{color:var(--loop)}
+.loop .bars{font-family:var(--f-mono);font-size:14px;font-variant-numeric:tabular-nums}
+.loop .meta{font-family:var(--f-mono);font-size:11px;color:var(--ink-dim);
+            display:flex;gap:10px;align-items:center}
+.loop .score{flex:1;height:3px;background:var(--rule);position:relative;min-width:36px}
+.loop .score i{position:absolute;inset:0 auto 0 0;background:var(--loop);display:block}
+
+.foot{color:var(--ink-faint);font-size:12.5px;max-width:72ch;margin:0}
+.foot code{font-family:var(--f-mono);font-size:12px;color:var(--ink-dim)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <section class="crate">
+    <h2>Crate &mdash; <span id="n-tracks"></span> tracks carrying a bar grid</h2>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <header class="head">
+    <div class="id">
+      <p class="artist" id="k-artist"></p>
+      <h1 id="k-title"></h1>
+    </div>
+    <dl class="readout">
+      <div><dt>Tempo</dt><dd id="k-bpm"></dd></div>
+      <div><dt>Key</dt><dd id="k-key"></dd></div>
+      <div><dt>Bars</dt><dd id="k-bars"></dd></div>
+      <div><dt>Sections</dt><dd id="k-sect"></dd></div>
+      <div><dt>Length</dt><dd id="k-len"></dd></div>
+    </dl>
+  </header>
+
+  <p class="note">Nothing here was separated into stems. Apple's
+  <b>MusicUnderstanding</b> reports how present each instrument family is, twenty
+  times a second, straight off the mixed file. It reports exactly four families
+  and <b>other</b> is the catch-all, so guitar, keys, synths and strings all
+  share that one lane.</p>
+
+  <section class="stage">
+    <div class="stage-hd">
+      <h2>Instrument activity &middot; plotted against the bar grid</h2>
+      <div class="legend">
+        <span><i style="background:var(--drum)"></i>Drums</span>
+        <span><i style="background:var(--bass)"></i>Bass</span>
+        <span><i style="background:var(--other)"></i>Other</span>
+        <span><i style="background:var(--vocal)"></i>Vocal</span>
+        <span><i style="background:var(--loop)"></i>Loop candidate</span>
+      </div>
+    </div>
+    <div class="canvas-wrap" id="cw">
+      <canvas id="c"></canvas>
+      <div class="tip" id="tip"></div>
+    </div>
+  </section>
+
+  <section class="shelf">
+    <h2>Four-bar loops, ranked</h2>
+    <p>Scored for how little vocal sits on top and how cleanly the window falls
+    inside one section. Select one to place it on the timeline.</p>
+    <div class="loops" id="loops"></div>
+  </section>
+
+  <p class="foot">The horizontal axis is <b>bars, not seconds</b>. Apple's grid
+  tracks the performance rather than laying a fixed ruler over it, so even
+  spacing here means even musical time <span id="k-drift"></span>. Section rules
+  come from the structure pass, which finds boundaries but does not name them,
+  and it reports one fewer section on iOS than on macOS for identical bytes &mdash;
+  these counts are the Mac's. Each lane's dashed rule is the loudest that family
+  reaches anywhere in the track, so a lane sitting near zero is measured quiet
+  rather than missing data.</p>
+</div>
+
+<script>
+const DB = __DATA__;
+const NAMES = Object.keys(DB);
+const CSS = getComputedStyle(document.documentElement);
+const c_ = n => CSS.getPropertyValue(n).trim();
+const STEMS = [
+  {k:"drum",  label:"DRUMS", color:c_("--drum")},
+  {k:"bass",  label:"BASS",  color:c_("--bass")},
+  {k:"other", label:"OTHER", color:c_("--other")},
+  {k:"vocal", label:"VOCAL", color:c_("--vocal")},
+];
+const RULE=c_("--rule"), RULE_HI=c_("--rule-hi"), INK=c_("--ink"),
+      DIM=c_("--ink-dim"), FAINT=c_("--ink-faint"), LOOP=c_("--loop"),
+      RAISED=c_("--raised");
+
+const PAD_L=76, PAD_R=16, RULER=28, SECT=22, TOP=RULER+SECT+8,
+      LANE_H=60, LANE_GAP=8, H=TOP+STEMS.length*(LANE_H+LANE_GAP);
+
+let D, BT, BI, B0, B1, lastGap, W=0, plotW=0, selected=0, hoverX=null;
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const tip = document.getElementById("tip");
+const mmss = s => Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+
+// --- bar-space mapping: time -> fractional bar index -------------------------
+function barAt(t){
+  if(t<=BT[0]) return BI[0] + (t-BT[0])/(BT.length>1?BT[1]-BT[0]:2);
+  if(t>=BT[BT.length-1]) return BI[BI.length-1] + (t-BT[BT.length-1])/lastGap;
+  let lo=0, hi=BT.length-1;
+  while(hi-lo>1){ const m=(lo+hi)>>1; if(BT[m]<=t) lo=m; else hi=m; }
+  return BI[lo] + (t-BT[lo])/(BT[hi]-BT[lo]);
+}
+function tOf(x){
+  const b = B0 + (x-PAD_L)/plotW*(B1-B0);
+  if(b<=BI[0]) return BT[0];
+  if(b>=BI[BI.length-1]) return BT[BT.length-1]+(b-BI[BI.length-1])*lastGap;
+  let lo=0, hi=BI.length-1;
+  while(hi-lo>1){ const m=(lo+hi)>>1; if(BI[m]<=b) lo=m; else hi=m; }
+  return BT[lo] + (b-BI[lo])*(BT[hi]-BT[lo])/(BI[hi]-BI[lo]);
+}
+const xOf = t => PAD_L + (barAt(t)-B0)/(B1-B0)*plotW;
+
+function draw(){
+  const rect = cv.getBoundingClientRect(), dpr = window.devicePixelRatio||1;
+  W = rect.width; plotW = W - PAD_L - PAD_R;
+  if(plotW <= 0) return;                       // laid out but not yet measured
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  cv.style.height = H+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const laneTop = i => TOP + i*(LANE_H+LANE_GAP);
+  const bottom  = laneTop(STEMS.length-1) + LANE_H;
+
+  D.sections.forEach((s,i)=>{
+    const x0=xOf(s.start_s), x1=xOf(s.end_s);
+    ctx.fillStyle = i%2 ? "rgba(255,255,255,.028)" : "rgba(255,255,255,.008)";
+    ctx.fillRect(x0, RULER, x1-x0, bottom-RULER);
+  });
+
+  // bar ticks -- label density follows the track's own length
+  const step = D.bars.length > 130 ? 16 : 8;
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textBaseline = "alphabetic";
+  D.bars.forEach(b=>{
+    const x = xOf(b.t), four = b.idx%4===0;
+    ctx.fillStyle = four ? RULE_HI : RULE;
+    ctx.fillRect(x, four?RULER-7:RULER-4, 1, four?7:4);
+    if(b.idx%step===0){
+      ctx.fillStyle = FAINT; ctx.textAlign = "center";
+      ctx.fillText(b.idx, x, RULER-11);
+    }
+  });
+
+  ctx.textAlign = "left";
+  D.sections.forEach((s,i)=>{
+    const x0=xOf(s.start_s), x1=xOf(s.end_s);
+    ctx.fillStyle = RAISED;
+    ctx.fillRect(x0+1, RULER+3, Math.max(x1-x0-2,1), SECT-6);
+    ctx.strokeStyle = RULE_HI; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(x0)+.5, RULER);
+    ctx.lineTo(Math.round(x0)+.5, bottom); ctx.stroke();
+    if(x1-x0 > 22){ ctx.fillStyle = DIM; ctx.fillText("S"+(i+1), x0+5, RULER+SECT-8); }
+  });
+
+  D.loops.forEach((L,i)=>{
+    const x0=xOf(L.start_s), x1=xOf(L.end_s), on = i===selected;
+    ctx.fillStyle = on ? "rgba(227,179,65,.17)" : "rgba(227,179,65,.05)";
+    ctx.fillRect(x0, RULER, x1-x0, bottom-RULER);
+    ctx.fillStyle = on ? LOOP : "rgba(227,179,65,.35)";
+    ctx.fillRect(x0, RULER, x1-x0, 2);
+    if(on){ ctx.fillRect(x0, RULER, 1, bottom-RULER);
+            ctx.fillRect(x1-1, RULER, 1, bottom-RULER); }
+  });
+
+  STEMS.forEach((st,i)=>{
+    const top = laneTop(i), base = top+LANE_H, pts = D.activity[st.k];
+    ctx.fillStyle = "rgba(255,255,255,.022)";
+    ctx.fillRect(PAD_L, top, plotW, LANE_H);
+    if(!pts || !pts.length) return;
+
+    ctx.beginPath(); ctx.moveTo(xOf(pts[0][0]), base);
+    pts.forEach(p => ctx.lineTo(xOf(p[0]), base - p[1]*(LANE_H-4)));
+    ctx.lineTo(xOf(pts[pts.length-1][0]), base); ctx.closePath();
+    ctx.fillStyle = st.color; ctx.globalAlpha = .30; ctx.fill(); ctx.globalAlpha = 1;
+
+    ctx.beginPath();
+    pts.forEach((p,j)=>{ const x=xOf(p[0]), y=base-p[1]*(LANE_H-4);
+      j ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
+    ctx.strokeStyle = st.color; ctx.lineWidth = 1.25; ctx.stroke();
+
+    ctx.strokeStyle = RULE; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD_L, base+.5); ctx.lineTo(PAD_L+plotW, base+.5); ctx.stroke();
+
+    const pk = pts.reduce((m,p) => p[1]>m ? p[1] : m, 0);
+    const py = base - pk*(LANE_H-4);
+    ctx.save();
+    ctx.setLineDash([2,3]); ctx.strokeStyle = st.color; ctx.globalAlpha = .5;
+    ctx.beginPath(); ctx.moveTo(PAD_L, py+.5); ctx.lineTo(PAD_L+plotW, py+.5); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = st.color; ctx.globalAlpha = .85;
+    ctx.font = '10px "JetBrains Mono", monospace'; ctx.textAlign = "right";
+    ctx.fillText("peak " + pk.toFixed(2), PAD_L+plotW-5, Math.max(py-4, top+10));
+    ctx.globalAlpha = 1;
+
+    ctx.fillStyle = st.color; ctx.font = '500 10px "JetBrains Mono", monospace';
+    ctx.fillText(st.label, PAD_L-12, top+11);
+    ctx.fillStyle = FAINT; ctx.font = '10px "JetBrains Mono", monospace';
+    ctx.fillText("1.0", PAD_L-12, top+24);
+    ctx.fillText("0", PAD_L-12, base);
+    ctx.textAlign = "left";
+  });
+
+  if(hoverX!==null){ ctx.fillStyle = INK; ctx.fillRect(Math.round(hoverX)+.5, RULER, 1, bottom-RULER); }
+}
+
+function levelAt(k,t){
+  const pts = D.activity[k];
+  if(!pts || !pts.length) return 0;
+  let lo=0, hi=pts.length-1;
+  if(t<=pts[0][0]) return pts[0][1];
+  if(t>=pts[hi][0]) return pts[hi][1];
+  while(hi-lo>1){ const m=(lo+hi)>>1; if(pts[m][0]<=t) lo=m; else hi=m; }
+  return pts[lo][1];
+}
+cv.addEventListener("pointermove", e=>{
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left;
+  if(x < PAD_L || x > PAD_L+plotW){ leave(); return; }
+  hoverX = x;
+  const t = tOf(x), bar = Math.floor(barAt(t));
+  const sec = D.sections.findIndex(s => t>=s.start_s && t<s.end_s);
+  tip.innerHTML =
+    '<div class="hd">Bar ' + bar + ' &middot; ' + mmss(t) +
+    (sec>=0 ? ' &middot; S'+(sec+1) : '') + '</div>' +
+    STEMS.map(s=>'<div class="r"><span>'+s.label+'</span><b>'+
+      levelAt(s.k,t).toFixed(2)+'</b></div>').join("");
+  tip.style.opacity = 1;
+  const w = tip.offsetWidth;
+  tip.style.left = Math.min(Math.max(x-w/2, 4), r.width-w-4) + "px";
+  draw();
+});
+function leave(){ hoverX=null; tip.style.opacity=0; draw(); }
+cv.addEventListener("pointerleave", leave);
+
+// --- loading a track ---------------------------------------------------------
+const shelf = document.getElementById("loops");
+function load(name){
+  D = DB[name];
+  BT = D.bars.map(b=>b.t); BI = D.bars.map(b=>b.idx);
+  lastGap = BT.length>1 ? BT[BT.length-1]-BT[BT.length-2] : 2;
+  B0 = BI[0]; B1 = barAt(D.duration);
+  selected = 0; hoverX = null; tip.style.opacity = 0;
+
+  document.getElementById("k-artist").textContent =
+    [D.artist, D.album].filter(Boolean).join(" \u00b7 ");
+  document.getElementById("k-title").textContent = name;
+  document.getElementById("k-bpm").textContent  = D.bpm.toFixed(1);
+  document.getElementById("k-key").textContent  = D.key || "\u2014";
+  document.getElementById("k-bars").textContent = D.bars.length;
+  document.getElementById("k-sect").textContent = D.sections.length;
+  document.getElementById("k-len").textContent  = mmss(D.duration);
+
+  // the drift sentence, measured on this track rather than asserted
+  if(BT.length > 4){
+    const first = BT[1]-BT[0], last = BT[BT.length-1]-BT[BT.length-2];
+    document.getElementById("k-drift").textContent =
+      "\u2014 here a bar runs " + first.toFixed(2) + "s at the top and " +
+      last.toFixed(2) + "s at the end";
+  } else { document.getElementById("k-drift").textContent = ""; }
+
+  shelf.replaceChildren();
+  D.loops.forEach((L,i)=>{
+    const b = document.createElement("button");
+    b.className = "loop"; b.type = "button";
+    b.setAttribute("aria-pressed", i===0);
+    b.innerHTML =
+      '<span class="rank">'+String(i+1).padStart(2,"0")+'</span>' +
+      '<span class="bars">Bars '+L.start_bar+'&ndash;'+(L.start_bar+3)+'</span>' +
+      '<span class="meta">'+mmss(L.start_s)+'&ndash;'+mmss(L.end_s)+
+        '<span class="score"><i style="width:'+(L.score*100).toFixed(0)+'%"></i></span>'+
+        L.score.toFixed(2)+'</span>';
+    b.addEventListener("click", ()=>{
+      selected = i;
+      [...shelf.children].forEach((el,j)=>el.setAttribute("aria-pressed", j===i));
+      draw();
+    });
+    shelf.appendChild(b);
+  });
+  draw();
+}
+
+// --- the crate ---------------------------------------------------------------
+const chips = document.getElementById("chips");
+document.getElementById("n-tracks").textContent = NAMES.length;
+NAMES.forEach((name,i)=>{
+  const t = DB[name], b = document.createElement("button");
+  b.className = "chip"; b.type = "button";
+  b.setAttribute("aria-pressed", i===0);
+  b.innerHTML = '<span class="n"></span><span class="m"></span>';
+  b.firstChild.textContent = name;
+  b.lastChild.textContent = t.bpm.toFixed(0) + " BPM \u00b7 " + (t.key || "\u2014");
+  b.addEventListener("click", ()=>{
+    [...chips.children].forEach((el,j)=>el.setAttribute("aria-pressed", j===i));
+    load(name);
+  });
+  chips.appendChild(b);
+});
+
+// Open on the track whose best loop scores highest, so the first frame shows
+// the tool at work rather than whichever title sorts first.
+const OPEN = NAMES.reduce((best,n)=>
+  (DB[n].loops[0]?.score ?? 0) > (DB[best].loops[0]?.score ?? 0) ? n : best, NAMES[0]);
+[...chips.children][NAMES.indexOf(OPEN)].setAttribute("aria-pressed", true);
+[...chips.children].forEach((el,j)=>{ if(NAMES[j]!==OPEN) el.setAttribute("aria-pressed", false); });
+
+addEventListener("resize", draw);
+document.fonts.ready.then(draw);
+load(OPEN);
+</script>
