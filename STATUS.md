@@ -284,6 +284,29 @@ dead-code warnings.
 
 ### 2026-09-03
 
+- Decided: **two sessions were editing `~/.claude/skills/ios-build/` at once, and
+  the split is now by directory, not by turn.** That session owns `~/.claude`
+  entirely -- the ios-build skill, its artifact, and the `invariants.sh` drift
+  check it is building. This session owns `~/developer/music` and the Ivy Stem
+  Map artifact. Neither crosses. Ownership removes the collision instead of
+  managing it, which is cheaper than any lock.
+  - First move made here: dropped this session's watch on the iOS Build Runbook
+    artifact, so their republishes no longer wake this session.
+  - Their `sha256(artifact.html)` in `artifact.json`, compared by an
+    `invariants.sh` check, is adopted as-is rather than competed with. Nothing
+    on this machine currently compares an artifact's source against what is
+    live, and one implementation of that is enough.
+  - This also explains two anomalies recorded earlier today as unexplained:
+    `artifact.html` changing size between an `ls` and a `cp` minutes later, and
+    `published` reading 2026-09-02 in a `cat` but 2026-09-03 in git's base. Both
+    were the other session writing to the same working tree. No content was
+    lost either way: HEAD is `ec9cf0c`, all four additions are present exactly
+    once, and that session synced to this one rather than over it.
+  - Standing rules that held and stay: scoped pathspecs on every commit in a
+    shared tree (the commit here was 3 files, 93 insertions, every line
+    attributable), and re-read a shared file immediately before editing rather
+    than from a copy read earlier in the session.
+
 - Observed: **R4a is done on hardware.** Flip runs on the iPhone (iOS 27.0) and
   reports 116.596 BPM, 58 beats, 14 bars, C major against the bundled clip,
   matching `Tools/mu-analyze` on the Mac to rounding. Analysis took 1.4s on
