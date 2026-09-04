@@ -4,6 +4,7 @@ struct ContentView: View {
     @State private var analysis: TrackAnalysis?
     @State private var error: String?
     @State private var running = false
+    @State private var icloud: ContainerStatus?
 
     var body: some View {
         NavigationStack {
@@ -16,6 +17,14 @@ struct ContentView: View {
                             Text("testclip.m4a").font(.system(.body, design: .monospaced))
                             Button(running ? "Analyzing..." : "Analyze") { run() }
                                 .disabled(running)
+                        }
+                        Section("iCloud") {
+                            // Rendered as unknown until the claim returns, never
+                            // as absent -- a claim still in flight and a device
+                            // with no account are different answers.
+                            Text(icloud?.label ?? "claiming...")
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(icloud == .claimFailed ? .red : .secondary)
                         }
                         if let error {
                             Section("Error") {
@@ -30,6 +39,15 @@ struct ContentView: View {
             // Runs once on appear so a headless simulator or device launch
             // produces the FLIP-RESULT line without needing a tap.
             .task { if analysis == nil && !running { run() } }
+            // Separate from `run()`: claiming the container is what makes the
+            // directory exist for this iCloud account, and it has to happen
+            // whether or not the bundled clip analyzes.
+            .task {
+                guard icloud == nil else { return }
+                let s = await ICloudLibrary.claim()
+                print("FLIP-ICLOUD \(s.label)")
+                icloud = s
+            }
         }
     }
 

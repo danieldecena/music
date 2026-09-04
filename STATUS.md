@@ -272,17 +272,17 @@
   Reconciled 2026-09-04, not fixed -- mechanism and numbers in the decision log.
 
 ## Next Up
-- **[code] Have the app claim the ubiquity container (R5's first slice).** The
-  capability is registered and signed, but
-  `~/Library/Mobile Documents/iCloud~com~danieldecena~flip/` still does not
-  exist, and `mkdir` there is refused -- only `bird` makes containers. It
-  appears when an entitled process calls
-  `FileManager.default.url(forUbiquityContainerIdentifier:)` on a machine signed
-  into the account, which means the app, on the phone. That single call is the
-  cheapest next step and it unblocks `publish_to_icloud` for real; verify with
-  `publish_to_icloud "02 Ivy"` with `MUSIC_ICLOUD_DIR` unset -- it prints the
-  destination and a file count of 5, and fails rather than reporting a publish it
-  did not make.
+- **[you] Run Flip once on the phone, then re-try `publish_to_icloud`.** The
+  claim is written and shipping (`ICloudLibrary.claim()`, called at launch), but
+  a simulator has no iCloud account so it can only ever report `noAccount`
+  there. The container directory appears when an entitled process calls
+  `url(forUbiquityContainerIdentifier:)` on a machine signed into the account --
+  which means the app, on the phone. Read the line off the console: `FLIP-ICLOUD
+  ready /private/var/mobile/Library/Mobile Documents/...` is the pass.
+  Then, on the Mac with `MUSIC_ICLOUD_DIR` unset, `publish_to_icloud "02 Ivy"`
+  should print the destination and a file count of 5. Before-state on the Mac,
+  recorded 2026-09-04: the container directory does not exist and that publish
+  fails with rc=1.
 - **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
@@ -300,6 +300,36 @@ dead-code warnings.
 ## Decision log
 
 ### 2026-09-04
+
+- Decided: **`url(forUbiquityContainerIdentifier:)`'s `nil` is split into two
+  answers, not reported as one.** Apple documents that single `nil` for two
+  different worlds -- "iCloud storage is unavailable for the current user or
+  device" and "the container could not be located" -- and only the second is a
+  fault. `ubiquityIdentityToken` is the documented discriminator (nil exactly
+  when iCloud is unavailable or nobody is logged in, and cheap enough to read on
+  the main thread), so `ICloudLibrary.status` returns `noAccount` /
+  `claimFailed` / `ready(URL)`. Without the split, a simulator with nobody
+  signed in would report identically to a container genuinely missing from the
+  App ID.
+- Mechanism: the claim runs off the main thread. Apple's page carries an
+  Important saying not to call it from the main thread because setting up iCloud
+  takes a nontrivial amount of time, so `claim()` owns the detached task rather
+  than leaving callers a note to remember. It is a second `.task` on
+  `ContentView`, separate from the analysis run, because claiming has to happen
+  whether or not the bundled clip analyzes.
+- Observed, both inputs kept separate: the pure decision's three branches are
+  unit-tested (`ICloudLibraryTests`, 38 tests / 5 suites, `** TEST SUCCEEDED **`
+  under `apple-build.sh`), and the live path was run in the iOS 27 simulator,
+  printing `FLIP-ICLOUD no iCloud account on this device`. That is the
+  known-BAD input firing correctly. **The `ready` branch has not been observed
+  live** -- only a signed-in device can produce it, which is what the phone
+  install is for. Analysis is unaffected: the same launch printed
+  `FLIP-RESULT bpm=116.597046 beats=58 bars=14 sections=2`.
+- `Documents` is appended on the Swift side rather than at each call site,
+  because that is the half the Mac agrees on: `icloud_container()` resolves to
+  `.../iCloud~com~danieldecena~flip/Documents` and `publish_to_icloud` writes
+  `Tracks/<track>/` beneath it. A test asserts the suffix so the two sides
+  cannot drift into addressing different directories.
 
 - Decided: **the stem map is republished under the icloud account and the gmail
   url is retired.** Daniel switched the CLI login to danieldecena@icloud.com
