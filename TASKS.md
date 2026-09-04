@@ -23,6 +23,11 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] Scaffold Flip iOS app (Xcode 27, iOS 27 target) -- eda7938
+- [x] Build Tools/mu-analyze.swift, dump full analysis JSON -- 4209e42
+- [x] Verify analysis runs in the iOS 27 Simulator -- 692f964
+- [x] Batch-analyze the 13 fixture tracks to JSON -- cae6669
+
 - [x] Fix key_oracle to grade live detect_key vs UG, not Echo Nest column 3
 - [x] Independent key oracle (key_oracle.py) — grade detect_key off Ultimate Guitar
 - [x] Demote --lyrics to a tie-break inside the tempo bucket in _sort_key
