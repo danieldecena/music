@@ -76,8 +76,11 @@ enum Runner {
     /// encoded JSON for the same reason `analyze(url:)` does: the JSON shape is
     /// already verified against `Tools/mu-analyze`, so going through it keeps
     /// the two reading the same thing by construction.
+    /// Also hands back the `Summary` it computed along the way, so a caller
+    /// that wants both (the `FLIP-RESULT` print and the tabs) can run the
+    /// six-analysis session once instead of twice.
     static func analyzeFull(url: URL, lyricsNamed lyricsResource: String?)
-        async throws -> TrackAnalysis {
+        async throws -> (TrackAnalysis, Summary) {
         let s = try await analyze(url: url)
         // NOTE the shape. `analyze(url:)` encodes `SessionResult` directly, so
         // rhythm/structure/key sit at the TOP level here. The `result` wrapper,
@@ -114,7 +117,13 @@ enum Runner {
 
         var activity: [ActivitySample] = []
         let ia = result["instrumentActivity"] as? [String: Any] ?? [:]
-        for (name, rows) in (ia["activity"] as? [String: [[String: Any]]] ?? [:]) {
+        // Cast each instrument's rows individually rather than the whole
+        // dictionary as `[String: [[String: Any]]]` in one shot: a single
+        // strict nested cast means one malformed instrument (or one
+        // non-conforming row) fails the WHOLE cast and `?? [:]` silently
+        // blanks all four lanes at once, not just the bad one.
+        for (name, any) in (ia["activity"] as? [String: Any] ?? [:]) {
+            let rows = any as? [[String: Any]] ?? []
             let parsed = rows.compactMap { row -> (Double, Double)? in
                 guard let t = seconds(row["time"]),
                       let level = row["value"] as? Double else { return nil }
@@ -134,8 +143,9 @@ enum Runner {
             lyrics = TimedLyrics.parse(text)
         }
 
-        return TrackAnalysis(bpm: s.bpm, key: s.key, duration: s.duration,
-                             bars: bars, sections: sections,
-                             activity: activity, lyrics: lyrics)
+        let ta = TrackAnalysis(bpm: s.bpm, key: s.key, duration: s.duration,
+                               bars: bars, sections: sections,
+                               activity: activity, lyrics: lyrics)
+        return (ta, s)
     }
 }

@@ -40,7 +40,7 @@ struct ContentView: View {
         error = nil
         Task {
             do {
-                let s = try await Runner.analyze(url: url)
+                let (full, s) = try await Runner.analyzeFull(url: url, lyricsNamed: "testclip")
                 // Also to stdout, so a simulator or device run can be read back
                 // with `simctl launch --console` instead of off a screenshot.
                 print("FLIP-RESULT bpm=\(s.bpm) beats=\(s.beats) bars=\(s.bars) "
@@ -48,7 +48,7 @@ struct ContentView: View {
                       + "phrases=\(s.phrases) key=\(s.key) "
                       + "instruments=\(s.instruments.joined(separator: "/")) "
                       + "elapsed=\(s.elapsed) bytes=\(s.jsonBytes)")
-                analysis = try await Runner.analyzeFull(url: url, lyricsNamed: "testclip")
+                analysis = full
             }
             catch { self.error = "\(error)" }
             running = false
