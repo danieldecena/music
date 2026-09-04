@@ -59,9 +59,11 @@ final class LoopEngine {
     /// "which loop is playing". That conflated every row's stop button with
     /// whichever loop actually had audio running (tapping another row's
     /// non-play area, which only updates `selected`, made THAT row look like
-    /// the one playing) and never cleared on natural completion, since
-    /// `scheduleSegment` was called with `completionHandler: nil`. A row now
-    /// compares its own `loop.id` against this instead of a single shared flag.
+    /// the one playing). A row now compares its own `loop.id` against this
+    /// instead of a single shared flag.
+    ///
+    /// Only `stop()` clears it: a loop repeats until it is stopped, so there
+    /// is no natural completion for a handler to report.
     private(set) var playingID: Int?
 
     /// Bumped by `stop()` (including the implicit one at the top of `play()`)
@@ -83,7 +85,14 @@ final class LoopEngine {
     /// `rate` is a tempo multiple; 1.0 is the recording's own tempo. Varispeed
     /// moves pitch with rate, which is what a DJ pitch fader does. Use
     /// AVAudioUnitTimePitch instead when the key must not move.
-    func play(_ loop: LoopCandidate, rate: Float = 1.0, repeats: Int = 8) throws {
+    /// `queued` is how many passes sit scheduled ahead of the playhead, not how
+    /// many the loop plays: each one queues another as it finishes, so playback
+    /// continues until `stop()`. A depth above 1 leaves slack for a completion
+    /// handler that lands late; the default is the only value the app uses.
+    /// Tests pass an explicit depth because a blocking offline render cannot
+    /// let the MainActor top-up run.
+    func play(_ loop: LoopCandidate, rate: Float = 1.0,
+              queued: Int = LoopEngine.queuedSegments) throws {
         guard let file else { return }
         guard let range = LoopPlayer.frames(for: loop,
                                             sampleRate: file.processingFormat.sampleRate,
@@ -98,22 +107,31 @@ final class LoopEngine {
         try AVAudioSession.sharedInstance().setActive(true)
 
         let token = playToken
-        let onLastSegmentDone: @Sendable () -> Void = { [weak self] in
-            _ = Task { @MainActor in
-                guard let self, self.playToken == token else { return }
-                self.playingID = nil
-            }
-        }
-        for i in 0..<repeats {
-            // Only the LAST segment needs a completion handler: that's the
-            // one moment "this loop finished all its repeats" is true.
-            player.scheduleSegment(file, startingFrame: range.start,
-                                   frameCount: range.length, at: nil,
-                                   completionHandler: i == repeats - 1 ? onLastSegmentDone : nil)
+        for _ in 0..<max(1, queued) {
+            scheduleOnePass(file: file, range: range, token: token)
         }
         if !engine.isRunning { try engine.start() }
         player.play()
         playingID = loop.id
+    }
+
+    /// Number of passes queued ahead of the playhead by default.
+    static let queuedSegments = 4
+
+    /// Schedules one pass of the loop and queues another when it completes.
+    ///
+    /// Scheduling every repeat up front stops being an option once the count is
+    /// unbounded, so the queue is kept shallow and topped up instead.
+    private func scheduleOnePass(file: AVAudioFile, range: FrameRange, token: Int) {
+        player.scheduleSegment(file, startingFrame: range.start,
+                               frameCount: range.length, at: nil) { [weak self] in
+            _ = Task { @MainActor in
+                // A completion belonging to a superseded play() must not queue
+                // audio against the loop that replaced it.
+                guard let self, self.playToken == token else { return }
+                self.scheduleOnePass(file: file, range: range, token: token)
+            }
+        }
     }
 
     func stop() {

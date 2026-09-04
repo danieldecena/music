@@ -151,6 +151,73 @@ struct LoopPlayerTests {
         return out
     }
 
+    /// Renders in `chunk`-sized pieces, yielding between them so a MainActor
+    /// task queued by a completion handler gets a turn. `renderOffline` cannot:
+    /// it holds the MainActor for the whole render, which is why every other
+    /// test here passes an explicit queue depth.
+    @MainActor
+    private func renderYielding(_ engine: LoopEngine, chunks: Int,
+                                chunk: AVAudioFrameCount,
+                                format: AVAudioFormat) async throws -> [Float] {
+        var out: [Float] = []
+        for _ in 0..<chunks {
+            out += try renderOffline(engine, frames: chunk, format: format)
+            await Task.yield()
+        }
+        return out
+    }
+
+    private func rms(_ samples: ArraySlice<Float>) -> Double {
+        guard !samples.isEmpty else { return 0 }
+        let sum = samples.reduce(0.0) { $0 + Double($1) * Double($1) }
+        return (sum / Double(samples.count)).squareRoot()
+    }
+
+    @Test("the loop keeps playing past the passes queued up front")
+    @MainActor
+    func topsUpTheQueue() async throws {
+        let url = try synthURL()
+        let file = try AVAudioFile(forReading: url)
+        let loop = LoopCandidate(startBar: 0, start: 0.5, end: 0.6, nBars: 1,
+                                 score: 1.0, instruments: [:])
+        let range = try #require(LoopPlayer.frames(for: loop,
+                                                    sampleRate: file.processingFormat.sampleRate,
+                                                    totalFrames: file.length))
+        let pass = range.length
+        let queued = 2
+        let passes = 6
+
+        // The control comes first, and it is the same call with the yields
+        // removed. Without them the top-up cannot run, so audio must stop after
+        // the queued passes — otherwise this test would pass just as happily
+        // against a player that had scheduled everything up front, and would be
+        // measuring nothing.
+        let blocked = LoopEngine()
+        try blocked.load(url: url)
+        try enableOfflineRendering(blocked, format: file.processingFormat)
+        try blocked.play(loop, queued: queued)
+        let blockedSamples = try renderOffline(blocked,
+                                               frames: pass * AVAudioFrameCount(passes),
+                                               format: file.processingFormat)
+        let blockedTail = rms(blockedSamples[
+            min(Int(pass) * (passes - 1), blockedSamples.count)...])
+        #expect(blockedTail < 0.0001,
+                "with no chance to top up, pass \(passes) should be silent (RMS \(blockedTail))")
+
+        let engine = LoopEngine()
+        try engine.load(url: url)
+        try enableOfflineRendering(engine, format: file.processingFormat)
+        try engine.play(loop, queued: queued)
+        let samples = try await renderYielding(engine, chunks: passes, chunk: pass,
+                                               format: file.processingFormat)
+        try #require(samples.count == Int(pass) * passes)
+        let tail = rms(samples[(Int(pass) * (passes - 1))...])
+        #expect(tail > 0.0001,
+                "pass \(passes) is silent (RMS \(tail)) — the queue was not topped up")
+        #expect(engine.playingID == loop.id,
+                "a loop that never ends should still report itself as playing")
+    }
+
     @Test("the rendered loop is actually audible, not a silent transport")
     @MainActor
     func nonZeroRMS() throws {
@@ -167,7 +234,7 @@ struct LoopPlayerTests {
                                                     totalFrames: file.length))
 
         try enableOfflineRendering(engine, format: file.processingFormat)
-        try engine.play(loop, repeats: 3)
+        try engine.play(loop, queued: 3)
 
         let totalFrames = range.length * 3
         let samples = try renderOffline(engine, frames: totalFrames,
@@ -193,10 +260,10 @@ struct LoopPlayerTests {
                                                     sampleRate: file.processingFormat.sampleRate,
                                                     totalFrames: file.length))
         let length = Int(range.length)
-        let repeats = 5
+        let repeats = 5   // queue depth; nothing tops it up during a blocking render
 
         try enableOfflineRendering(engine, format: file.processingFormat)
-        try engine.play(loop, repeats: repeats)
+        try engine.play(loop, queued: repeats)
 
         let samples = try renderOffline(engine, frames: AVAudioFrameCount(length * repeats),
                                         format: file.processingFormat)

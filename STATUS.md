@@ -383,6 +383,10 @@ dead-code warnings.
   inherited from the plan's own sample code rather than chosen. At this clip's
   ~8.2s window that is about 66 seconds, after which playback stops with no UI
   change. Tracked as its own decision rather than patched blind.
+  - **Decided and shipped 2026-09-04: a loop runs until it is stopped.** The
+    "no UI change" half of this was already stale when written -- the last
+    segment's completion handler clears `playingID`, so the row does return to
+    its play icon. See that date's entry for the scheduler.
 - Recorded so it survives a `git clean`: **instrument activity diverges between
   macOS and iOS as well as section count.** Drum peaks 2.25x and bass 2.69x
   higher on iOS for identical bytes; vocal agrees within 4%. STATUS carries both
@@ -390,6 +394,21 @@ dead-code warnings.
   the section-count split which it states outright. Because vocal is the one
   family that agrees, and vocal is what `clean` is computed from, loop-rank
   stability across the two platforms is an inference and not a measurement.
+- Decided (Daniel, asked): **loop playback repeats until stopped, not 8 times.**
+  Auditioning a loop ends when you stop it; 66 seconds was an arbitrary cliff
+  inherited from the plan's sample code and never chosen. `LoopEngine.play`'s
+  `repeats:` becomes `queued:` -- how many passes sit scheduled ahead of the
+  playhead, default 4 -- and each pass's completion handler queues another,
+  guarded by the same `playToken` that already stops a superseded play() from
+  acting on a newer one. Hand-scheduling is unchanged, so the drift the
+  `.loops` option accumulates is still avoided. `playingID` is now cleared only
+  by `stop()`, because there is no natural completion left to report.
+- The top-up is observed, not assumed, and the test carries its own control:
+  `topsUpTheQueue` primes 2 passes, renders 6, and asserts the sixth is audible
+  -- and first runs the identical call through the blocking `renderOffline`,
+  where the MainActor top-up cannot get a turn, asserting the sixth pass is
+  silent there. Without that half the test would pass just as happily against a
+  player that scheduled everything up front. 33 tests in 4 suites.
 - Shipped: **`catalog.py backfill-grid`, and the bar grid backfilled from 14
   tracks to 55 of 58.** The grid, structure boundaries and activity signal come
   from MusicUnderstanding alone -- `backfill` fills bpm/key from

@@ -4,7 +4,6 @@
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
 - [ ] (you) Install Flip on the phone and read BPM/bars/lyrics off it
-- [ ] Decide whether loop playback should repeat past 8 iterations
 - [ ] Library browser over the iCloud container (R5 remainder)
 
 ## Roadmap — song database
@@ -23,6 +22,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] Decide whether loop playback should repeat past 8 iterations
 - [x] Backfill the bar grid for the 44 tracks without one -- 5bdb181
 - [x] Reconcile the macOS/iOS section-count split before trusting loop ranks -- fc8f6cf
 - [x] Repoint the design canvas row from ace836b3 to c5d0c33b -- paper-system 3cf3622
