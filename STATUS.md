@@ -284,12 +284,21 @@ dead-code warnings.
 
 ### 2026-09-03
 
-- Decided: **two sessions were editing `~/.claude/skills/ios-build/` at once, and
-  the split is now by directory, not by turn.** That session owns `~/.claude`
-  entirely -- the ios-build skill, its artifact, and the `invariants.sh` drift
-  check it is building. This session owns `~/developer/music` and the Ivy Stem
-  Map artifact. Neither crosses. Ownership removes the collision instead of
-  managing it, which is cheaper than any lock.
+- Decided: **two sessions were editing `~/.claude/skills/ios-build/` at once.
+  Tooling is owned; the runbook is not.** Corrected within the hour: an earlier
+  version of this entry handed that session all of `~/.claude`, which was an
+  overreach. The ios-build runbook is shared knowledge with no single owner --
+  either session may hit an iOS lesson and must be able to write it the same
+  turn rather than queue behind the other. What *is* owned is the tooling: that
+  session builds the `invariants.sh` drift check, this one does not. This
+  session owns `~/developer/music` and the Ivy Stem Map artifact.
+  Five rules govern the shared page, agreed with that session: read the live
+  artifact immediately before any republish; publish with the url recorded in
+  `artifact.json`, never bare; move `SKILL.md` and `artifact.html` in one commit,
+  because a lesson that lands only on the page never routes in a session;
+  explicit pathspec on every `~/.claude` commit, never `-a`; and write a lesson
+  up the same turn it is learned, because short-lived divergence is what keeps a
+  shared page safe.
   - First move made here: dropped this session's watch on the iOS Build Runbook
     artifact, so their republishes no longer wake this session.
   - Their `sha256(artifact.html)` in `artifact.json`, compared by an
