@@ -1,5 +1,6 @@
 ## Tasks
 
+- [ ] Reconcile the macOS/iOS section-count split before trusting loop ranks
 - [ ] Backfill the bar grid for the 44 tracks without one
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
@@ -12,8 +13,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] (R1) Analysis probe and measurement [code] C
 - [x] (R2) Song database: schema and ingest [code] C
 - [x] (R3) Region scorers over the beat grid [code] C
-- [~] (R4a) Flip on device, analyzing a bundled track [you] C
-      signing retired 2026-09-03; only the phone half remains
+- [x] (R4a) Flip on device, analyzing a bundled track [you] C
 - [ ] (R4b) iCloud container and publish_to_icloud [code] C
 - [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
 - [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C

@@ -284,6 +284,29 @@ dead-code warnings.
 
 ### 2026-09-03
 
+- Observed: **R4a is done on hardware.** Flip runs on the iPhone (iOS 27.0) and
+  reports 116.596 BPM, 58 beats, 14 bars, C major against the bundled clip,
+  matching `Tools/mu-analyze` on the Mac to rounding. Analysis took 1.4s on
+  device for a 30s clip and produced 406,870 bytes of JSON. The framework runs
+  on real hardware, which was the single biggest risk in the whole design.
+- Observed: **the section-count split is macOS versus iOS, not Simulator versus
+  device.** Identical bytes give 3 sections on macOS and 2 on both the iOS
+  Simulator and the phone; segments (5) and phrases (9) are identical
+  everywhere. `structurePredictions` carries a `detectionThreshold`, which is
+  the likely knob. This matters because `score_loops` gives a containment bonus
+  to a window that falls inside one section, so the phone and the Mac can rank
+  the same track's loops differently. Not yet reconciled; do not treat a loop
+  ranking as platform-independent until it is.
+- Confirmed: **MusicUnderstanding reports four instrument families and only
+  four** -- `bass`, `drum`, `other`, `vocal` -- and that is the framework's
+  fixed taxonomy, not a detection that happened to find four. `other` is the
+  catch-all, and on the test clip it dominates (peak 0.821 against bass 0.127
+  and drum 0.036), because guitar, keys, synths and strings all land there.
+  Discrete `ranges` were emitted for `other` and `vocal` only, so the framework
+  withholds them where it is not confident. For finer granularity the repo's own
+  `separate_stems 6stem` (htdemucs_6s) splits guitar and piano out separately,
+  which Apple does not.
+
 - Decided: two tracks are combined by cutting both on the persisted bar grid,
   not by a BPM ratio. `Scripts/mix_render.py` (`449b195`) adds `layer` (both
   sides at once, per stem) and `transition` (A into B). The repo previously had
