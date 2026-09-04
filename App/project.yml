@@ -25,3 +25,16 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1"
+  FlipTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: FlipTests
+    dependencies:
+      - target: Flip
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.danieldecena.flip.tests
+        DEVELOPMENT_TEAM: 877MLS29T9
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
