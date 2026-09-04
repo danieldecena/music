@@ -4,7 +4,6 @@
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
 - [ ] (you) Install Flip on the phone and read BPM/bars/lyrics off it
-- [ ] Library browser over the iCloud container (R5 remainder)
 
 ## Roadmap — song database
 
@@ -21,6 +20,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
+- [x] Library browser over the iCloud container (R5 remainder) -- 276803d
 - [x] (R5) Claim the iCloud ubiquity container from the app -- e9e6591
 - [x] (R4b) Register the iCloud container on the App ID -- 448efb7
 - [x] (R4b) iCloud container and publish_to_icloud -- Mac half, 6bac72d
