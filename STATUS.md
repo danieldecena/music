@@ -420,13 +420,17 @@ dead-code warnings.
   the build signs with `DEVELOPMENT_TEAM: 877MLS29T9` while the certificate's CN
   reads "Apple Development: Daniel Decena (FU9H8VF2PN)". R4a's remaining half is
   the phone.
-- Corrected: the plan records `App/Flip/Resources/testclip.m4a` at sha
-  `1552377b9407a32754e56e85`. The file actually bundled hashes
-  `111194ee858465c6f01f940f`, and source and built product agree, so Xcode
-  copies it verbatim and the plan's hash is stale (the file was rewritten at
-  21:41). The reference *readings* are unaffected and were re-derived from the
-  file that ships: **116.597755 BPM, 58 beats, 14 bars, 3 sections, 5 segments,
-  9 phrases, C major**. That is what the device must reproduce, not the hash.
+- RETRACTED 2026-09-04: an earlier entry here claimed the plan's recorded sha for
+  `App/Flip/Resources/testclip.m4a` was stale. **It was not.** The README and the
+  plan record `1552377b9407a32754e56e85`, which is the file's SHA-**256**. I ran
+  bare `shasum`, which defaults to SHA-**1** and returns
+  `111194ee858465c6f01f940f`, compared the two, and reported a mismatch that never
+  existed. Nothing was wrong with the README. Found by the Task 5/6 implementer,
+  which verified the claim before acting on it and refused the edit — the
+  silent-failure rule working from the other direction, against me.
+  The reference readings stand and were independently re-derived from the shipping
+  file: **116.597755 BPM, 58 beats, 14 bars, 3 sections, 5 segments, 9 phrases,
+  C major**. Those are what the device must reproduce.
 - Decided: build the flip toolkit's future around a **song database**, not a
   feature list. Apple's `MusicUnderstanding` (macOS/iOS 27) supplies rhythm, key,
   structure, loudness, pace and instrument activity on-device and free; loop

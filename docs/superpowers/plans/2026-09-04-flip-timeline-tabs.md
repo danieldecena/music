@@ -775,9 +775,15 @@ In `App/Flip/Analysis/MusicUnderstandingRunner.swift`, add this method to `Runne
     static func analyzeFull(url: URL, lyricsNamed lyricsResource: String?)
         async throws -> TrackAnalysis {
         let s = try await analyze(url: url)
-        let root = try JSONSerialization
+        // NOTE the shape. `analyze(url:)` encodes `SessionResult` directly, so
+        // rhythm/structure/key sit at the TOP level here. The `result` wrapper,
+        // and `durationSeconds` beside it, exist only in `Tools/mu-analyze`'s
+        // output FILE, which adds them around the same payload. Reading
+        // `root["result"]` in-app yields an empty dictionary and every array
+        // below comes back empty — with no error, because every cast is
+        // optional with a `?? [:]` fallback.
+        let result = try JSONSerialization
             .jsonObject(with: s.jsonData) as? [String: Any] ?? [:]
-        let result = root["result"] as? [String: Any] ?? [:]
 
         // CMTime encodes as {epoch, flags, timescale, value}; seconds are
         // value / timescale. Timescale is 44100 in practice but is read rather
@@ -805,8 +811,13 @@ In `App/Flip/Analysis/MusicUnderstandingRunner.swift`, add this method to `Runne
         var activity: [ActivitySample] = []
         let ia = result["instrumentActivity"] as? [String: Any] ?? [:]
         for (name, rows) in (ia["activity"] as? [String: [[String: Any]]] ?? [:]) {
+            // The key is `time`, NOT `start`. Bars encode as a bare CMTime,
+            // sections as {start, duration}, and activity samples as
+            // {time, value} — three different shapes in one payload. Reading
+            // the wrong one here returns nil for every row, compactMap drops
+            // them all, and the lanes render empty over a green build.
             let parsed = rows.compactMap { row -> (Double, Double)? in
-                guard let t = seconds(row["start"]),
+                guard let t = seconds(row["time"]),
                       let level = row["value"] as? Double else { return nil }
                 return (t, level)
             }.sorted { $0.0 < $1.0 }
@@ -830,7 +841,13 @@ In `App/Flip/Analysis/MusicUnderstandingRunner.swift`, add this method to `Runne
     }
 ```
 
-`Summary` must now carry `jsonData` and `duration`. In the same file, add `let jsonData: Data` and `let duration: Double` to `Summary`, and populate them where `Summary` is constructed — `jsonData` from the encoder output already in hand, `duration` from the JSON's top-level `durationSeconds`.
+`Summary` must now carry the encoded JSON and the track duration. In the same file:
+
+- Add `var jsonData = Data()` and `var duration: TimeInterval = 0` to `Summary`. Give both defaults — every other property has one and `Summary()` is constructed empty then filled.
+- In `analyze(url:)`, set `s.jsonData = data` beside the existing `s.jsonBytes = data.count`.
+- Set the duration from the asset, NOT from the JSON: `s.duration = try await asset.load(.duration).seconds`. There is no `durationSeconds` key in this payload — that field belongs to `Tools/mu-analyze`'s output file, not to the encoded `SessionResult`. Put the load beside the existing `AVURLAsset` use.
+
+`Summary` is declared `Sendable, Equatable`; `Data` and `TimeInterval` satisfy both, so the conformances still hold.
 
 - [ ] **Step 3: Write the activity chart**
 
@@ -1171,7 +1188,7 @@ A plausible-looking wrong number is the failure this catches, so check the value
 
 - [ ] **Step 6: Correct the stale hash in the resources README**
 
-`App/Flip/Resources/README.md` records the clip's sha as `1552377b9407a32754e56e85`. The file that actually ships hashes `111194ee858465c6f01f940f`, and source and built product agree, so the README's value is stale. Replace it, and add the lyrics regeneration command beneath the ffmpeg one:
+The README's recorded sha `1552377b9407a32754e56e85` is CORRECT — it is the file's SHA-256, which is what `shasum -a 256` returns. An earlier revision of this plan told you to replace it with `111194ee858465c6f01f940f`; that value is the SHA-**1** of the same bytes, produced by bare `shasum`, and comparing the two was an error. Leave the sha alone. Add only the lyrics regeneration command beneath the ffmpeg one:
 
 ```sh
 .venv/bin/python -c "
