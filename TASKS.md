@@ -23,8 +23,8 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 ## Completed
 
-- [x] Backfill the bar grid: catalog.py backfill-grid, 14 -> 55 of 58 tracks
-- [x] Reconcile the macOS/iOS section-count split before trusting loop ranks
+- [x] Backfill the bar grid for the 44 tracks without one -- 5bdb181
+- [x] Reconcile the macOS/iOS section-count split before trusting loop ranks -- fc8f6cf
 - [x] Repoint the design canvas row from ace836b3 to c5d0c33b -- paper-system 3cf3622
 - [x] Add tests/score_apple reusing existing classifiers -- cae6669
 - [x] Three-way table Apple vs ours vs label -- cae6669
