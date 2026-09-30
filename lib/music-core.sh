@@ -273,6 +273,54 @@ mix_report() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" mix --seed "$seed" "$@"
 }
 
+apple_analyze() {
+  # $1 = audio file. Runs Tools/mu-analyze, ingests the result and scores loop
+  # regions, so the track gains the bar grid mix_render cuts on. Separate from
+  # analyze_track: that estimates BPM/key from this repo's own analyzer, while
+  # this persists Apple's beats, bars, sections and instrument activity.
+  local file="$1" track="${1:t:r}"
+  local mu="$MUSIC_DIR/Tools/mu-analyze" py="$MUSIC_DIR/.venv/bin/python"
+  if [[ ! -x "$mu" ]]; then
+    echo "apple_analyze: Tools/mu-analyze is not built -- mix-render needs its bar grid" >&2
+    return 1
+  fi
+  if [[ ! -f "$file" ]]; then
+    echo "apple_analyze: no such audio file: '$file'" >&2
+    return 1
+  fi
+  # Keep mu-analyze's own stderr: a missing file and an unsupported OS are
+  # different failures, and collapsing both into one guess is how a wrong
+  # cause gets written down as fact.
+  #
+  # The JSON is kept, not written to a temp file and deleted. Samples/Analysis/
+  # is where score_apple.py, test_catalog_ingest.py and catalog.py backfill-grid
+  # all look, and publish_to_icloud has nothing to hand the phone without it.
+  # Regenerating means re-decoding the audio, so throwing it away was the more
+  # expensive of the two options as well as the inconsistent one.
+  local outdir="$MUSIC_DIR/Samples/Analysis"
+  mkdir -p "$outdir"
+  local json="$outdir/$track.json" err
+  if ! err=$("$mu" "$file" 2>&1 >"$json"); then
+    rm -f "$json"
+    echo "apple_analyze: mu-analyze failed on '$file': ${err:-no error text}" >&2
+    return 1
+  fi
+  if ! "$py" "$MUSIC_DIR/Scripts/catalog.py" ingest "$track" "$json" >/dev/null; then
+    echo "apple_analyze: could not ingest the analysis for '$track'" >&2
+    return 1
+  fi
+  "$py" "$MUSIC_DIR/Scripts/catalog.py" regions "$track" --bars 4 >/dev/null
+}
+
+mix_render() {
+  # $1 = mode (layer|transition). Remaining args pass through to
+  # Scripts/mix_render.py, which cuts both tracks on their persisted bar grids.
+  # Unlike mix_report's preview this writes a real file: `layer` plays both
+  # sides at once so one track's stems sit under the other's.
+  local mode="$1"; shift
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/mix_render.py" "$mode" "$@"
+}
+
 click_compare() {
   # $1 = an audio file or a Stems/<model>/<track> folder; extra flags pass
   # through (--bpm B, --label L, --dur S, --start S). Interactive: auditions
@@ -391,6 +439,86 @@ mangle() {
   "$MUSIC_DIR/.venv/bin/python" "${args[@]}"
 }
 
+icloud_container() {
+  # Absolute path of the Flip app's iCloud Documents container, printed on
+  # stdout; non-zero and silent when there isn't one.
+  #
+  # MUSIC_ICLOUD_DIR overrides it. That exists so the copy logic is testable
+  # without a registered container -- the container is created by iCloud once
+  # the app carries the entitlement, and nothing this repo does can conjure one.
+  if [[ -n "$MUSIC_ICLOUD_DIR" ]]; then
+    print -r -- "$MUSIC_ICLOUD_DIR"
+    return 0
+  fi
+  # Existence is enough of a test: ~/Library/Mobile Documents is not writable
+  # by hand (mkdir there is Permission denied), so only `bird` can have made
+  # this, and a stray local folder cannot pose as a synced container. The
+  # directory appears once an entitled process claims the container at runtime.
+  local c="$HOME/Library/Mobile Documents/iCloud~com~danieldecena~flip/Documents"
+  [[ -d "$c" ]] || return 1
+  print -r -- "$c"
+}
+
+publish_to_icloud() {
+  # $1 = track name. Copies the track's stems and its analysis JSON into the
+  # iCloud container as Tracks/<track>/, which is what the phone reads.
+  #
+  # Fails loudly with no container: this is only called directly when someone
+  # asked for it, and "nothing to publish to" is not the same as "published".
+  # deconstruct() probes icloud_container first and reports rather than failing.
+  local track="$1"
+  [[ -z "$track" ]] && { echo "publish_to_icloud: need a track name" >&2; return 2; }
+  # The destination is rsync --delete'd, so a track name that can escape its own
+  # directory would delete somewhere else entirely.
+  case "$track" in
+    */*|*..*) echo "publish_to_icloud: refusing a path-shaped track name: '$track'" >&2; return 2 ;;
+  esac
+
+  local container
+  if ! container=$(icloud_container); then
+    echo "publish_to_icloud: no iCloud container. The Flip app needs an iCloud" >&2
+    echo "  Documents entitlement before one exists; set MUSIC_ICLOUD_DIR to" >&2
+    echo "  publish somewhere else meanwhile." >&2
+    return 1
+  fi
+
+  # Whichever model holds this track. Several can: a track split fast and then
+  # again at hq lands under both htdemucs and htdemucs_6s. Take the newest and
+  # say which, rather than picking one silently.
+  local -a candidates
+  candidates=("$MUSIC_DIR"/Stems/*/"$track"(/Nom))
+  if (( ${#candidates} == 0 )); then
+    echo "publish_to_icloud: no stems for '$track' under $MUSIC_DIR/Stems" >&2
+    return 1
+  fi
+  local src="${candidates[1]}"
+  (( ${#candidates} > 1 )) && echo "  (several models have '$track'; publishing ${src:h:t})"
+
+  local json="$MUSIC_DIR/Samples/Analysis/$track.json"
+  if [[ ! -f "$json" ]]; then
+    echo "publish_to_icloud: no analysis for '$track' -- run apple_analyze first" >&2
+    return 1
+  fi
+
+  local dest="$container/Tracks/$track"
+  mkdir -p "$dest" || return 1
+  # --delete so a republish after a different stem profile does not leave the
+  # previous model's stems behind for the phone to show as real. Bounded to the
+  # one directory this function owns, whose name was validated above.
+  rsync -a --delete --exclude 'analysis.json' "$src/" "$dest/" || return 1
+  cp "$json" "$dest/analysis.json" || return 1
+
+  # rsync's exit code says the transfer ran, not that the phone has anything to
+  # read. Count what actually landed.
+  local -a landed
+  landed=("$dest"/*(.N))
+  if (( ${#landed} < 2 )); then
+    echo "publish_to_icloud: '$track' published but $dest holds ${#landed} files" >&2
+    return 1
+  fi
+  echo "  Published ${#landed} files to $dest"
+}
+
 deconstruct() {
   # $1 = audio file, $2 = drum density (tight|loose, default loose).
   # One-command flip prep: tempo/key -> 4-stem split -> drum one-shots ->
@@ -428,5 +556,23 @@ deconstruct() {
   _key=$(print -r -- "$_analysis" | sed -nE 's/.*[Kk]ey[[:space:]]+([A-Ga-g][b#]?m?).*/\1/p' | head -1)
   if [[ -x "$MUSIC_DIR/.venv/bin/python" ]]; then
     "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" index-track "$track" ${_bpm:+--bpm $_bpm} ${_key:+--key $_key} >/dev/null 2>&1
+  fi
+  # Apple's bar grid, so the track is mixable. Reported rather than swallowed:
+  # without it mix_render has nothing to cut on, and a silent skip would leave
+  # that discoverable only when a mix is attempted much later.
+  echo "→ Bar grid & loop candidates…"
+  if apple_analyze "$file"; then
+    echo "  Loop candidates: catalog.py regions \"$track\""
+    # Publishing is the phone's only source. Reported either way: a deconstruct
+    # that quietly did not publish looks identical to one that did, and the
+    # container legitimately does not exist yet.
+    if icloud_container >/dev/null; then
+      echo "→ Publishing to iCloud…"
+      publish_to_icloud "$track" || echo "  (publish failed -- the stems stayed local)" >&2
+    else
+      echo "  (no iCloud container yet -- nothing published; R4b in STATUS)"
+    fi
+  else
+    echo "  (no bar grid -- mix-render will not accept this track yet)" >&2
   fi
 }

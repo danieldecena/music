@@ -1,55 +1,66 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var summary: Summary?
+    @State private var analysis: TrackAnalysis?
     @State private var error: String?
     @State private var running = false
+    @State private var icloud: ContainerStatus?
+    @State private var showLibrary = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Bundled clip") {
-                    Text("testclip.m4a").font(.system(.body, design: .monospaced))
-                    Button(running ? "Analyzing..." : "Analyze") { run() }
-                        .disabled(running)
-                }
-                if let s = summary {
-                    Section("Rhythm") {
-                        row("BPM", String(format: "%.3f", s.bpm))
-                        row("beats", "\(s.beats)")
-                        row("bars", "\(s.bars)")
-                    }
-                    Section("Structure") {
-                        row("sections", "\(s.sections)")
-                        row("segments", "\(s.segments)")
-                        row("phrases", "\(s.phrases)")
-                    }
-                    Section("Other") {
-                        row("key", s.key)
-                        row("instruments", s.instruments.joined(separator: ", "))
-                        row("elapsed", String(format: "%.1fs", s.elapsed))
-                        row("json", "\(s.jsonBytes) bytes")
-                    }
-                }
-                if let error {
-                    Section("Error") {
-                        Text(error).foregroundStyle(.red)
-                            .font(.system(.footnote, design: .monospaced))
+            Group {
+                if let analysis {
+                    TimelineTabs(analysis: analysis)
+                } else {
+                    Form {
+                        Section("Bundled clip") {
+                            Text("testclip.m4a").font(.system(.body, design: .monospaced))
+                            Button(running ? "Analyzing..." : "Analyze") { run() }
+                                .disabled(running)
+                        }
+                        Section("iCloud") {
+                            // Rendered as unknown until the claim returns, never
+                            // as absent -- a claim still in flight and a device
+                            // with no account are different answers.
+                            Text(icloud?.label ?? "claiming...")
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(icloud == .claimFailed ? .red : .secondary)
+                        }
+                        if let error {
+                            Section("Error") {
+                                Text(error).foregroundStyle(.red)
+                                    .font(.system(.footnote, design: .monospaced))
+                            }
+                        }
                     }
                 }
             }
             .navigationTitle("Flip")
+            // A toolbar entry rather than a new root, so the bundled-clip run
+            // that the device smoke test reads stays exactly as it was.
+            .toolbar {
+                if case .ready = icloud {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Library") { showLibrary = true }
+                    }
+                }
+            }
+            .sheet(isPresented: $showLibrary) {
+                if case .ready(let docs) = icloud { LibraryView(documents: docs) }
+            }
             // Runs once on appear so a headless simulator or device launch
             // produces the FLIP-RESULT line without needing a tap.
-            .task { if summary == nil && !running { run() } }
-        }
-    }
-
-    private func row(_ k: String, _ v: String) -> some View {
-        HStack {
-            Text(k).foregroundStyle(.secondary)
-            Spacer()
-            Text(v).font(.system(.body, design: .monospaced))
+            .task { if analysis == nil && !running { run() } }
+            // Separate from `run()`: claiming the container is what makes the
+            // directory exist for this iCloud account, and it has to happen
+            // whether or not the bundled clip analyzes.
+            .task {
+                guard icloud == nil else { return }
+                let s = await ICloudLibrary.claim()
+                print("FLIP-ICLOUD \(s.label)")
+                icloud = s
+            }
         }
     }
 
@@ -60,7 +71,7 @@ struct ContentView: View {
         error = nil
         Task {
             do {
-                let s = try await Runner.analyze(url: url)
+                let (full, s) = try await Runner.analyzeFull(url: url, lyricsNamed: "testclip")
                 // Also to stdout, so a simulator or device run can be read back
                 // with `simctl launch --console` instead of off a screenshot.
                 print("FLIP-RESULT bpm=\(s.bpm) beats=\(s.beats) bars=\(s.bars) "
@@ -68,7 +79,7 @@ struct ContentView: View {
                       + "phrases=\(s.phrases) key=\(s.key) "
                       + "instruments=\(s.instruments.joined(separator: "/")) "
                       + "elapsed=\(s.elapsed) bytes=\(s.jsonBytes)")
-                summary = s
+                analysis = full
             }
             catch { self.error = "\(error)" }
             running = false

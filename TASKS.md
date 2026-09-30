@@ -1,7 +1,10 @@
 ## Tasks
 
+- [ ] Prove it against a clean clone, then confirm PR #2's check goes green
+- [ ] (you) Amend silent-failure rule 10 in place, vs the byte budget
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
+- [ ] (you) Install Flip on the phone and read BPM/bars/lyrics off it
 
 ## Roadmap — song database
 
@@ -11,13 +14,33 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 - [x] (R1) Analysis probe and measurement [code] C
 - [x] (R2) Song database: schema and ingest [code] C
 - [x] (R3) Region scorers over the beat grid [code] C
-- [~] (R4a) Flip on device, analyzing a bundled track [you] C
-- [ ] (R4b) iCloud container and publish_to_icloud [code] C
+- [x] (R4a) Flip on device, analyzing a bundled track [you] C
 - [ ] (R5) The iOS app: browse, charts, loop candidates [code] C
 - [ ] (R6) Downstream ports: chopping, lyrics, kit [code] C
 - [ ] (R7) Verdict on old and lo-fi material [you] B
 
 ## Completed
+
+- [x] Add App/ci_scripts/ci_post_clone.sh so Xcode Cloud can generate the project -- fc41f35
+- [x] Note the xcodegen-post-clone requirement in CLAUDE.md -- fc41f35
+- [x] Library browser over the iCloud container (R5 remainder) -- 276803d
+- [x] (R5) Claim the iCloud ubiquity container from the app -- e9e6591
+- [x] (R4b) Register the iCloud container on the App ID -- 448efb7
+- [x] (R4b) iCloud container and publish_to_icloud -- Mac half, 6bac72d
+- [x] Decide whether loop playback should repeat past 8 iterations -- 3d06275
+- [x] Backfill the bar grid for the 44 tracks without one -- 5bdb181
+- [x] Reconcile the macOS/iOS section-count split before trusting loop ranks -- fc8f6cf
+- [x] Repoint the design canvas row from ace836b3 to c5d0c33b -- paper-system 3cf3622
+- [x] Add tests/score_apple reusing existing classifiers -- cae6669
+- [x] Three-way table Apple vs ours vs label -- cae6669
+- [x] Extend catalog schema: time-series + regions tables -- c37f02b
+- [x] Scaffold Flip iOS app (Xcode 27, iOS 27 target) -- eda7938
+- [x] Build Tools/mu-analyze.swift, dump full analysis JSON -- 4209e42
+- [x] Verify analysis runs in the iOS 27 Simulator -- 692f964
+- [x] Batch-analyze the 13 fixture tracks to JSON -- cae6669
+- [x] Track detail charts in Swift Charts -- eb423b8
+- [x] Lyrics and loops tabs with bar-accurate playback -- eb423b8
+- [x] Loop region scorer over the beat grid -- e5ed1ae
 
 - [x] Fix key_oracle to grade live detect_key vs UG, not Echo Nest column 3
 - [x] Independent key oracle (key_oracle.py) — grade detect_key off Ultimate Guitar
@@ -90,7 +113,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-09-03 21:45.
+Plan approved 2026-09-04 11:29.
 
 Sessions start in "plan" (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
@@ -99,7 +122,7 @@ when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 
 Only if Claude Code actually closed:
 
-    claude --resume 8cc1b1a3-989d-40ee-a8e4-d7a12bfc0048
+    claude --resume 060c1574-c64b-475d-8ffd-6076377c8503
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->

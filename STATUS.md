@@ -264,12 +264,37 @@
 - `R` on a full-length track is slow (autocorrelation over the whole file) — feed
   it short mono loops, not whole songs.
 - Transcription is monophonic only; chordal/strummed parts won't transcribe.
+- **A loop ranking is platform-dependent and stays that way.** MusicUnderstanding
+  produces materially different structure-prediction curves on macOS and iOS
+  (max |delta| 0.056 to 0.176 across levels), which flips which of two adjacent
+  candidate boundaries it emits. Measured on `testclip.m4a` the effect is
+  confined to ranks 7-10 and the top pick is unchanged, but that is one clip.
+  Reconciled 2026-09-04, not fixed -- mechanism and numbers in the decision log.
 
 ## Next Up
+- **[you] Run Flip once on the phone, then re-try `publish_to_icloud`.** The
+  claim is written and shipping (`ICloudLibrary.claim()`, called at launch), but
+  a simulator has no iCloud account so it can only ever report `noAccount`
+  there. The container directory appears when an entitled process calls
+  `url(forUbiquityContainerIdentifier:)` on a machine signed into the account --
+  which means the app, on the phone. Read the line off the console: `FLIP-ICLOUD
+  ready /private/var/mobile/Library/Mobile Documents/...` is the pass.
+  Then, on the Mac with `MUSIC_ICLOUD_DIR` unset, `publish_to_icloud "02 Ivy"`
+  should print the destination and a file count of 5. Before-state on the Mac,
+  recorded 2026-09-04: the container directory does not exist and that publish
+  fails with rc=1.
 - **[you] Tempo lock on Nikes + Rambo** — the two remaining `?` rows. `T) Tempo lock`
   now writes the fixtures row and reruns `score` itself, so this is a pure listen
   step. Tried and exhausted without the ear: independent BPM sources, `beat_this`
   (incoherent on exactly these two), Logic Smart Tempo (ruled out).
+
+- **[blocked, not on Daniel] Amend silent-failure rule 10.** Measured 2026-09-04:
+  the always-loaded set is 36806 of 36864 bytes, so any amendment must be net
+  <=58 bytes or something else has to shrink. That is the easy half. The hard
+  half is that **what the amendment was meant to say did not survive
+  compaction** -- only the task title did. Re-derive it from
+  `rules/silent-failure.md` rule 10 and the cases behind it before editing, or
+  drop the task; do not guess at it.
 
 Full open list: `TASKS.md`.
 
@@ -282,7 +307,464 @@ dead-code warnings.
 
 ## Decision log
 
+### 2026-09-04
+
+- Decided: **the browser reuses the analysis parser rather than growing a second
+  copy.** `analyzeFull` held the only JSON -> geometry mapping, so reading a
+  published file meant either duplicating it or splitting it out.
+  `Runner.summarize` (flat fields) and `Runner.assemble` (bars, sections,
+  activity, and the instrument-taxonomy check) are now the shared halves, and
+  the live session and a Mac-published file go through both. A second parser
+  would have silently skipped the taxonomy check, which is the thing standing
+  between a shifted payload and four lanes reading peak 0.00.
+- The load-bearing difference between the two callers: **the file wraps the
+  payload in `result` and the app encodes it bare.** Every cast below a wrong
+  root is optional with an empty fallback, so reading the top level of a
+  published file yields zero bars, zero sections and no error at all.
+  `PublishedAnalysis.load` therefore `guard ... else throw`s on both `result`
+  and `durationSeconds` -- duration is not defaulted to 0 because it closes the
+  final activity sample, and a zero would truncate the last lane segment to
+  nothing. Two tests cover exactly those refusals.
+- Observed against real data, not only fixtures: `02 Ivy` published into a fake
+  container decoded to `bpm=113.00256 bars=118 sections=14 loops=114`, matching
+  an independent `python3` read of the same 6.4 MB file field for field
+  (`bar[1]=2.15059`, `section[0].end=33.009297`, key `c major`), and the index
+  listed both published tracks with their four stems each. That check was a
+  throwaway -- the fixture is gitignored and 6.4 MB, too big to commit -- so the
+  committed suite covers the same paths against synthetic JSON: 44 tests in 6
+  suites, `** TEST SUCCEEDED **`.
+- `FLIP_LIBRARY_DIR` is the app-side twin of `MUSIC_ICLOUD_DIR`, and it is how
+  the `.ready` branch was finally exercised: `FLIP-ICLOUD ready
+  .../fake-container/Documents`. A simulator reads Mac paths directly, so
+  pointing it at a real published folder is a genuine end-to-end run, not a
+  stub. **What is still unobserved is the real container** -- only a signed-in
+  device produces that.
+- Scope note: the library is a toolbar sheet, not a new root, so the bundled-clip
+  run the device smoke test reads is untouched. Opening a track from the list has
+  not been exercised by hand -- a CLI-only project has no UI-tap coverage, and
+  this is one of the places that shows.
+
+- Observed: **the claim's live path fires correctly, re-run on a device built
+  from scratch.** `FLIP-ICLOUD no iCloud account on this device`, alongside
+  `FLIP-RESULT bpm=116.59659 ... bars=14 sections=2`. `timeout` returning 124 is
+  the console detaching, not a failure.
+- Gotcha, and it cost a confusing minute: **this Mac carries two iOS 27 runtimes
+  that share one identifier** -- `24A5355p` and `24A5380i`, both
+  `com.apple.CoreSimulator.SimRuntime.iOS-27-0`. A device's `device.plist`
+  records only that ambiguous identifier plus `runtimePolicy: System`, so which
+  runtime actually ran is not pinned by the device and not recoverable from a
+  shut-down one. Read it off a *booted* device instead:
+  `xcrun simctl getenv booted SIMULATOR_RUNTIME_BUILD_VERSION`.
+- And the `Flip-iOS27` device **vanished between 06:56 and 07:18** with no action
+  taken against it, leaving a cached UUID answering `Invalid device`. Recreate by
+  name (`simctl create Flip-iOS27 ...iPhone-17 ...iOS-27-0`) and address it as
+  `booted`; never cache the UUID. This is the skill's stale-UUID rule showing up
+  for real rather than in the abstract.
+- Unattributed, deliberately: the same bundled clip read `bpm=116.597046 /
+  bytes=406870` at 06:56 and `bpm=116.59659 / bytes=406869` at 07:24 on
+  `24A5380i`. The first run's device is deleted, so its runtime cannot be
+  recovered and the difference cannot be pinned on the runtime split. Worth
+  knowing next time loop ranks are compared across machines -- it is the same
+  shape as the macOS/iOS section-count divergence, at a much smaller magnitude.
+
+- Decided: **`url(forUbiquityContainerIdentifier:)`'s `nil` is split into two
+  answers, not reported as one.** Apple documents that single `nil` for two
+  different worlds -- "iCloud storage is unavailable for the current user or
+  device" and "the container could not be located" -- and only the second is a
+  fault. `ubiquityIdentityToken` is the documented discriminator (nil exactly
+  when iCloud is unavailable or nobody is logged in, and cheap enough to read on
+  the main thread), so `ICloudLibrary.status` returns `noAccount` /
+  `claimFailed` / `ready(URL)`. Without the split, a simulator with nobody
+  signed in would report identically to a container genuinely missing from the
+  App ID.
+- Mechanism: the claim runs off the main thread. Apple's page carries an
+  Important saying not to call it from the main thread because setting up iCloud
+  takes a nontrivial amount of time, so `claim()` owns the detached task rather
+  than leaving callers a note to remember. It is a second `.task` on
+  `ContentView`, separate from the analysis run, because claiming has to happen
+  whether or not the bundled clip analyzes.
+- Observed, both inputs kept separate: the pure decision's three branches are
+  unit-tested (`ICloudLibraryTests`, 38 tests / 5 suites, `** TEST SUCCEEDED **`
+  under `apple-build.sh`), and the live path was run in the iOS 27 simulator,
+  printing `FLIP-ICLOUD no iCloud account on this device`. That is the
+  known-BAD input firing correctly. **The `ready` branch has not been observed
+  live** -- only a signed-in device can produce it, which is what the phone
+  install is for. Analysis is unaffected: the same launch printed
+  `FLIP-RESULT bpm=116.597046 beats=58 bars=14 sections=2`.
+- `Documents` is appended on the Swift side rather than at each call site,
+  because that is the half the Mac agrees on: `icloud_container()` resolves to
+  `.../iCloud~com~danieldecena~flip/Documents` and `publish_to_icloud` writes
+  `Tracks/<track>/` beneath it. A test asserts the suffix so the two sides
+  cannot drift into addressing different directories.
+
+- Decided: **the stem map is republished under the icloud account and the gmail
+  url is retired.** Daniel switched the CLI login to danieldecena@icloud.com
+  (uuid 1414539c); `~/.claude-work/.claude.json` still holds the gmail account,
+  so the two directories now genuinely differ where earlier today they did not.
+  New url `c5d0c33b`, owned by the account that persists.
+- Observed: **the old artifact cannot be updated from here, and the failure is
+  explicit rather than silent.** A republish was refused ("could not verify the
+  target page is not a review page"), and a direct read of `ace836b3` returns
+  "served to you as a public (non-member) reader". `Artifact list` under icloud
+  shows 15 artifacts, none of them tonight's two -- and it does include
+  `db42c89c`, which another session had guessed was icloud-owned, so that guess
+  is now confirmed rather than assumed.
+- Mechanism worth knowing: an artifact is bound to (conversation, file path), so
+  a republish of the same path keeps trying to reach the old page. Minting under
+  the new account required a new path, which is why the generated page is now
+  `flip-stem-map.html`. The content is byte-identical -- it restamped to the same
+  `43306caaa3bc`, which is the determinism property doing its job.
+- Consequence, currently RED and not mine to fix: **invariants check 29 fails**
+  with "binding not on the register: c5d0c33b / on the register but not bound
+  anywhere: ace836b3". That is the check working -- it caught a url change the
+  same night it was widened, which is the discrimination its author wanted to
+  demonstrate. The fix is a one-row edit to paper-system's hand-authored design
+  canvas, which belongs to the session that owns that tooling.
+
+- Shipped: **the three timeline tabs, branch `flip-timeline-tabs`
+  (`cdf61dc..eb423b8`, 12 commits).** Analysis (four activity lanes on a bar grid
+  with section rules), Lyrics (timed `.lrc` against the same grid), Loops (ranked
+  candidates, each playable). `LoopScorer.swift` and
+  `TimedLyrics.swift` are ports of `Scripts/regions.py` and `Scripts/lyrics.py`
+  with parity tests pinned to the Python's current output. 31 tests in 4 suites.
+- Observed, by screenshot of the running simulator app: BPM 116.6, C major, 14
+  bars, 2 sections, lane peaks drum 0.09 / bass 0.35 / other 0.85 / vocal 0.82;
+  Lyrics 11 lines, "Back then" first at 0:02.32; Loops ranked 0.47 down to 0.27.
+- Decided: **Task 7's "confirm you hear audio" step replaced with an offline
+  assertion.** No device attached. The engine is driven through
+  `enableManualRenderingMode` and the test asserts non-zero RMS over rendered
+  frames plus repeat N starting at exactly `N * length`. `isPlaying == true` was
+  explicitly ruled insufficient: a transport running over silence is the failure
+  that step existed to catch. Audio session category, output routing and hardware
+  playback remain unverified and parked.
+- Found and fixed: **`LoopEngine` was not `@Observable` while `LoopList` read
+  `engine.isPlaying` in the view body.** Playback stopped correctly; the icon did
+  not update, so the control read as broken. Fixed in `eb423b8`. Worth noting how
+  it was caught -- no UI test and no driveable tap exist on this machine, and it
+  was still established with certainty by reading for the missing dependency edge.
+  "No interaction test" is not the same as "no evidence available".
+- RETRACTED, my error: **I claimed `App/Flip/Resources/README.md` recorded a stale
+  sha.** `shasum` defaults to SHA-1 (`111194ee...`); `shasum -a 256` gives
+  `1552377b...`, which is exactly what the README says. I compared the two and
+  wrote a "correction" into STATUS, a commit message (`b4cc47e`) and the plan. The
+  Task 5/6 implementer re-hashed, found its observation contradicted mine, refused
+  the edit and flagged it. `b4cc47e`'s message still carries the wrong claim;
+  commits are not amended, so this entry is the record.
+- RETRACTED, my error: **I concluded Simulator.app had no window and recommended
+  deleting its saved application state.** Both wrong.
+  `CGWindowListCopyWindowInfo` finds the `iPhone 17` window at
+  `(296,-1346,456,972)` -- inside the BetterDisplay virtual-display rect, i.e.
+  parked off-screen the whole time. `System Events` reporting 0 windows is an AX
+  blind spot for Simulator specifically. My control (ghostty reports 1 window)
+  proved Accessibility *permission* works; it did not prove Simulator *exposes*
+  windows through AX -- the wrong control for the claim (silent-failure rule 8).
+  The saved-state directory I proposed deleting does not exist, so that repair
+  would have been a no-op reported as a fix. Correct coordinates were then derived
+  (device origin `(323.5,-1271)` at 1:1 point scale, Loops tab at `(610,-441)`) and
+  `cliclick` still does not flip the tab, focused or not. Taps stay unavailable.
+- Process note: **subagents corrected me five times on this branch** -- a
+  non-existent second signing team, a fabricated xcodegen requirement for
+  pre-existing files, the sha above, an unfounded worry that the drift test had
+  stopped testing the real clip, and a test-count arithmetic conflict I had
+  created with my own ruling. One earlier instance had already produced a false
+  green (`TEST SUCCEEDED` with the file under test never compiled), which is why
+  the plan now requires checking the suite COUNT rather than the exit code.
+
+- CORRECTED, same night: **an earlier version of the entry above said the
+  Analysis tab shows the "top loop span shaded". On a fresh launch it shades
+  nothing.** `TimelineTabs.swift:5` declares `@State private var selectedLoop:
+  LoopCandidate?` with no initial value and nothing assigns it on appear, and
+  `ActivityChart` draws the span only `if let loop = selectedLoop`. The final
+  reviewer caught the committed claim contradicting the code.
+  The mechanism is worth recording because the reviewer guessed it wrong and the
+  screenshots settle it: my 01:45 capture really does show filled yellow
+  rectangles across all four lanes, and my 02:14 captures of the same build,
+  after I relaunched the app, show none. The reviewer supposed I had mistaken a
+  section `RuleMark` for the span; I had not. The earlier instance had been
+  tapped by the Task 5/6 implementer, which set the selection, so I photographed
+  a tapped state and described it as the launch state. A real observation of the
+  wrong moment (silent-failure rule 7), not a misread mark.
+  Being fixed by assigning `selectedLoop = analysis.loops.first` on appear, which
+  makes the claim true rather than merely deleting it.
+- Known limit, not a defect: **`LoopEngine.play()` schedules exactly 8 repeats**,
+  inherited from the plan's own sample code rather than chosen. At this clip's
+  ~8.2s window that is about 66 seconds, after which playback stops with no UI
+  change. Tracked as its own decision rather than patched blind.
+  - **Decided and shipped 2026-09-04: a loop runs until it is stopped.** The
+    "no UI change" half of this was already stale when written -- the last
+    segment's completion handler clears `playingID`, so the row does return to
+    its play icon. See that date's entry for the scheduler.
+- Recorded so it survives a `git clean`: **instrument activity diverges between
+  macOS and iOS as well as section count.** Drum peaks 2.25x and bass 2.69x
+  higher on iOS for identical bytes; vocal agrees within 4%. STATUS carries both
+  sets of numbers in different entries but had never said they disagree, unlike
+  the section-count split which it states outright. Because vocal is the one
+  family that agrees, and vocal is what `clean` is computed from, loop-rank
+  stability across the two platforms is an inference and not a measurement.
+- Shipped: **the Mac half of R4b -- `publish_to_icloud` and `icloud_container`.**
+  `publish_to_icloud <track>` copies `Stems/<model>/<track>/` plus that track's
+  analysis into the container as `Tracks/<track>/{*.wav,analysis.json}`, with
+  `rsync -a --delete` so a republish after a different stem profile does not
+  leave the previous model's stems behind for the phone to show as real. A
+  path-shaped track name is refused before anything is deleted. Several models
+  holding one track picks the newest and says which. `deconstruct` publishes at
+  the end when a container exists and says so when one does not -- a deconstruct
+  that quietly did not publish is indistinguishable from one that did.
+  16 new assertions in `tests/test-core.sh`.
+- The prune assertion was proved able to fail: dropping `--delete` was confirmed
+  applied (`grep -c` 0), the test then failed naming the stale `bass.wav`, and
+  restoring brought it back. Without that pair it would be a check that cannot
+  fail.
+- Changed on the way: **`apple_analyze` keeps its JSON instead of writing a temp
+  file and deleting it.** It now writes `Samples/Analysis/<track>.json`, which is
+  where `score_apple.py`, `tests/test_catalog_ingest.py` and `backfill-grid`
+  already look, and publish has nothing to hand the phone without it. Verified by
+  deleting `02 Ivy.json`, re-running `apple_analyze`, and observing the file back.
+- Measured, and it changes the R5 design: **one published track is ~174 MB.**
+  Four uncompressed 44 MB stems plus a 6.7 MB analysis, observed end-to-end for
+  `02 Ivy` with `MUSIC_ICLOUD_DIR` pointed at a temp dir. The whole 55-track
+  catalog would be ~9.6 GB into iCloud. Publishing every deconstruct at that size
+  is a decision R5 has to make, not one this function should settle -- compressed
+  stems, or the analysis alone with stems fetched on demand.
+- Shipped, and done entirely on the CLI at Daniel's instruction: **the iCloud
+  capability is registered and signed.** The entitlement lives in
+  `App/project.yml` under the Flip target -- so `xcodegen generate` no longer
+  drops it, confirmed by regenerating and getting a byte-identical pbxproj --
+  and `xcodebuild -destination 'generic/platform=iOS' -allowProvisioningUpdates
+  build-for-testing` returned `** TEST BUILD SUCCEEDED **`, which is Apple
+  issuing a profile that carries the container.
+- Verified by reading the products rather than the exit code:
+  `codesign -d --entitlements` on the signed `Flip.app` shows
+  `com.apple.developer.{icloud-container,ubiquity-container}-identifiers` =
+  `iCloud.com.danieldecena.flip` and `icloud-services` = `CloudDocuments`; the
+  profile `iOS Team Provisioning Profile: com.danieldecena.flip` carries the
+  container and expires 2027-09-04, a year out, matching a paid team
+  (`isFreeProvisioningTeam = 0`). The 33-test simulator suite stays green with
+  the entitlement in place.
+- `FlipTests.xctest` carries no entitlements at all, which is the placement the
+  `ios-build` skill's scar is about. Proved with a control: the same
+  `codesign -d --entitlements -` prints a `[Dict]` for `Flip.app` and nothing for
+  the xctest. An earlier attempt at this check globbed a path that did not exist,
+  read empty stdin and printed "correct" -- a failed lookup rendered as a pass,
+  silent-failure rule 5, caught before it was written down.
+- Still open, and no longer account state: **the Mac-side container directory
+  does not exist yet.** `~/Library/Mobile Documents` refuses `mkdir`
+  (Permission denied -- only `bird` creates containers there), so nothing this
+  repo runs can conjure it and, usefully, no stray folder can pose as a synced
+  container either. `icloud_container`'s directory test is therefore safe by
+  construction. The directory materializes when an entitled process claims the
+  container at runtime, which means the app calling
+  `URLForUbiquityContainerIdentifier` -- R5 work, on a device signed into the
+  same iCloud account.
+- Decided (Daniel, asked): **loop playback repeats until stopped, not 8 times.**
+  Auditioning a loop ends when you stop it; 66 seconds was an arbitrary cliff
+  inherited from the plan's sample code and never chosen. `LoopEngine.play`'s
+  `repeats:` becomes `queued:` -- how many passes sit scheduled ahead of the
+  playhead, default 4 -- and each pass's completion handler queues another,
+  guarded by the same `playToken` that already stops a superseded play() from
+  acting on a newer one. Hand-scheduling is unchanged, so the drift the
+  `.loops` option accumulates is still avoided. `playingID` is now cleared only
+  by `stop()`, because there is no natural completion left to report.
+- The top-up is observed, not assumed, and the test carries its own control:
+  `topsUpTheQueue` primes 2 passes, renders 6, and asserts the sixth is audible
+  -- and first runs the identical call through the blocking `renderOffline`,
+  where the MainActor top-up cannot get a turn, asserting the sixth pass is
+  silent there. Without that half the test would pass just as happily against a
+  player that scheduled everything up front. 33 tests in 4 suites.
+- Shipped: **`catalog.py backfill-grid`, and the bar grid backfilled from 14
+  tracks to 55 of 58.** The grid, structure boundaries and activity signal come
+  from MusicUnderstanding alone -- `backfill` fills bpm/key from
+  `analyze_track.py` and cannot touch them -- so 44 tracks were invisible to the
+  region scorers. The new command runs `Tools/mu-analyze` for every track with
+  a source file and no bars, ingests the JSON, and keeps it under
+  `Samples/Analysis/` (gitignored, now 269 MB for 53 files). 40 tracks in 3m13s,
+  no failures. The remaining 3 have no `source_path` -- `Let Em Know`, `demo`
+  and `vocals`, artifacts of the filename-stem keying already in Known broken --
+  so there is nothing to analyze, which is the correct outcome and not a gap.
+- Two branches were written to fail loudly and both were observed failing, then
+  the same command was observed passing on a real analysis (six assertions in
+  `tests/test_catalog_ingest.py`, 24 passing): a missing `Tools/mu-analyze` is
+  an error naming the `swiftc` line, never a quiet "0 tracks needed a grid" --
+  the binary is gitignored, so absent is a fresh checkout's normal state; and an
+  analysis that ingests cleanly but carries no rhythm block is reported as no
+  bars rather than counted done. Found while writing them: a cached
+  `Samples/Analysis` JSON is reused as-is, so a bad one stays bad until
+  `--refresh`. Documented rather than fixed.
+- Observed: **the macOS/iOS structure split is one boundary, and it is peak
+  competition rather than the detection threshold.** `structurePredictions`
+  exposes the raw per-frame curve behind each level (`sections`, `segments`,
+  `phrases`; float32 base64, shape [1,600] at `predictionResolution` 0.05s for
+  the 30s clip) alongside `detectionThreshold` 0.33. Decoding both platforms'
+  curves for `testclip.m4a`:
+  - The curves themselves diverge well past float rounding -- max |delta| 0.056
+    on sections, 0.098 on segments, 0.176 on phrases, differing in ~598 of 600
+    frames. This is the model producing different numbers per platform, not a
+    different rule applied to the same numbers.
+  - The entire structural difference is ONE boundary. macOS puts it at 10.131s,
+    iOS at 12.199s. Segments and phrases substitute it, which is why their
+    counts (5 and 9) matched and read as "identical everywhere" -- they are not.
+    Sections drop it outright on iOS, which is the whole of 3 versus 2.
+  - Both candidates clear the threshold on both platforms at segment and phrase
+    level, and each platform emits exactly one, so the selection has a spacing
+    rule beyond thresholding. The higher peak wins and the platforms rank the
+    two oppositely, consistently across two independent levels: segments
+    mac 0.648 vs 0.602 and iOS 0.616 vs 0.652; phrases mac 0.616 vs 0.582 and
+    iOS 0.578 vs 0.620. Margins of 0.03-0.05 -- inside the divergence measured
+    above, so the flip is fully explained by it.
+  - `detectionThreshold` is NOT the knob, and the correlation runs backwards:
+    the sections curve at the disputed boundary is 0.306 on macOS (under 0.33)
+    and 0.335 on iOS (over), and it is macOS that emits the boundary. The
+    section level plausibly requires a coinciding segment boundary -- iOS has
+    none near 10.2s -- but that rule was not closed and is inference.
+- Measured, not inferred: **what the split does to loop ranks.** Holding the
+  macOS bars and activity fixed and swapping only the section set, `score_loops`
+  at 4 bars gives 10 windows. Ranks 1-6 are identical in order and in score,
+  the top pick included (bar 6, 14.270s, 0.4922). Ranks 7-10 reorder: bars 1, 2
+  and 3 straddle macOS's 10.131s boundary and take the 0.75x penalty, but sit
+  inside iOS's single 0-28.651s section and lose it, so they climb over bar 0.
+  So on this clip the split moves the tail of the ranking and not the pick.
+  Bounded deliberately: one clip, and it isolates the section variable only --
+  iOS's own bars and vocal activity differ slightly on top of this.
+- Consequence: **no code change.** A design change off n=1 would be premature,
+  and the top pick is stable where it was measured. The standing instruction is
+  unchanged: do not treat a loop ranking as platform-independent. The comment
+  in `LoopScorerTests.swift` pinning the test's sections by hand is the guard.
+- Method note, cost a run: **no iOS 27 simulator device existed on this Mac**,
+  so `xcodebuild test` against any named simulator fails with a deployment-target
+  mismatch against every iOS 26.5 device. Created `Flip-iOS27` (iPhone 17 Pro,
+  iOS 27.0) and kept it; the 32 tests in 4 suites pass on it. Two iOS 27.0
+  runtimes are installed (24A5355p and 24A5380i) and they share one runtime
+  identifier, so `simctl create` cannot choose between them.
+
 ### 2026-09-03
+
+- Observed: **both published artifacts are owned by the gmail account, whose
+  subscription is temporary.** `~/.claude.json` and `~/.claude-work/.claude.json`
+  both hold danieldecena10@gmail.com, uuid ffd06fee -- the same account and uuid,
+  so the config files do not distinguish them at all and only the directory
+  differs. That makes `ace836b3` (Flip Stem Map) and `c4d78867` (iOS Build
+  Runbook) gmail-owned. A switch back to icloud is planned, which inverts which
+  set of pointers resolves; eight other recorded pointers are already unreachable
+  from gmail. Inventory kept by another session at
+  `~/Archive/account-switch-20260903/NOTES.md`.
+- Observed: **invariants check 36 cannot see an artifact that becomes
+  unreachable.** It hashes a local file against a sha recorded at publish time
+  and makes no network call, so a lapsed artifact and a healthy one are
+  byte-identical from where it stands: `Artifacts/stem-map` will keep reading OK
+  after the URL changes hands. This is the same blind direction the check already
+  documents for "published ahead of local", widened to everything server-side.
+  The artifact register is therefore not a safety net for the account switch.
+  Not restamped or repointed ahead of the switch -- a binding recording a url the
+  user cannot open is his call, not something to rewrite quietly.
+- Corrected: an earlier reading here found `firing-audit: off` in
+  `~/.claude/settings.json`. That was accurate when taken and is now false --
+  `55ba939` added the override and `cf902f8` removed it mid-session, so the skill
+  is live. A third session diagnosed the disagreement as this session having read
+  `~/.claude-work/settings.json` instead; it had not, and two config files
+  carrying the same key name is what made that cause plausible. The record is
+  "the override was removed mid-session", and nothing in this session edited
+  `settings.json`.
+
+- Decided: **two sessions were editing `~/.claude/skills/ios-build/` at once.
+  Tooling is owned; the runbook is not.** Corrected within the hour: an earlier
+  version of this entry handed that session all of `~/.claude`, which was an
+  overreach. The ios-build runbook is shared knowledge with no single owner --
+  either session may hit an iOS lesson and must be able to write it the same
+  turn rather than queue behind the other. What *is* owned is the tooling: that
+  session builds the `invariants.sh` drift check, this one does not. This
+  session owns `~/developer/music` and the Ivy Stem Map artifact.
+  Five rules govern the shared page, agreed with that session: read the live
+  artifact immediately before any republish; publish with the url recorded in
+  `artifact.json`, never bare; move `SKILL.md` and `artifact.html` in one commit,
+  because a lesson that lands only on the page never routes in a session;
+  explicit pathspec on every `~/.claude` commit, never `-a`; and write a lesson
+  up the same turn it is learned, because short-lived divergence is what keeps a
+  shared page safe.
+  - First move made here: dropped this session's watch on the iOS Build Runbook
+    artifact, so their republishes no longer wake this session.
+  - Their `sha256(artifact.html)` in `artifact.json`, compared by an
+    `invariants.sh` check, is adopted as-is rather than competed with. Nothing
+    on this machine currently compares an artifact's source against what is
+    live, and one implementation of that is enough.
+  - This also explains two anomalies recorded earlier today as unexplained:
+    `artifact.html` changing size between an `ls` and a `cp` minutes later, and
+    `published` reading 2026-09-02 in a `cat` but 2026-09-03 in git's base. Both
+    were the other session writing to the same working tree. No content was
+    lost either way: HEAD is `ec9cf0c`, all four additions are present exactly
+    once, and that session synced to this one rather than over it.
+  - Standing rules that held and stay: scoped pathspecs on every commit in a
+    shared tree (the commit here was 3 files, 93 insertions, every line
+    attributable), and re-read a shared file immediately before editing rather
+    than from a copy read earlier in the session.
+
+- Observed: **R4a is done on hardware.** Flip runs on the iPhone (iOS 27.0) and
+  reports 116.596 BPM, 58 beats, 14 bars, C major against the bundled clip,
+  matching `Tools/mu-analyze` on the Mac to rounding. Analysis took 1.4s on
+  device for a 30s clip and produced 406,870 bytes of JSON. The framework runs
+  on real hardware, which was the single biggest risk in the whole design.
+- Observed: **the section-count split is macOS versus iOS, not Simulator versus
+  device.** Identical bytes give 3 sections on macOS and 2 on both the iOS
+  Simulator and the phone; segments (5) and phrases (9) are identical
+  everywhere. `structurePredictions` carries a `detectionThreshold`, which is
+  the likely knob. This matters because `score_loops` gives a containment bonus
+  to a window that falls inside one section, so the phone and the Mac can rank
+  the same track's loops differently. Not yet reconciled; do not treat a loop
+  ranking as platform-independent until it is.
+  - **Reconciled and partly corrected 2026-09-04** -- see that date's entry.
+    Two claims here are wrong. Segments and phrases are identical in COUNT
+    only; their boundary TIMES differ, which a count comparison cannot see.
+    And `detectionThreshold` is not the knob: at the disputed boundary the
+    sections curve reads 0.306 on macOS (under the 0.33 threshold) and 0.335
+    on iOS (over it), yet macOS is the platform that emits the boundary.
+- Confirmed: **MusicUnderstanding reports four instrument families and only
+  four** -- `bass`, `drum`, `other`, `vocal` -- and that is the framework's
+  fixed taxonomy, not a detection that happened to find four. `other` is the
+  catch-all, and on the test clip it dominates (peak 0.821 against bass 0.127
+  and drum 0.036), because guitar, keys, synths and strings all land there.
+  Discrete `ranges` were emitted for `other` and `vocal` only, so the framework
+  withholds them where it is not confident. For finer granularity the repo's own
+  `separate_stems 6stem` (htdemucs_6s) splits guitar and piano out separately,
+  which Apple does not.
+
+- Decided: two tracks are combined by cutting both on the persisted bar grid,
+  not by a BPM ratio. `Scripts/mix_render.py` (`449b195`) adds `layer` (both
+  sides at once, per stem) and `transition` (A into B). The repo previously had
+  no way to sound two sources together at all: grepping `amix`, `amerge`,
+  `layer` and `overlay` across `Scripts/` and `lib/` returned nothing, and
+  `mix_preview` only crossfades A then B at a section boundary. `stretch_for`
+  measures how long n bars actually take in each track and folds B's bar count
+  by octaves, so a double-tempo partner contributes twice the bars at no
+  stretch. A BPM ratio would only be right if both tempos were constant, and
+  Ivy alone runs 2.08s per bar early and 2.95s by the outro. Verified on audio,
+  not exit codes: Ivy's bass and other under Nikes' vocals over bars 111-115
+  rendered 11.859s against an 11.86s window, mean -18.3 dB, max -0.4 dB.
+- Decided: `deconstruct()` now runs `apple_analyze` (`76be55b`), so a new track
+  gets Apple's bar grid instead of only bpm/key from this repo's analyzer. Before
+  this, 13 of 58 catalogued tracks were mixable and nothing said so until a mix
+  was attempted. The three failure causes are kept distinct on purpose; an
+  earlier draft collapsed a mistyped path, an unsupported format and an unbuilt
+  binary into one "needs macOS 27" message, which reports a fabricated cause.
+  Proven against a known-good input as well as bad ones: "01 Intro (Difference)"
+  gained 40 bars, 5 sections, 7,356 activity points and 10 loop candidates.
+- Observed: device signing is retired with no hardware attached.
+  `build-for-testing` against `generic/platform=iOS` gives **TEST BUILD
+  SUCCEEDED**, and the product carries `application-identifier`
+  `877MLS29T9.com.danieldecena.flip`, `team-identifier` `877MLS29T9`, on a
+  profile valid to 2027-09-02. This settles the OU-vs-CN question empirically:
+  the build signs with `DEVELOPMENT_TEAM: 877MLS29T9` while the certificate's CN
+  reads "Apple Development: Daniel Decena (FU9H8VF2PN)". R4a's remaining half is
+  the phone.
+- RETRACTED 2026-09-04: an earlier entry here claimed the plan's recorded sha for
+  `App/Flip/Resources/testclip.m4a` was stale. **It was not.** The README and the
+  plan record `1552377b9407a32754e56e85`, which is the file's SHA-**256**. I ran
+  bare `shasum`, which defaults to SHA-**1** and returns
+  `111194ee858465c6f01f940f`, compared the two, and reported a mismatch that never
+  existed. Nothing was wrong with the README. Found by the Task 5/6 implementer,
+  which verified the claim before acting on it and refused the edit — the
+  silent-failure rule working from the other direction, against me.
+  The reference readings stand and were independently re-derived from the shipping
+  file: **116.597755 BPM, 58 beats, 14 bars, 3 sections, 5 segments, 9 phrases,
+  C major**. Those are what the device must reproduce.
 - Decided: build the flip toolkit's future around a **song database**, not a
   feature list. Apple's `MusicUnderstanding` (macOS/iOS 27) supplies rhythm, key,
   structure, loudness, pace and instrument activity on-device and free; loop

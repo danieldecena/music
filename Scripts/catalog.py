@@ -328,6 +328,48 @@ def ingest(con, track: str, json_path: Path) -> dict:
     }
 
 
+def ingest_lyrics(con, track: str | None = None) -> dict:
+    """Load timed lyric lines from .lrc sidecars into the lyrics table.
+
+    Apple Music downloads ship an .lrc beside the audio, timestamped per line.
+    `lyrics.py` already reads them but throws the timing away, because the mix
+    report only wants a word set -- so the table has been sitting empty with
+    start_s/end_s columns shaped for exactly this. Timed lines are what let a
+    lyric be placed against the bar grid rather than listed as a block.
+
+    Rows are replaced per track, not appended, so re-running is idempotent.
+    Returns {track: line_count} for tracks that had a sidecar; a track with no
+    .lrc is absent from the result rather than present with zero, because those
+    are different states and only one is a fault.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from lyrics import timed_lrc
+
+    rows = con.execute(
+        "SELECT name, source_path FROM tracks WHERE source_path IS NOT NULL"
+        + (" AND name=?" if track else ""),
+        (track,) if track else ()).fetchall()
+
+    out = {}
+    for name, source in rows:
+        p = Path(source)
+        if not p.is_absolute():
+            p = ROOT / p
+        lrc = p.with_suffix(".lrc")
+        if not lrc.is_file():
+            continue
+        lines = timed_lrc(lrc.read_text(encoding="utf-8", errors="replace"))
+        if not lines:
+            continue
+        con.execute("DELETE FROM lyrics WHERE track=?", (name,))
+        con.executemany(
+            "INSERT INTO lyrics (track, start_s, end_s, text) VALUES (?,?,?,?)",
+            [(name, s, e, txt) for s, e, txt in lines])
+        out[name] = len(lines)
+    con.commit()
+    return out
+
+
 def compute_regions(con, track: str, kind: str = "loop", n_bars: int = 4,
                     limit: int = 0) -> list[dict]:
     """Score and store the regions of one track. Replaces this track's rows of
@@ -625,6 +667,87 @@ def backfill(con, limit=None, refresh=False):
     )
     con.commit()
     print(f"backfilled {done}/{len(rows)}")
+
+
+def backfill_grid(con, limit=None, refresh=False):
+    """Run Tools/mu-analyze on tracks with no bar grid and ingest the result.
+
+    Distinct from `backfill`, which fills bpm/key from analyze_track.py. The bar
+    grid, structure boundaries and the continuous activity signal come from
+    MusicUnderstanding and nothing else in this repo can produce them, so a
+    track without them is invisible to the region scorers.
+
+    The JSON is kept under Samples/Analysis/ (gitignored, ~6 MB a track) and
+    reused on a re-run: regenerating it means re-decoding the audio, and
+    tests/score_apple.py reads the same files. A cached file is taken as-is, so
+    a bad one stays bad until `refresh` re-analyzes over it.
+    """
+    init(con)
+    binary = ROOT / "Tools" / "mu-analyze"
+    if not os.access(binary, os.X_OK):
+        # Not a skip. The binary is gitignored, so an absent one is the normal
+        # state of a fresh checkout, and reporting "0 tracks needed a grid"
+        # would be indistinguishable from the job having nothing to do.
+        print(f"{binary} is missing or not executable -- build it first:\n"
+              "  swiftc -parse-as-library -O -o Tools/mu-analyze Tools/mu-analyze.swift")
+        return 1
+    out_dir = ROOT / "Samples" / "Analysis"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    where = "source_path IS NOT NULL"
+    if not refresh:
+        where += " AND name NOT IN (SELECT DISTINCT track FROM bars)"
+    rows = con.execute(
+        f"SELECT name, source_path FROM tracks WHERE {where} ORDER BY name"
+    ).fetchall()
+    if limit:
+        rows = rows[:limit]
+
+    done, failed = 0, []
+    for r in rows:
+        name, src = r["name"], ROOT / r["source_path"]
+        dest = out_dir / f"{name}.json"
+        if not src.exists():
+            failed.append((name, "source file is gone"))
+            print(f"{name}: source missing", flush=True)
+            continue
+        if refresh or not dest.exists():
+            proc = subprocess.run(
+                [str(binary), str(src), "-o", str(dest)],
+                capture_output=True, text=True,
+            )
+            if proc.returncode != 0 or not dest.exists():
+                failed.append((name, (proc.stderr or "no output").strip()[:120]))
+                print(f"{name}: mu-analyze failed", flush=True)
+                continue
+        try:
+            counts = ingest(con, name, dest)
+        except (json.JSONDecodeError, KeyError) as e:
+            failed.append((name, f"unreadable JSON: {e}"))
+            print(f"{name}: ingest failed", flush=True)
+            continue
+        con.commit()
+        # The ingest returning is not the observation; the rows are. A JSON with
+        # an empty rhythm block ingests happily and leaves the grid as absent as
+        # it was.
+        if not counts["bars"]:
+            failed.append((name, "ingested but produced no bars"))
+            print(f"{name}: no bars in the analysis", flush=True)
+            continue
+        done += 1
+        print(f"{name}: {counts['bars']} bars, {counts['beats']} beats, "
+              f"{counts['structure']} boundaries", flush=True)
+
+    con.execute(
+        "INSERT INTO runs(ts,action,target,status,note) VALUES(?,?,?,?,?)",
+        (now(), "backfill-grid", "tracks", "ok" if not failed else "partial",
+         f"{done}/{len(rows)}"),
+    )
+    con.commit()
+    print(f"gridded {done}/{len(rows)}")
+    for name, why in failed:
+        print(f"  failed: {name} -- {why}")
+    return 1 if failed else 0
 
 
 def _counts_for(con, name):
@@ -1064,6 +1187,9 @@ def main(argv):
     p.add_argument("track")
     p.add_argument("json_path")
 
+    p = sub.add_parser("ingest-lyrics")
+    p.add_argument("track", nargs="?", help="one track, or every track if omitted")
+
     p = sub.add_parser("set-analysis")
     p.add_argument("name")
     p.add_argument("--bpm", type=int, required=True)
@@ -1089,6 +1215,15 @@ def main(argv):
         "--refresh",
         action="store_true",
         help="re-analyze every track with a source file, overwriting existing bpm/key",
+    )
+
+    p = sub.add_parser("backfill-grid")
+    p.add_argument("--limit", type=int)
+    p.add_argument(
+        "--refresh",
+        action="store_true",
+        help="re-run mu-analyze for every track with a source file, not only "
+             "those missing a bar grid",
     )
     p = sub.add_parser("search")
     p.add_argument("query", nargs="?", default="")
@@ -1123,6 +1258,16 @@ def main(argv):
                                 sorted(r["instruments"].items()))
                 print(f"{r['start_s']:8.1f} {r['end_s']:8.1f} "
                       f"{r['start_bar']:5d} {r['score']:6.3f}  {inst}")
+            return
+        if ns.cmd == "ingest-lyrics":
+            got = ingest_lyrics(con, ns.track)
+            if not got:
+                print("no .lrc sidecar found for "
+                      + (repr(ns.track) if ns.track else "any catalogued track"))
+                return
+            for name, n in sorted(got.items()):
+                print(f"{n:5d} lines  {name}")
+            print(f"{len(got)} track(s), {sum(got.values())} lines")
             return
         if ns.cmd == "ingest":
             counts = ingest(con, ns.track, Path(ns.json_path))
@@ -1177,6 +1322,8 @@ def main(argv):
             cmd_stats(con, ns.json)
         elif ns.cmd == "backfill":
             backfill(con, ns.limit, ns.refresh)
+        elif ns.cmd == "backfill-grid":
+            return backfill_grid(con, ns.limit, ns.refresh)
         elif ns.cmd == "search":
             cmd_search(con, ns.query, ns.json, ns.menu)
         elif ns.cmd == "mix":
