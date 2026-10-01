@@ -8,7 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Or run a single step directly: `./download.sh`, `./stems.sh`, `./chop.sh`, `./chop-drums.sh`, `./chop-stems.sh`, `./sort-kit.sh`, `./analyze.sh`, `./deconstruct.sh` — each prompts for input then calls the matching `music-core.sh` function
 - Run tests: `zsh tests/test-core.sh` — hand-rolled assertions (no framework) covering `stem_mode_args`, `chop_sensitivity_args`, `drum_split_args`, `find_new_m4a`
 - Python steps need the venv: `source .venv/bin/activate` before invoking `Scripts/chop.py` directly. `chop_vocals()` in music-core already does this itself, so `./chop.sh` and pipeline runs don't need manual activation.
-- No lint/build config exists in this repo (no ruff config, no package manifest) — don't invent commands for these.
+- No lint config exists in this repo (no ruff config, no package manifest) — don't invent commands for that.
+- **There is a build: `App/` is the Flip iOS app.** This line used to say no build config existed, which sent build chats away from a real app and contradicted the generated-project note under Architecture below — read that note first for how `App/Flip.xcodeproj` is produced and why a fresh clone has none.
+  - The `ios-build` skill owns every `xcodebuild` / `simctl` / `devicectl` run here. Read it before the first invocation, not after the first false pass: a failed build has read as exit 0 on this machine before.
+  - A `generic/platform=iOS` build signs for a real device but produces **no installable product for a specific device**. A device build needs `-destination "id=<UDID>"` (STATUS, via `~/developer/radio/scripts/ios_run.sh`).
+  - Xcode 27 replaced `Simulator.app` with **DeviceHub.app**. It is not missing from this install, and the cerebrum entry of 2026-08-14 calling it a stripped install is wrong (STATUS).
+  - macOS and the iOS Simulator disagree by one section on the same clip, so a loop ranking computed on the Mac can differ from the phone (STATUS). Neither validates the other.
 
 ## Architecture
 
