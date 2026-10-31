@@ -263,22 +263,28 @@ push_lyrics() {
   # MUSIC_LYRICS_FORCE=1, which first saves the old text to Samples/LyricsBackup/.
   # Reads the field back and fails unless it matches (Music stores newlines as
   # carriage returns, so both sides are normalized before comparing).
-  local pid="$1" txt="$2"
+  local pid="$1" txt="${2:A}"
   local script="$MUSIC_DIR/Scripts/music_lyrics.applescript"
-  local old new want
-  old="$(osascript "$script" get "$pid")" || { echo "  No local file track with ID $pid" >&2; return 1; }
+  local old new want bak
+  local nl=$'\n' cr=$'\r'
+  [[ "$pid" =~ ^[0-9A-Fa-f]+$ ]] || { echo "  Not a persistent ID: $pid" >&2; return 2; }
+  want="$(<"$txt")" 2>/dev/null || { echo "  Cannot read $txt" >&2; return 2; }
+  [[ -n "${want//[[:space:]]/}" ]] || { echo "  $txt is empty; refusing to write blank lyrics" >&2; return 2; }
+  old="$(osascript "$script" get "$pid")" || { echo "  Lookup failed for track $pid (see osascript error above)" >&2; return 1; }
   if [[ -n "${old//[[:space:]]/}" ]]; then
     if [[ "${MUSIC_LYRICS_FORCE:-}" != "1" ]]; then
       echo "  Track already has lyrics; set MUSIC_LYRICS_FORCE=1 to replace (old text is saved first)" >&2
       return 1
     fi
-    mkdir -p "$MUSIC_DIR/Samples/LyricsBackup"
-    print -r -- "$old" > "$MUSIC_DIR/Samples/LyricsBackup/$pid.txt"
+    bak="$MUSIC_DIR/Samples/LyricsBackup/$pid.$(date +%s).txt"
+    mkdir -p "${bak:h}" && print -r -- "$old" > "$bak" && [[ -s "$bak" ]] \
+      || { echo "  Could not save a backup of the old lyrics; nothing changed" >&2; return 1; }
   fi
-  new="$(osascript "$script" set "$pid" "$txt" | tr '\r' '\n')" || return 1
-  want="$(<"$txt")"
-  if [[ "${new//[[:space:]]/}" != "${want//[[:space:]]/}" ]]; then
-    echo "  Read-back differs from what was written" >&2
+  new="$(osascript "$script" set "$pid" "$txt")" || { echo "  Write failed for track $pid" >&2; return 1; }
+  new="${new//$cr/$nl}"
+  while [[ "$new" == *$nl ]]; do new="${new%$nl}"; done  # Music keeps the final line break; $(<file) drops it
+  if [[ "$new" != "$want" ]]; then
+    echo "  Read-back differs from what was written${bak:+; old text is in $bak}" >&2
     return 1
   fi
   echo "  Wrote ${#want} characters to track $pid" >&2
