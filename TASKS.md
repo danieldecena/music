@@ -5,6 +5,9 @@
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
 - [ ] Re-record replay baseline after the tempo question settles
 - [ ] (you) Install Flip on the phone and read BPM/bars/lyrics off it
+- [ ] Chords slice 1: probe Music.app Lyrics view with test text
+- [ ] Chords slice 1: chords_to_lyrics turns bars into lines
+- [ ] Chords slice 1: push_lyrics writes and re-reads the field
 
 ## Roadmap — song database
 

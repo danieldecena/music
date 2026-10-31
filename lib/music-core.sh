@@ -257,6 +257,33 @@ chord_progression() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
 }
 
+push_lyrics() {
+  # $1 = persistent ID of a local file track in Music.app, $2 = text file to
+  # put in its Lyrics field. Refuses when the track already has lyrics, unless
+  # MUSIC_LYRICS_FORCE=1, which first saves the old text to Samples/LyricsBackup/.
+  # Reads the field back and fails unless it matches (Music stores newlines as
+  # carriage returns, so both sides are normalized before comparing).
+  local pid="$1" txt="$2"
+  local script="$MUSIC_DIR/Scripts/music_lyrics.applescript"
+  local old new want
+  old="$(osascript "$script" get "$pid")" || { echo "  No local file track with ID $pid" >&2; return 1; }
+  if [[ -n "${old//[[:space:]]/}" ]]; then
+    if [[ "${MUSIC_LYRICS_FORCE:-}" != "1" ]]; then
+      echo "  Track already has lyrics; set MUSIC_LYRICS_FORCE=1 to replace (old text is saved first)" >&2
+      return 1
+    fi
+    mkdir -p "$MUSIC_DIR/Samples/LyricsBackup"
+    print -r -- "$old" > "$MUSIC_DIR/Samples/LyricsBackup/$pid.txt"
+  fi
+  new="$(osascript "$script" set "$pid" "$txt" | tr '\r' '\n')" || return 1
+  want="$(<"$txt")"
+  if [[ "${new//[[:space:]]/}" != "${want//[[:space:]]/}" ]]; then
+    echo "  Read-back differs from what was written" >&2
+    return 1
+  fi
+  echo "  Wrote ${#want} characters to track $pid" >&2
+}
+
 mix_match() {
   # Ranks catalog track pairs that mix well (Camelot key + tempo). Reads the
   # catalog; takes no track path. Flags pass through to `catalog.py mix`
