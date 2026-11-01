@@ -93,6 +93,11 @@ download_url() {
   [[ -z "$url" ]] && { echo "download_url: no URL given." >&2; return 2; }
 
   if [[ "$url" == *"music.apple.com"* ]]; then
+    # Tcl metacharacters, quotes, whitespace and shell-special characters would
+    # be interpreted by the expect heredoc below; real Apple Music URLs have none.
+    if [[ "$url" == *[\{\}\[\]\"\$\;\\\`\ ]* ]]; then
+      echo "download_url: URL contains characters that are not allowed." >&2; return 2
+    fi
     command -v gamdl >/dev/null || { echo "gamdl not found on PATH — install it (pipx install gamdl)." >&2; return 3; }
     command -v expect >/dev/null || { echo "expect not found on PATH — install it (brew install expect)." >&2; return 3; }
     if [[ ! -f "$cookies" ]]; then
@@ -255,6 +260,17 @@ chord_progression() {
   # $1 = an audio file or a Stems/<model>/<track> folder. Prints a bar-by-bar
   # chord chart and writes <input>/chords.txt (read-only; never re-encodes).
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
+}
+
+chords_lyrics_text() {
+  # $1 = audio file or Stems folder. Prints the chords as timed lyric-style lines.
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords_to_lyrics.py" "$1"
+}
+
+music_find_tracks() {
+  # $1 = title fragment. Prints "persistentID<TAB>title<TAB>artist" for each
+  # matching local file track in Music.app (streaming tracks cannot hold lyrics).
+  osascript "$MUSIC_DIR/Scripts/music_lyrics.applescript" find "$1"
 }
 
 push_lyrics() {

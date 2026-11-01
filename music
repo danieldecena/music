@@ -4,19 +4,25 @@
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/music-core.sh"
 
-read_path() {  # prints a cleaned drag-and-drop path
-  local p; read "p?> "
-  p="${p//\\ / }"
+clean_path() {  # $1 = a dragged path; Finder backslash-escapes spaces, parens, quotes
+  local p="$1"
+  [[ "$p" == *\\* ]] && p="${(Q)p}"
   print -- "${p%"${p##*[! ]}"}"
 }
 
-resolve_input() {  # mode=source: current track's source, else a dragged path
+read_path() {  # prints a cleaned drag-and-drop path
+  local p; read "p?> "
+  clean_path "$p"
+}
+
+resolve_input() {  # mode=source: current track's source, else a dragged path or a pasted URL
   if [[ -n "$CUR_SRC" ]]; then
     local p; read "p?Input: [Enter] = $CUR_LABEL  (or drag a different file)> "
     if [[ -z "$p" ]]; then print -- "$CUR_SRC"; return; fi
-    p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
+    clean_path "$p"
   else
     local p; echo "Type a song title (typos OK) or drag a file/folder:" >&2; read "p?> "
+    if [[ "$p" == http*://* ]]; then print -- "$p"; return; fi
     resolve_target "$p"
   fi
 }
@@ -27,7 +33,7 @@ resolve_stems() {  # echoes current track's Stems dir, or a dragged path; empty 
     if [[ -n "$d" ]]; then
       local p; read "p?Stems: [Enter] = $CUR_NAME  (or drag a folder/stem)> "
       if [[ -z "$p" ]]; then print -- "$d"; return; fi
-      p="${p//\\ / }"; print -- "${p%"${p##*[! ]}"}"
+      clean_path "$p"
       return
     fi
     echo "No stems for $CUR_NAME yet — run Separate (2) or Deconstruct (8) first." >&2
@@ -44,9 +50,10 @@ select_file() {  # $1 = path to an audio file; makes it the current track
 }
 
 download_and_select() {  # $1 = url; downloads then auto-selects (sets CUR_*). 0 on success.
-  local files
-  files=$(download_and_locate "$1" "$SCRIPT_DIR/Apple Music")
-  if [[ -z "$files" ]]; then echo "Nothing downloaded."; return 1; fi
+  local files rc
+  files=$(download_and_locate "$1" "$SCRIPT_DIR/Apple Music"); rc=$?
+  if (( rc != 0 )); then echo "Download failed (exit $rc)."; return 1; fi
+  if [[ -z "$files" ]]; then echo "Nothing new downloaded (a file that already existed is skipped)."; return 1; fi
   local -a arr=("${(@f)files}")
   local pick=1
   if (( ${#arr} > 1 )); then
@@ -95,7 +102,7 @@ while true; do
     echo "  Tools  ·  ${CUR_SHORT:-no track selected}"
     echo "  ------------------------------------------------------------"
     echo "    A  Stem levels            loudness / presence per stem"
-    echo "    H  Chords                 bar-by-bar progression"
+    echo "    H  Guitar chords          bar-by-bar progression, or write to Music lyrics"
     echo "    X  Mix-match              catalog pairs that mix well"
     echo "    Z  Mix report             what mixes with one track you name"
     echo "    C  Combine two tracks      layer or transition, cut on the bar grid"
@@ -129,7 +136,7 @@ while true; do
     echo "    6  Sort drum kit"
     echo "    5  Chop stems"
     echo ""
-    echo "    L  Browse tracks    O  Open Samples/    T  More tools"
+    echo "    H  Guitar chords    L  Browse tracks    O  Open Samples/    T  More tools"
     if [[ -n "$CUR_NAME" ]]; then
       echo "    G  Guide            Q  Quit            C  Clear track"
     else
@@ -137,6 +144,12 @@ while true; do
     fi
   fi
   read "choice?> "
+
+  # The Tools menu reuses C and T, which the main-menu arms below match first;
+  # give the Tools entries their own names so they are reachable.
+  if [[ "$MENU" == tools ]]; then
+    case "$choice" in C|c) choice=combine ;; T|t) choice=tempolock ;; esac
+  fi
 
   case "$choice" in
     "") continue ;;
@@ -210,7 +223,30 @@ GUIDE
       INPUT=$(resolve_stems)
       [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
-      chord_progression "$INPUT"
+      chord_progression "$INPUT" || continue
+      read "yn?Write these chords into the song's Lyrics in Apple Music? [y/N]> "
+      [[ "$yn" == (y|Y|yes) ]] || continue
+      deflt="${CUR_NAME#<-> }"
+      read "q?Song title to find in Music [$deflt]> "; : "${q:=$deflt}"
+      [[ -z "$q" ]] && continue
+      tb=$'\t'
+      matches=("${(@f)$(music_find_tracks "$q")}"); matches=("${(@)matches:#}")
+      if (( ${#matches} == 0 )); then
+        echo "No local-file track matching '$q' in Music (streaming tracks cannot hold lyrics)."; continue
+      fi
+      pick=1
+      if (( ${#matches} > 1 )); then
+        i=1; for m in "${matches[@]}"; do printf "  %d) %s\n" "$i" "${${m#*$tb}//$tb/  -  }"; ((i++)); done
+        read "pick?Pick # (Enter = cancel)> "
+        (( ${pick:-0} >= 1 && ${pick:-0} <= ${#matches} )) 2>/dev/null || { echo "Cancelled."; continue; }
+      fi
+      tmp=$(mktemp)
+      if chords_lyrics_text "$INPUT" > "$tmp"; then
+        push_lyrics "${matches[$pick]%%$tb*}" "$tmp"
+      else
+        echo "Chord analysis failed."
+      fi
+      rm -f "$tmp"
       ;;
     X|x)
       read "ly?Match lyric themes too? (slower, needs network) [y/N]> "
@@ -226,7 +262,7 @@ GUIDE
         mix_report "$seed" --lyrics
       fi
       ;;
-    C|c)
+    combine)
       # Cuts both tracks on their persisted bar grids. Needs a bar grid on each,
       # which deconstruct now records; a track analyzed before that reports it.
       read "ta?Track A, the one that keeps its timing (typos OK)> "
@@ -241,16 +277,16 @@ GUIDE
       read "md?1) layer both at once  2) transition A into B  [1]> "
       if [[ "$md" == 2 ]]; then
         mix_render transition --a "$ta" --a-bar "$abar" --b "$tb" --b-bar "$bbar" \
-          --bars "$nb" --out "Exports/mix.wav" --play
+          --bars "$nb" --out "$SCRIPT_DIR/Exports/mix.wav" --play
       else
         read "ast?Stems from A (mix, or e.g. drums,bass) [mix]> "; : "${ast:=mix}"
         read "bst?Stems from B (mix, or e.g. vocals) [mix]> "; : "${bst:=mix}"
         mix_render layer --a "$ta" --a-bar "$abar" --a-stems "$ast" \
           --b "$tb" --b-bar "$bbar" --b-stems "$bst" \
-          --bars "$nb" --out "Exports/mix.wav" --play
+          --bars "$nb" --out "$SCRIPT_DIR/Exports/mix.wav" --play
       fi
       ;;
-    T|t)
+    tempolock)
       INPUT=$(resolve_stems)
       [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
@@ -272,9 +308,13 @@ GUIDE
         BASS="$INPUT"
       fi
       read "tempo?Tempo BPM [120]> "; [[ -z "$tempo" ]] && tempo=120
-      OUT="$SCRIPT_DIR/Samples/MIDI/${BASS:h:t}_bass.mid"
+      if [[ "${BASS:t}" == bass.wav ]]; then BN="${BASS:h:t}"; else BN="${BASS:t:r}"; fi
+      OUT="$SCRIPT_DIR/Samples/MIDI/${BN}_bass.mid"
       mkdir -p "${OUT:h}"
+      STAMPF=$(mktemp)
       bass_to_midi "$BASS" "$OUT" "$tempo"
+      if [[ "$OUT" -nt "$STAMPF" ]]; then echo "Wrote $OUT"; else echo "No MIDI was written."; fi
+      rm -f "$STAMPF"
       ;;
     O|o)
       open "$SCRIPT_DIR/Samples" 2>/dev/null || echo "Samples/ not found — run a step first."
@@ -324,11 +364,14 @@ GUIDE
       echo "Quality: 1) fast (4-stem)  2) 6-stem  3) 6-stem HQ [recommended, slow]  4) acapella"; read "m?> "
       case "$m" in 1) MODE=fast;; 2) MODE=6stem;; 4) MODE=acapella;; 3|"") MODE=hq;; *) echo "Invalid."; continue;; esac
       if [[ -f "$INPUT" ]]; then
-        separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems"
+        separate_stems "$INPUT" "$MODE" "$SCRIPT_DIR/Stems" || echo "Separate failed for ${INPUT:t}."
       else
-        find "$INPUT" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \) | while read -r f; do
-          echo "Processing: ${f:t}"; separate_stems "$f" "$MODE" "$SCRIPT_DIR/Stems"
+        nall=0; nfail=0
+        for f in ${(f)"$(find "$INPUT" -type f \( -name '*.m4a' -o -name '*.mp3' -o -name '*.flac' -o -name '*.wav' \))"}; do
+          echo "Processing: ${f:t}"; (( nall++ ))
+          separate_stems "$f" "$MODE" "$SCRIPT_DIR/Stems" || { (( nfail++ )); echo "  failed: ${f:t}"; }
         done
+        echo "Separated $(( nall - nfail )) of $nall."
       fi
       ;;
     3)
@@ -377,7 +420,8 @@ GUIDE
       fi
       echo "Drum density: 1) tight  2) loose [recommended]"; read "d?> "
       case "$d" in 1) DENS=tight;; 2) DENS=loose;; *) DENS=loose;; esac
-      deconstruct "$INPUT" "$DENS"
+      deconstruct "$INPUT" "$DENS" || { echo "Deconstruct failed."; continue; }
+      [[ -d "$SCRIPT_DIR/Stems/htdemucs/${INPUT:t:r}" ]] || { echo "No stems folder was produced."; continue; }
       read "yn?Build Logic project from these stems now? [y/N]> "
       if [[ "$yn" == (y|Y|yes) ]]; then
         build_logic_project "$SCRIPT_DIR/Stems/htdemucs/${INPUT:t:r}"
@@ -392,16 +436,18 @@ GUIDE
       if [[ -z "$new_files" ]]; then
         echo "Nothing downloaded — aborting pipeline."; continue
       fi
-      echo "$new_files" | while read -r track; do
+      nl=$'\n'; nfail=0
+      for track in ${(f)new_files}; do
         echo "→ Stems: ${track:t}"
-        vocals=$(separate_stems "$track" acapella "$SCRIPT_DIR/Stems" | tail -1)
-        if [[ ! -f "$vocals" ]]; then
-          echo "  no vocals.wav for ${track:t} — skipping chop."; continue
+        sout=$(separate_stems "$track" acapella "$SCRIPT_DIR/Stems"); rc=$?
+        vocals="${sout##*$nl}"
+        if (( rc != 0 )) || [[ ! -f "$vocals" ]]; then
+          echo "  separation failed for ${track:t} — skipping chop."; (( nfail++ )); continue
         fi
         echo "→ Chop: ${vocals:h:t}"
-        chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" loose
+        chop_vocals "$vocals" "$SCRIPT_DIR/Samples/Vocals" loose || { echo "  chop failed for ${track:t}."; (( nfail++ )); }
       done
-      echo "Pipeline complete."
+      if (( nfail )); then echo "Pipeline finished with $nfail failure(s)."; else echo "Pipeline complete."; fi
       ;;
     Q|q|10) echo "Bye."; exit 0 ;;
     *) echo "Invalid choice."; continue ;;
