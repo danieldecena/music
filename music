@@ -120,6 +120,7 @@ while true; do
     row M "Bass stem -> MIDI"
     row R "Re-voice a melody"  "as another instrument"
     row P "Build Logic project"
+    row W "Paste a chord chart" "write a chart you paste into a song's Music lyrics"
     row 9 "Download + chop"    "URL straight to vocal clips"
     echo ""
     row B "Back"
@@ -306,6 +307,29 @@ GUIDE
       [[ -n "$cbpm" ]] && cargs+=(--bpm "$cbpm")
       [[ -n "$clab" ]] && cargs+=(--label "$clab")
       click_compare "${cargs[@]}"
+      ;;
+    W|w)
+      read "q?Song title to find in Music (a file track in your library)> "
+      [[ -z "$q" ]] && continue
+      tb=$'\t'
+      matches=("${(@f)$(music_find_tracks "$q")}"); matches=("${(@)matches:#}")
+      if (( ${#matches} == 0 )); then
+        echo "No local-file track matching '$q' in Music (streaming tracks cannot hold lyrics)."; continue
+      fi
+      pick=1
+      if (( ${#matches} > 1 )); then
+        i=1; for m in "${matches[@]}"; do printf "  %d) %s\n" "$i" "${${m#*$tb}//$tb/  -  }"; ((i++)); done
+        read "pick?Pick # (Enter = cancel)> "
+        (( ${pick:-0} >= 1 && ${pick:-0} <= ${#matches} )) 2>/dev/null || { echo "Cancelled."; continue; }
+      fi
+      echo "Paste the chord chart, then a line with only END:"
+      tmp=$(mktemp)
+      while IFS= read -r line; do
+        [[ "$line" == END ]] && break
+        print -r -- "$line" >> "$tmp"
+      done
+      push_lyrics "${matches[$pick]%%$tb*}" "$tmp"
+      rm -f "$tmp"
       ;;
     M|m)
       INPUT=$(resolve_stems)
