@@ -45,6 +45,8 @@ def get_duration(path: Path) -> float:
          "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
         capture_output=True, text=True,
     )
+    if r.returncode != 0 or not r.stdout.strip():
+        sys.exit(f"Cannot read audio: {path}")
     return float(r.stdout.strip())
 
 
@@ -133,7 +135,10 @@ def main() -> None:
 
     total = failed = 0
     for f in files:
-        audio = decode_mono(f, DETECT_SR)
+        try:
+            audio = decode_mono(f, DETECT_SR)
+        except RuntimeError:
+            sys.exit(f"Cannot read audio: {f}")
         times = onset_times(audio, DETECT_SR, args.delta, args.wait)
         out_dir = out_root / f.parent.name
         print(f"\n{f.parent.name}/{f.stem}: {len(times)} onsets")

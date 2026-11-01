@@ -25,4 +25,5 @@ TEMPO="${2:-120}"
 OUT="$SCRIPT_DIR/Samples/MIDI/${BASS:h:t}_bass.mid"
 mkdir -p "${OUT:h}"
 bass_to_midi "$BASS" "$OUT" "$TEMPO"
+[[ -s "$OUT" ]] || { echo "No MIDI file was written."; exit 1; }
 echo "Wrote $OUT"

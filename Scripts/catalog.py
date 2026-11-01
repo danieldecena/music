@@ -458,7 +458,8 @@ def _playable(rel_path):
             timeout=15,
         ).stdout.strip()
         return float(out) > 0
-    except Exception:
+    except Exception as e:
+        print(f"could not probe {rel_path}: {e}", file=sys.stderr)
         return False
 
 
@@ -597,14 +598,19 @@ def _analyze(source_rel):
     if not (src.exists() and py.exists() and script.exists()):
         return None, None
     try:
-        out = subprocess.run(
+        r = subprocess.run(
             [str(py), str(script), str(src)],
             capture_output=True,
             text=True,
             timeout=120,
-        ).stdout
-    except Exception:
+        )
+    except Exception as e:
+        print(f"could not analyze {source_rel}: {e}", file=sys.stderr)
         return None, None
+    if r.returncode != 0:
+        print(f"could not analyze {source_rel}", file=sys.stderr)
+        return None, None
+    out = r.stdout
     m = ANALYZE_RE.search(out)
     if m:
         return round(float(m.group(1))), m.group(2)

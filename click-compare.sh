@@ -7,7 +7,7 @@ echo "Click-Compare Tempo"
 echo "-------------------"
 echo "Type a song title (typos OK) or drag an audio file / Stems folder, then Enter:"
 read "RAW?> "
-INPUT="$(resolve_target "$RAW")"
+INPUT="$(resolve_target "$RAW")" || true  # set -e would exit before "No match"
 [[ -z "$INPUT" || ! -e "$INPUT" ]] && { echo "No match. Exiting."; exit 1; }
 echo "Using: ${INPUT:t}"
 

@@ -140,16 +140,16 @@ def _fetch(query: str) -> str:
     url = (
         _SEARCH + "?" + urllib.parse.urlencode({"search_type": "title", "value": query})
     )
-    try:
-        r = subprocess.run(
-            ["curl", "-sS", "-m", "25", "-L", url],
-            capture_output=True,
-            text=True,
-            timeout=40,
-        )
-        return r.stdout
-    except (subprocess.SubprocessError, OSError):
-        return ""
+    # A failure raises: returned as empty text it would be cached as "no tabs".
+    r = subprocess.run(
+        ["curl", "-fsS", "-m", "25", "-L", url],
+        capture_output=True,
+        text=True,
+        timeout=40,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip() or f"curl exit {r.returncode}")
+    return r.stdout
 
 
 def _fixture_tracks() -> list[tuple[str, str, str]]:
@@ -193,7 +193,8 @@ def _analyzer_key(path: str) -> str:
         import analyze_track as A  # noqa: E402
 
         return A.detect_key(A.spectra(A.decode_mono(p, A.SR)))
-    except Exception:
+    except Exception as e:
+        print(f"  analyzer failed on {p.name}: {e}", file=sys.stderr)
         return ""
 
 
@@ -209,9 +210,13 @@ def fetch(limit: int | None = None, refresh: bool = False) -> int:
         if cache.exists() and not refresh:
             results = json.loads(cache.read_text())
         else:
-            results = parse_results(_fetch(f"{artist} {title}"))
-            if not results:
-                results = parse_results(_fetch(title))
+            try:
+                results = parse_results(_fetch(f"{artist} {title}"))
+                if not results:
+                    results = parse_results(_fetch(title))
+            except (RuntimeError, subprocess.SubprocessError, OSError) as e:
+                print(f"fetch failed at {title}: {e}. Labels file not updated.")
+                return 1
             cache.write_text(json.dumps(results))
             time.sleep(1.2)  # one search per ~second; this is a 13-row sweep
         pick = pick_tonality(results, title, artist)

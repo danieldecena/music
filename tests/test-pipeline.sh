@@ -86,6 +86,44 @@ out=$(printf '%s\n1\n' "$TMP/batch" | zsh "$REPO/stems.sh" 2>&1); rc=$?
 check "batch tries every file" '[[ "$out" == *"Processing: a.wav"* && "$out" == *"Processing: b.wav"* ]]'
 check "batch reports failures and exits 1" '(( rc == 1 )) && [[ "$out" == *"2 file(s) failed"* && "$out" != *"Done."* ]]'
 
+# unreadable audio gets a plain message, not a traceback
+"$PY" "$REPO/Scripts/chop.py" "$TMP/batch/a.wav" "$TMP/j1" >"$TMP/o" 2>&1; rc=$?
+check "chop names unreadable audio" '(( rc == 1 )) && grep -q "Cannot read audio" "$TMP/o" && ! grep -q Traceback "$TMP/o"'
+"$PY" "$REPO/Scripts/slice_drums.py" "$TMP/batch/a.wav" "$TMP/j2" >"$TMP/o" 2>&1; rc=$?
+check "slice names unreadable audio" '(( rc == 1 )) && grep -q "Cannot read audio" "$TMP/o" && ! grep -q Traceback "$TMP/o"'
+
+# stem levels label an unreadable stem, and a good one normally
+mkdir -p "$TMP/lv"; print junk > "$TMP/lv/bad.wav"; tone "sine=300" 1 "$TMP/lv/good.wav"
+analyze_stems "$TMP/lv" >"$TMP/o" 2>&1
+check "unreadable stem is labelled" 'grep -E "^bad " "$TMP/o" | grep -q unreadable'
+check "good stem is not labelled unreadable" 'grep -E "^good " "$TMP/o" | grep -qv unreadable'
+
+# lookups: a real "none" stays quiet, an outage says so; the oracle keeps no bad cache
+"$PY" - "$REPO/Scripts" >"$TMP/o" 2>"$TMP/e" <<'PYEOF'
+import sys, io, urllib.error, urllib.request, subprocess, types
+sys.path.insert(0, sys.argv[1])
+import lyrics, key_oracle
+lyrics.CACHE_DIR = __import__("pathlib").Path("/nonexistent/lyr")
+def raiser(exc):
+    def f(*a, **k): raise exc
+    return f
+urllib.request.urlopen = raiser(urllib.error.HTTPError("u", 404, "nf", {}, None))
+print("L404", lyrics.fetch_lyrics("a", "t1"))
+urllib.request.urlopen = raiser(urllib.error.URLError("down"))
+print("LDOWN", lyrics.fetch_lyrics("a", "t2"))
+subprocess.run = lambda *a, **k: types.SimpleNamespace(returncode=22, stdout="", stderr="HTTP 500")
+try:
+    key_oracle._fetch("q"); print("ORACLE no-raise")
+except RuntimeError:
+    print("ORACLE raised")
+subprocess.run = lambda *a, **k: types.SimpleNamespace(returncode=0, stdout="page", stderr="")
+print("ORACLEOK", key_oracle._fetch("q"))
+PYEOF
+check "404 is quiet no-lyrics" 'grep -q "L404 None" "$TMP/o" && ! grep -q t1 "$TMP/e"'
+check "outage is reported" 'grep -q "LDOWN None" "$TMP/o" && grep -q "lookup failed for t2" "$TMP/e"'
+check "oracle failed fetch raises" 'grep -q "ORACLE raised" "$TMP/o"'
+check "oracle good fetch returns the page" 'grep -q "ORACLEOK page" "$TMP/o"'
+
 # the menu exits when its input closes
 out=$(zsh -c 'cd "$1"; ./music </dev/null | head -2000 | wc -l' _ "$REPO")
 check "menu exits at end of input" '(( out < 100 ))'

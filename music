@@ -197,9 +197,9 @@ file/folder dragged from Finder into the terminal.
 GUIDE
       ;;
     L|l)
-      "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" scan >/dev/null 2>&1
+      "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" scan >/dev/null
       read "q?Search (blank = all, name/artist)> "
-      lines=("${(@f)$("$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" search "$q" --menu 2>/dev/null)}")
+      lines=("${(@f)$("$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/Scripts/catalog.py" search "$q" --menu)}")
       lines=("${(@)lines:#}")
       [[ ${#lines} -eq 0 ]] && { echo "No matches. (Download or Scan first if the library is new.)"; continue; }
       total=${#lines}

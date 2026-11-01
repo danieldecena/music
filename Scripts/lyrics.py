@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import math
 import re
+import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -128,7 +130,12 @@ def fetch_lyrics(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         text = (data.get("plainLyrics") or "").strip()
-    except Exception:  # noqa: BLE001 -- any failure degrades to "no lyrics"
+    except urllib.error.HTTPError as e:
+        if e.code != 404:  # 404 is LRCLIB's real "no lyrics"; the rest is an outage
+            print(f"lyrics lookup failed for {title}: {e}", file=sys.stderr)
+        return None
+    except Exception as e:  # noqa: BLE001 -- degrades to no lyrics, but says so
+        print(f"lyrics lookup failed for {title}: {e}", file=sys.stderr)
         return None
     if not text:
         return None

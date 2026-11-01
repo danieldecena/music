@@ -25,6 +25,8 @@ def get_duration(path: Path) -> float:
         capture_output=True,
         text=True,
     )
+    if result.returncode != 0 or not result.stdout.strip():
+        sys.exit(f"Cannot read audio: {path}")
     return float(result.stdout.strip())
 
 

@@ -243,7 +243,7 @@ analyze_stems() {
       vd=$(ffmpeg -nostdin -i "$stem" -af volumedetect -f null - 2>&1)
       mean=$(print -r -- "$vd" | awk -F': ' '/mean_volume:/{print $2+0}')
       max=$(print -r -- "$vd" | awk -F': ' '/max_volume:/{print $2+0}')
-      label=$(stem_presence_label "$mean" "$max")
+      if [[ -z "$mean" ]]; then label=unreadable; else label=$(stem_presence_label "$mean" "$max"); fi
       printf "%-10s %6s dB %6s dB  %s\n" "$name" "$mean" "$max" "$label"
     done
   } | tee "$report"
