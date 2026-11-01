@@ -91,6 +91,23 @@ next_step() {  # the one action the current state implies
   fi
 }
 
+if [[ -t 1 ]]; then
+  c_b=$'\e[1m' c_d=$'\e[2m' c_k=$'\e[36;1m' c_x=$'\e[0m'
+else
+  c_b= c_d= c_k= c_x=
+fi
+heading() {  # $1 = title, $2 = current track
+  printf "  %s%s%s  ·  %s\n  %s------------------------------------------------------------%s\n" "$c_b" "$1" "$c_x" "$2" "$c_d" "$c_x"
+}
+section() { printf "  %s%s%s\n" "$c_b" "$1" "$c_x" }
+row() {  # $1 = key, $2 = label, $3 = optional description
+  if [[ -n "$3" ]]; then
+    printf "    %s%-2s%s %-20s %s%s%s\n" "$c_k" "$1" "$c_x" "$2" "$c_d" "$3" "$c_x"
+  else
+    printf "    %s%-2s%s %s\n" "$c_k" "$1" "$c_x" "$2"
+  fi
+}
+
 MENU=main
 while true; do
   echo ""
@@ -99,49 +116,48 @@ while true; do
   # cuts at the last "  [", so a title like "Song  [Live]" keeps its BPM and key.
   CUR_SHORT="${CUR_LABEL%  \[*}"
   if [[ "$MENU" == tools ]]; then
-    echo "  Tools  ·  ${CUR_SHORT:-no track selected}"
-    echo "  ------------------------------------------------------------"
-    echo "    A  Stem levels            loudness / presence per stem"
-    echo "    H  Guitar chords          bar-by-bar progression, or write to Music lyrics"
-    echo "    X  Mix-match              catalog pairs that mix well"
-    echo "    Z  Mix report             what mixes with one track you name"
-    echo "    C  Combine two tracks      layer or transition, cut on the bar grid"
-    echo "    T  Tempo lock             settle BPM by ear (click A/B)"
-    echo "    M  Bass stem -> MIDI"
-    echo "    R  Re-voice a melody      as another instrument"
-    echo "    P  Build Logic project"
-    echo "    9  Download + chop        URL straight to vocal clips"
+    heading "Tools" "${CUR_SHORT:-no track selected}"
+    row A "Stem levels"        "loudness / presence per stem"
+    row H "Guitar chords"      "chart, or write to Music lyrics"
+    row X "Mix-match"          "catalog pairs that mix well"
+    row Z "Mix report"         "what mixes with one track you name"
+    row C "Combine two tracks" "layer or transition, cut on the bar grid"
+    row T "Tempo lock"         "settle BPM by ear (click A/B)"
+    row M "Bass stem -> MIDI"
+    row R "Re-voice a melody"  "as another instrument"
+    row P "Build Logic project"
+    row 9 "Download + chop"    "URL straight to vocal clips"
     echo ""
-    echo "    B  Back"
+    row B "Back"
   else
     scan_track
+    heading "Music Toolkit" "${CUR_SHORT:-no track selected}"
     if [[ -n "$CUR_NAME" ]]; then
-      echo "  Music Toolkit  ·  $CUR_SHORT"
       echo "  stems $(box $HAS_STEMS)   one-shots $(box $HAS_SHOTS)   kit $(box $HAS_KIT)   chops $(box $HAS_CHOPS)"
     else
-      echo "  Music Toolkit  ·  no track selected"
-      echo "  Turn songs into stems, one-shots & samples for flipping."
+      echo "  ${c_d}Turn songs into stems, one-shots & samples for flipping.${c_x}"
     fi
-    echo "  ------------------------------------------------------------"
     echo "  Next:  $(next_step)"
     echo ""
-    echo "  THE FLIP PATH"
-    echo "    1  Download"
-    echo "    8  Deconstruct           everything below, in one go"
-    echo "    ·"
-    echo "    2  Separate stems"
-    echo "    7  Tempo & key"
-    echo "    3  Chop vocals"
-    echo "    4  Split drums"
-    echo "    6  Sort drum kit"
-    echo "    5  Chop stems"
+    section "THE FLIP PATH"
+    row 1 "Download"       "paste a URL, saves into Apple Music/"
+    row 8 "Deconstruct"    "everything below, in one go"
+    row 2 "Separate stems"
+    row 7 "Tempo & key"
+    row 3 "Chop vocals"
+    row 4 "Split drums"
+    row 6 "Sort drum kit"
+    row 5 "Chop stems"
     echo ""
-    echo "    H  Guitar chords    L  Browse tracks    O  Open Samples/    T  More tools"
-    if [[ -n "$CUR_NAME" ]]; then
-      echo "    G  Guide            Q  Quit            C  Clear track"
-    else
-      echo "    G  Guide            Q  Quit"
-    fi
+    section "EXTRAS"
+    row H "Guitar chords"  "chart, or write to Music lyrics"
+    row L "Browse tracks"
+    row O "Open Samples/"
+    row T "More tools"
+    echo ""
+    [[ -n "$CUR_NAME" ]] && row C "Clear track"
+    row G "Guide"
+    row Q "Quit"
   fi
   read "choice?> "
 
