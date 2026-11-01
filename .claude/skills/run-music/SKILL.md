@@ -132,7 +132,7 @@ catalog). Call the entry point directly; do not go through the interactive
 wrapper, which only prompts and forwards.
 
 ```bash
-# Chord chart for a Stems folder or an audio file (writes chords.txt beside it)
+# Chord chart for a Stems folder or an audio file (writes chords.txt in a Stems folder, "<song> chords.txt" beside a file)
 .venv/bin/python Scripts/chords.py "Stems/htdemucs_6s/02 Let Em' Know"
 
 # Harmonic mix-match over the catalog

@@ -271,7 +271,7 @@ analyze_track() {
 
 chord_progression() {
   # $1 = an audio file or a Stems/<model>/<track> folder. Prints a bar-by-bar
-  # chord chart and writes <input>/chords.txt (read-only; never re-encodes).
+  # chord chart and writes chords.txt in a Stems folder, or "<song> chords.txt" beside a file (never re-encodes).
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
 }
 
