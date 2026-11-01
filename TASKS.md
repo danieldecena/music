@@ -8,6 +8,10 @@
 - [ ] Chords slice 1: probe Music.app Lyrics view with test text
 - [ ] Chords slice 1: chords_to_lyrics turns bars into lines
 - [ ] Chords slice 1: push_lyrics writes and re-reads the field
+- [ ] Guitar tuner: scaffold ~/developer/guitar-tuner + TunerCore package
+- [ ] Guitar tuner: detector passes accuracy tests incl. known-bad control
+- [ ] Guitar tuner: capture, tone and UI built and run in simulator
+- [ ] (you) Guitar tuner: check phone readout against a known tone
 
 ## Roadmap — song database
 
@@ -116,16 +120,17 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-09-04 11:29.
+Plan approved 2026-10-31 17:05.
+Plan file: docs/superpowers/plans/look-at-the-best-frolicking-dove.md
 
-Sessions start in "plan" (permissions.defaultMode in
+Sessions start in "default" mode (permissions.defaultMode in
 ~/.claude/settings.json). Bypass is reachable in the Shift+Tab cycle only
 when launched via `cb` (--allow-dangerously-skip-permissions); `yolo`
 (--dangerously-skip-permissions) starts in bypass outright.
 
 Only if Claude Code actually closed:
 
-    claude --resume 060c1574-c64b-475d-8ffd-6076377c8503
+    claude --resume f70e7780-5a4b-4221-9ed7-71d3d389ded9
 
 (`-c` resumes the most recent session; bare `--resume` opens a searchable picker.)
 <!-- /resume-footer -->
