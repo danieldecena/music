@@ -418,8 +418,14 @@ resolve_target() {
   local raw="$1"
   raw="${raw//\\ / }"; raw="${raw%"${raw##*[! ]}"}"
   [[ -z "$raw" ]] && return 1
-  [[ -e "$raw" ]] && { print -- "$raw"; return 0; }
-  pick_track "$raw"
+  local target="$raw"
+  [[ -e "$raw" ]] || target="$(pick_track "$raw")" || return 1
+  if [[ "${target:e:l}" == (m4p|movpkg) ]]; then
+    echo "${target:t} is locked by Apple Music (DRM), so the toolkit cannot read its audio." >&2
+    echo "Use an unprotected copy: a song bought from the iTunes Store, or any .m4a/.mp3/.wav you own." >&2
+    return 1
+  fi
+  print -- "$target"
 }
 
 bass_to_midi() {

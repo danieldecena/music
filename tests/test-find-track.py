@@ -97,6 +97,30 @@ def find() -> None:
         rows = ft.find("exchange", root, limit=10, min_score=0.05, gap=0.25)
         check(all(r[0] >= rows[0][0] - 0.25 for r in rows), "gap floor drops the tail")
 
+    with tempfile.TemporaryDirectory() as d:
+        root = _mkroot(Path(d) / "repo")
+        lib = Path(d) / "library"
+        (lib / "SWAG" / "02 DAISIES.movpkg").mkdir(parents=True)
+        (lib / "SWAG" / "02 DAISIES.movpkg" / "root.xml").write_bytes(b"x")
+        (lib / "Album").mkdir()
+        for f in ("06 Better.m4p", "06 Better.m4a", "07 Control.m4a"):
+            (lib / "Album" / f).write_bytes(b"x")
+
+        rows = ft.find("daisies", root, limit=10, min_score=0.34, library=lib)
+        check(
+            rows[0][1:3] == ("locked", "02 DAISIES"),
+            "a .movpkg is found, marked locked",
+        )
+        rows = ft.find("better", root, limit=10, min_score=0.34, library=lib)
+        check(
+            rows[0][1] == "source" and rows[0][3].endswith(".m4a"),
+            "a usable copy beats the locked copy of the same song",
+        )
+        rows = ft.find("control", root, limit=10, min_score=0.34, library=lib)
+        check(rows[0][1] == "source", "a usable file in the library is found")
+        rows = ft.find("control", root, limit=10, min_score=0.34)
+        check(rows == [], "no library given -> library stays out of the search")
+
 
 def cli() -> None:
     with tempfile.TemporaryDirectory() as d:

@@ -32,7 +32,12 @@ AUDIO_EXTS = {".m4a", ".wav", ".mp3", ".flac", ".aiff", ".aif", ".ogg"}
 SOURCE_DIRS = ("Apple Music", "SoundCloud", "Downloads")
 STEM_MODELS = ("htdemucs", "htdemucs_6s")
 # stems outrank source so a track that is both collapses to its stem folder.
-KIND_RANK = {"stems": 1, "source": 0}
+KIND_RANK = {"stems": 1, "source": 0, "locked": -1}
+# Music.app's own media folder: read alongside the repo's source folders.
+LIBRARY = Path.home() / "Apple Music"
+# FairPlay-protected Apple Music downloads. Listed so a search can say why a song
+# in the library is unusable; a usable copy of the same title outranks them.
+LOCKED_EXTS = {".m4p", ".movpkg"}
 
 
 def _norm(s: str) -> str:
@@ -67,7 +72,7 @@ def score(query: str, label: str) -> float:
     return best
 
 
-def candidates(root: Path):
+def candidates(root: Path, library: Path | None = None):
     """Yield (kind, label, path) for every stem folder and source audio file."""
     for model in STEM_MODELS:
         mdir = root / "Stems" / model
@@ -75,22 +80,34 @@ def candidates(root: Path):
             for track in sorted(mdir.iterdir()):
                 if track.is_dir():
                     yield ("stems", track.name, track)
-    for name in SOURCE_DIRS:
-        base = root / name
+    bases = [root / name for name in SOURCE_DIRS]
+    if library:
+        bases.append(library)
+    for base in bases:
         if base.is_dir():
             for f in sorted(base.rglob("*")):
-                if f.is_file() and f.suffix.lower() in AUDIO_EXTS:
+                ext = f.suffix.lower()
+                if ext in LOCKED_EXTS:
+                    yield ("locked", f.stem, f)
+                elif f.is_file() and ext in AUDIO_EXTS:
                     yield ("source", f.stem, f)
 
 
-def find(query: str, root: Path, limit: int, min_score: float, gap: float = 0.25):
+def find(
+    query: str,
+    root: Path,
+    limit: int,
+    min_score: float,
+    gap: float = 0.25,
+    library: Path | None = None,
+):
     """Ranked, deduped matches: list of (score, kind, label, path).
 
     Drops the weak tail: once a strong top match exists, rows more than `gap`
     below it are cut so a picker shows a handful, not the whole library.
     """
     best: dict[str, tuple] = {}  # normalized label -> best row
-    for kind, label, path in candidates(root):
+    for kind, label, path in candidates(root, library):
         sc = score(query, label)
         if sc < min_score:
             continue
@@ -109,7 +126,7 @@ def find(query: str, root: Path, limit: int, min_score: float, gap: float = 0.25
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Fuzzy-find a track by title.")
     ap.add_argument("query")
-    ap.add_argument("--root", default=str(Path(__file__).resolve().parent.parent))
+    ap.add_argument("--root")
     ap.add_argument("--limit", type=int, default=10)
     ap.add_argument("--min-score", type=float, default=0.34)
     out = ap.add_mutually_exclusive_group()
@@ -119,7 +136,12 @@ def main(argv=None) -> int:
     out.add_argument("--json", action="store_true")
     ns = ap.parse_args(argv)
 
-    rows = find(ns.query, Path(ns.root).expanduser(), ns.limit, ns.min_score)
+    # An explicit --root is a self-contained search, so the real library stays out.
+    if ns.root:
+        root, library = Path(ns.root).expanduser(), None
+    else:
+        root, library = Path(__file__).resolve().parent.parent, LIBRARY
+    rows = find(ns.query, root, ns.limit, ns.min_score, library=library)
     if not rows:
         return 1
     if ns.json:
