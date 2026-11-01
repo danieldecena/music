@@ -184,6 +184,11 @@ def _audio_source(p: Path) -> Path:
     source, so refuse it with a clean message rather than handing ffmpeg a
     directory (which fails with an opaque "Is a directory").
     """
+    if p.suffix.lower() == ".movpkg":
+        raise ValueError(
+            f"{p.name} is an Apple Music offline download (protected, not an audio file); "
+            "use an .m4a/.mp3/.wav file instead"
+        )
     if not p.is_dir():
         return p
     inst = p / "no_vocals.wav"

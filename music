@@ -368,6 +368,7 @@ GUIDE
     1)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
+      [[ "$url" == http*://* ]] || { echo "That is not a URL. For a file on this Mac use H (chords), 7 (tempo & key) or 8 (deconstruct)."; continue; }
       download_and_select "$url"
       ;;
     2)
@@ -446,6 +447,7 @@ GUIDE
     9)
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
+      [[ "$url" == http*://* ]] || { echo "That is not a URL."; continue; }
       STAMP=$(date +%s)
       download_url "$url" "$SCRIPT_DIR/Apple Music"
       new_files=$(find_new_m4a "$SCRIPT_DIR/Apple Music" "$STAMP")
