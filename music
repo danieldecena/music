@@ -76,7 +76,7 @@ box() { (( $1 )) && print -n "[x]" || print -n "[ ]" }
 
 next_step() {  # the one action the current state implies
   if [[ -z "$CUR_NAME" ]]; then print -- "1  Download a song      (or  L  to pick one you have)"
-  elif (( ! HAS_STEMS ));  then print -- "8  Deconstruct          (or  2  to split stems only)"
+  elif (( ! HAS_STEMS ));  then print -- "8  Deconstruct          (or  2  stems only,  H  guitar chords)"
   elif (( ! HAS_DRUMS ));  then print -- "3  Chop vocals          (acapella split — no drums to slice)"
   elif (( ! HAS_SHOTS ));  then print -- "4  Split drums"
   elif (( ! HAS_KIT ));    then print -- "6  Sort drum kit"
@@ -173,7 +173,7 @@ Guide — how to flip a track
 ---------------------------
 Fastest path (recommended):
   1) Download      paste a URL; saves .m4a into Apple Music/
-  8) Deconstruct   drag that file, pick "loose" — chains everything:
+  8) Deconstruct   press Enter for that file, pick "loose" — chains everything:
                    analyze (BPM+key) -> 4-stem split -> drum one-shots ->
                    sort kit (kick/snare/hat) -> fixed-length stem snippets.
   Everything lands under Samples/, ready to drag into Logic.
@@ -189,12 +189,13 @@ Pick what you need:
   Sample-flip fast ....... 8
   Acapella / instrumental  2 (acapella) -> 3
   Build a drum kit ....... 2 -> 4 -> 6
+  Play it on guitar ...... 1 -> H
 
 Density / sensitivity: "loose" = more, longer clips; "tight" = fewer, cleaner.
 Start loose, tighten if you get too much noise.
 
-Input: Download/Full pipeline take a pasted URL; everything else takes a
-file/folder dragged from Finder into the terminal.
+Input: Download takes a pasted URL. Other steps use the current track, or a
+song title or file/folder dragged from Finder into the terminal.
 GUIDE
       ;;
     L|l)
@@ -231,7 +232,12 @@ GUIDE
       analyze_stems "$INPUT"
       ;;
     H|h)
-      INPUT=$(resolve_stems)
+      # Chords read a plain audio file, so a fresh download needs no stems first.
+      if [[ -f "$CUR_SRC" && -z "$(stems_dir_for "$CUR_NAME")" ]]; then
+        INPUT="$CUR_SRC"
+      else
+        INPUT=$(resolve_stems)
+      fi
       [[ -z "$INPUT" ]] && continue
       [[ ! -e "$INPUT" ]] && { echo "Invalid path."; continue; }
       chord_progression "$INPUT" || continue

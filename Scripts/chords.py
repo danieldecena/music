@@ -253,7 +253,8 @@ def main() -> None:
         print(f"chord analysis failed -- {exc}")
         sys.exit(1)
     print(format_chart(p.name, bpm, key, labels))
-    dest = (p if p.is_dir() else p.parent) / "chords.txt"
+    # One chart per song: songs from an album share a folder.
+    dest = p / "chords.txt" if p.is_dir() else p.with_name(f"{p.stem} chords.txt")
     try:
         dest.write_text(chords_txt(p.name, bpm, key, labels))
         print(f"\n  Chart: {dest}")

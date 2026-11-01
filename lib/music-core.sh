@@ -85,6 +85,11 @@ find_new_m4a() {
   rm -f "$ref"
 }
 
+apple_login_current() {  # $1 = cookies.txt; true when its Apple Music token has not expired
+  [[ -f "$1" ]] && awk -F'\t' -v now="$(date +%s)" \
+    '$1 ~ /music\.apple\.com/ && $6 == "media-user-token" && $5 > now { found = 1 } END { exit !found }' "$1"
+}
+
 download_url() {
   # $1 = url, $2 = apple-music output dir (other types derive siblings)
   local url="$1" am_out="$2"
@@ -100,9 +105,9 @@ download_url() {
     fi
     command -v gamdl >/dev/null || { echo "gamdl not found on PATH — install it (pipx install gamdl)." >&2; return 3; }
     command -v expect >/dev/null || { echo "expect not found on PATH — install it (brew install expect)." >&2; return 3; }
-    if [[ ! -f "$cookies" ]]; then
-      python3 "$MUSIC_DIR/get-cookies.py" "$cookies" || {
-        echo "Cookie extraction failed. Sign into music.apple.com in Safari + grant Full Disk Access." >&2
+    if ! apple_login_current "$cookies"; then
+      python3 "$MUSIC_DIR/get-cookies.py" "$cookies" && apple_login_current "$cookies" || {
+        echo "Could not get a current Apple Music sign-in. Sign into music.apple.com in Safari + grant Full Disk Access." >&2
         return 1
       }
     fi
@@ -112,10 +117,14 @@ download_url() {
     expect -c "
       set timeout -1
       spawn gamdl --cookies-path [list ${cookies}] --output-path [list ${am_out}] [list ${url}]
-      expect -re {[?>]}
-      send \"\x01\"
-      send \"\r\"
-      interact
+      catch {
+        expect {
+          -re {[?>]} { send \"\x01\"; send \"\r\"; interact }
+          eof {}
+        }
+      }
+      catch wait result
+      exit [lindex \$result 3]
     "
   elif [[ "$url" == *"soundcloud.com"* ]]; then
     command -v yt-dlp >/dev/null || { echo "yt-dlp not found on PATH — install it (brew install yt-dlp)." >&2; return 3; }

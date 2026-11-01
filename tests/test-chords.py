@@ -149,8 +149,8 @@ def exitcode() -> None:
         )
         check(r.returncode == 0, f"good file -> zero exit (got {r.returncode})")
         check(
-            (Path(d) / "chords.txt").is_file(),
-            "good file -> writes chords.txt beside it",
+            (Path(d) / "good chords.txt").is_file(),
+            "good file -> writes '<song> chords.txt' beside it",
         )
         check("BPM" in r.stdout, "good file -> prints a chart header")
 
