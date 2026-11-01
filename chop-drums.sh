@@ -7,7 +7,7 @@ echo "Drum Splitter"
 echo "-------------"
 echo "Drag a drums.wav file or a Stems folder here (or press Enter for all stems):"
 read "INPUT?> "
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ -z "$INPUT" ]] && INPUT="$SCRIPT_DIR/Stems"
 [[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 

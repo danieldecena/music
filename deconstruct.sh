@@ -11,7 +11,7 @@ else
 	echo "Drag an audio file (analyzes tempo/key, splits stems, makes one-shots + kit + snippets):"
 	read "INPUT?> "
 fi
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -f "$INPUT" ]] && { echo "Need an audio file. Exiting."; exit 1; }
 
 if [[ -n "${2:-}" ]]; then

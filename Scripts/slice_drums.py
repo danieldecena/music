@@ -87,23 +87,27 @@ def onset_times(audio: np.ndarray, sr: int, delta: float, wait_s: float) -> list
 
 
 def slice_hits(src: Path, out_dir: Path, times: list[float], total_dur: float,
-               max_len: float, min_len: float) -> int:
+               max_len: float, min_len: float) -> tuple[int, int]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    n = 0
+    n = failed = 0
     for i, start in enumerate(times):
         nxt = times[i + 1] if i + 1 < len(times) else total_dur
         dur = min(nxt, start + max_len) - start
         if dur < min_len:
             continue
-        n += 1
-        out = out_dir / f"{src.stem}_{n:03d}.wav"
-        subprocess.run(
+        out = out_dir / f"{src.stem}_{n + 1:03d}.wav"
+        r = subprocess.run(
             ["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.4f}", "-i", str(src),
              "-t", f"{dur:.4f}", "-c", "copy", str(out)],
             capture_output=True,
         )
+        if r.returncode != 0:
+            failed += 1
+            print(f"  FAILED {start:.2f}s  ->  {out.name}", file=sys.stderr)
+            continue
+        n += 1
         print(f"  [{n:03d}] {start:.2f}s ({dur:.2f}s)  ->  {out.name}")
-    return n
+    return n, failed
 
 
 def main() -> None:
@@ -127,14 +131,19 @@ def main() -> None:
         print("No drums.wav found (pass a stem file directly to split something else).")
         sys.exit(1)
 
-    total = 0
+    total = failed = 0
     for f in files:
         audio = decode_mono(f, DETECT_SR)
         times = onset_times(audio, DETECT_SR, args.delta, args.wait)
         out_dir = out_root / f.parent.name
         print(f"\n{f.parent.name}/{f.stem}: {len(times)} onsets")
-        total += slice_hits(f, out_dir, times, get_duration(f), args.max_len, args.min_len)
+        saved, bad = slice_hits(f, out_dir, times, get_duration(f), args.max_len, args.min_len)
+        total += saved
+        failed += bad
 
+    if failed:
+        print(f"\n✗ {failed} one-shots failed, {total} saved to {out_root}")
+        sys.exit(1)
     print(f"\n✓ {total} one-shots saved to {out_root}")
 
 

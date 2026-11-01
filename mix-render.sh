@@ -30,7 +30,7 @@ read "MODE?> "
 
 if [[ "$MODE" == "2" ]]; then
   mix_render transition --a "$A" --a-bar "$ABAR" --b "$B" --b-bar "$BBAR" \
-    --bars "$BARS" --out "Exports/mix.wav" --play
+    --bars "$BARS" --out "$SCRIPT_DIR/Exports/mix.wav" --play
 else
   echo "Stems from A? (mix, or e.g. drums,bass) [mix]"
   read "AST?> "; : "${AST:=mix}"
@@ -38,5 +38,5 @@ else
   read "BST?> "; : "${BST:=mix}"
   mix_render layer --a "$A" --a-bar "$ABAR" --a-stems "$AST" \
     --b "$B" --b-bar "$BBAR" --b-stems "$BST" \
-    --bars "$BARS" --out "Exports/mix.wav" --play
+    --bars "$BARS" --out "$SCRIPT_DIR/Exports/mix.wav" --play
 fi

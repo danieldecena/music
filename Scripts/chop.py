@@ -54,6 +54,8 @@ def detect_segments(
     silence_regions = []
     if len(ends) > len(starts):
         starts = [0.0] + starts
+    elif len(starts) > len(ends):
+        ends.append(duration)  # silence runs to the end of the file
     for s, e in zip(starts, ends):
         silence_regions.append((s, e))
 

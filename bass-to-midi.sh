@@ -11,7 +11,7 @@ else
   echo "Drag a bass.wav or a Stems track folder:"
   read "INPUT?> "
 fi
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 
 if [[ -d "$INPUT" ]]; then

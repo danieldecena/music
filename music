@@ -4,12 +4,6 @@
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/music-core.sh"
 
-clean_path() {  # $1 = a dragged path; Finder backslash-escapes spaces, parens, quotes
-  local p="$1"
-  [[ "$p" == *\\* ]] && p="${(Q)p}"
-  print -- "${p%"${p##*[! ]}"}"
-}
-
 read_path() {  # prints a cleaned drag-and-drop path
   local p; read "p?> "
   clean_path "$p"
@@ -159,7 +153,7 @@ while true; do
     row G "Guide"
     row Q "Quit"
   fi
-  read "choice?> "
+  read "choice?> " || { echo; exit 0; }  # input closed: without this the menu spins forever
 
   # The Tools menu reuses C and T, which the main-menu arms below match first;
   # give the Tools entries their own names so they are reachable.
@@ -448,9 +442,7 @@ GUIDE
       read "url?Paste URL> "
       [[ -z "$url" ]] && { echo "No URL."; continue; }
       [[ "$url" == http*://* ]] || { echo "That is not a URL."; continue; }
-      STAMP=$(date +%s)
-      download_url "$url" "$SCRIPT_DIR/Apple Music"
-      new_files=$(find_new_m4a "$SCRIPT_DIR/Apple Music" "$STAMP")
+      new_files=$(download_and_locate "$url" "$SCRIPT_DIR/Apple Music")
       if [[ -z "$new_files" ]]; then
         echo "Nothing downloaded — aborting pipeline."; continue
       fi

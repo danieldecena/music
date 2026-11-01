@@ -7,7 +7,7 @@ echo "Chord Progression"
 echo "-----------------"
 echo "Drag an audio file or a Stems/<model>/<track> folder, then press Enter:"
 read "INPUT?> "
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 
 chord_progression "$INPUT"

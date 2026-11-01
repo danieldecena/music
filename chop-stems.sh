@@ -7,7 +7,7 @@ echo "Stem Snippet Chopper"
 echo "--------------------"
 echo "Drag a Stems track folder (or a single stem .wav):"
 read "INPUT?> "
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 
 read "SECS?Snippet length in seconds [8]> "

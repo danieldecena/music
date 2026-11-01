@@ -11,7 +11,7 @@ else
   echo "Drag a Stems track folder (with drums/bass/other/vocals.wav):"
   read "INPUT?> "
 fi
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -d "$INPUT" ]] && { echo "Need a Stems track folder. Exiting."; exit 1; }
 
 TEMPO="${2:-}"

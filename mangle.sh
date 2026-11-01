@@ -11,7 +11,7 @@ else
 	echo "Drag a sample .wav or a folder of samples:"
 	read "INPUT?> "
 fi
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -e "$INPUT" ]] && { echo "Need a .wav or folder. Exiting."; exit 1; }
 
 # $2 optional comma-separated transform list (default = all)

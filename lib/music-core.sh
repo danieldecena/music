@@ -139,10 +139,13 @@ download_and_locate() {
   # so check each root that exists for files newer than the pre-download stamp.
   local url="$1" am_out="$2" stamp d
   stamp=$(date +%s)
-  download_url "$url" "$am_out" || return
+  # stderr, not stdout: callers capture stdout as the file list, and the
+  # downloader's progress lines would read as tracks.
+  download_url "$url" "$am_out" >&2 || return
   for d in "$am_out" "$MUSIC_DIR/SoundCloud" "$MUSIC_DIR/Downloads"; do
     [[ -d "$d" ]] && find_new_m4a "$d" "$stamp"
   done
+  return 0
 }
 
 separate_stems() {
@@ -195,14 +198,15 @@ chop_stems() {
     stems=("$input")
   fi
   [[ ${#stems} -eq 0 ]] && { echo "No stem .wav files in $input" >&2; return 1; }
-  local stem name dest
+  local stem name dest rc=0
   for stem in $stems; do
     name="${stem:t:r}"
     dest="$out/$track/$name"; mkdir -p "$dest"
     ffmpeg -nostdin -y -v error -i "$stem" -f segment -segment_time "$secs" \
       -segment_start_number 1 -c copy -reset_timestamps 1 "$dest/${name}_%03d.wav" \
-      && echo "  $name -> $dest"
+      && echo "  $name -> $dest" || rc=1
   done
+  return $rc
 }
 
 stem_presence_label() {
@@ -411,12 +415,16 @@ pick_track() {
   local -a p=("${(@s:	:)rows[$pick]}"); print -- "$p[4]"
 }
 
+clean_path() {  # $1 = a dragged path; Finder backslash-escapes spaces, parens, quotes
+  local p="$1"
+  [[ "$p" == *\\* ]] && p="${(Q)p}"
+  print -- "${p%"${p##*[! ]}"}"
+}
 resolve_target() {
   # $1 = raw typed input — a dragged path or a song title. Echoes a resolved
   # path (empty + return 1 on no match/cancel). An existing path is passed
   # through untouched; anything else is fuzzy-matched via pick_track.
-  local raw="$1"
-  raw="${raw//\\ / }"; raw="${raw%"${raw##*[! ]}"}"
+  local raw; raw="$(clean_path "$1")"
   [[ -z "$raw" ]] && return 1
   local target="$raw"
   [[ -e "$raw" ]] || target="$(pick_track "$raw")" || return 1
@@ -584,19 +592,26 @@ deconstruct() {
   local track="${file:t:r}"
   local stemdir="$MUSIC_DIR/Stems/htdemucs/$track"
   echo "→ Tempo & key:"
-  local _analysis; _analysis=$(analyze_track "$file"); print -r -- "$_analysis"
+  local -a failed
+  local _analysis; _analysis=$(analyze_track "$file") || failed+=("tempo & key")
+  print -r -- "$_analysis"
   echo "→ Separating 4 stems (drums/bass/other/vocals)…"
   separate_stems "$file" fast "$MUSIC_DIR/Stems" >/dev/null || return 1
   echo "→ Drum one-shots…"
   chop_drums "$stemdir/drums.wav" "$MUSIC_DIR/Samples/One-Shots" "$dens" | tail -1
+  (( ${pipestatus[1]} == 0 )) || failed+=("drum one-shots")
   echo "→ Sorting kit (kick/snare/hat)…"
-  sort_kit "$MUSIC_DIR/Samples/One-Shots/$track"
+  sort_kit "$MUSIC_DIR/Samples/One-Shots/$track" || failed+=("kit sort")
   echo "→ Stem presence & loudness…"
-  analyze_stems "$stemdir" >/dev/null
+  analyze_stems "$stemdir" >/dev/null || failed+=("stem levels")
   echo "→ 8s stem snippets…"
-  chop_stems "$stemdir" "$MUSIC_DIR/Samples/Chops" 8 >/dev/null
+  chop_stems "$stemdir" "$MUSIC_DIR/Samples/Chops" 8 >/dev/null || failed+=("stem snippets")
   echo "→ Vocal phrase chops…"
-  chop_vocals "$stemdir/vocals.wav" "$MUSIC_DIR/Samples/Vocals" loose >/dev/null
+  chop_vocals "$stemdir/vocals.wav" "$MUSIC_DIR/Samples/Vocals" loose >/dev/null || failed+=("vocal chops")
+  if (( ${#failed} )); then
+    echo "✗ Deconstruct incomplete: $track -- failed: ${(j:, :)failed}" >&2
+    return 1
+  fi
   echo "✓ Deconstruct complete: $track"
   echo "  Stems: $stemdir"
   echo "  One-shots + kit: Samples/One-Shots/$track"
@@ -609,8 +624,12 @@ deconstruct() {
   _bpm=$(print -r -- "$_analysis" | sed -nE 's/.*[^0-9]([0-9]{2,3}(\.[0-9]+)?)[[:space:]]*BPM.*/\1/p' | head -1)
   _bpm=${_bpm:+$(printf '%.0f' "$_bpm")}
   _key=$(print -r -- "$_analysis" | sed -nE 's/.*[Kk]ey[[:space:]]+([A-Ga-g][b#]?m?).*/\1/p' | head -1)
+  # An array because zsh does not word-split ${x:+--bpm $x}: it passes one argument.
+  local -a _index_args
+  [[ -n "$_bpm" ]] && _index_args+=(--bpm "$_bpm")
+  [[ -n "$_key" ]] && _index_args+=(--key "$_key")
   if [[ -x "$MUSIC_DIR/.venv/bin/python" ]]; then
-    "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" index-track "$track" ${_bpm:+--bpm $_bpm} ${_key:+--key $_key} >/dev/null 2>&1
+    "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/catalog.py" index-track "$track" "${_index_args[@]}" >/dev/null 2>&1
   fi
   # Apple's bar grid, so the track is mixable. Reported rather than swallowed:
   # without it mix_render has nothing to cut on, and a silent skip would leave

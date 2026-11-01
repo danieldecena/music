@@ -14,6 +14,7 @@ Files are COPIED (originals stay put). Usage:
 
 import argparse
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -110,6 +111,12 @@ def main() -> None:
         print(f"No .wav one-shots in {src}")
         return
 
+    # An undecodable hit has no features to classify, and would land in snare.
+    unreadable = [h for h in hits if decode_mono(h).size == 0]
+    for h in unreadable:
+        print(f"Unreadable, not sorted: {h.name}", file=sys.stderr)
+    hits = [h for h in hits if h not in unreadable]
+
     labels = classify_folder(hits)
     counts = {"kick": 0, "snare": 0, "hat": 0}
     for h in hits:
@@ -122,6 +129,8 @@ def main() -> None:
     print(f"Sorted {len(hits)} hits -> "
           f"kick {counts['kick']}, snare {counts['snare']}, hat {counts['hat']}")
     print(f"  {src}/kick  {src}/snare  {src}/hat")
+    if unreadable:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ else
   echo "Drag a monophonic melodic stem (.wav -- a lead/bass/vocal line):"
   read "INPUT?> "
 fi
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 
 if [[ -d "$INPUT" ]]; then
   STEM=$(find "$INPUT" -type f \( -name 'other.wav' -o -name 'bass.wav' -o -name 'vocals.wav' \) | head -1)

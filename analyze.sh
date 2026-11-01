@@ -7,7 +7,7 @@ echo "Tempo & Key Analyzer"
 echo "--------------------"
 echo "Drag an audio file or a folder:"
 read "INPUT?> "
-INPUT="${INPUT//\\ / }"; INPUT="${INPUT%"${INPUT##*[! ]}"}"
+INPUT="$(clean_path "$INPUT")"
 [[ ! -e "$INPUT" ]] && { echo "Invalid path. Exiting."; exit 1; }
 
 analyze_track "$INPUT"
