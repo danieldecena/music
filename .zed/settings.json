@@ -1,8 +1,11 @@
 {
   "context_servers": {
     "sqlite-catalog": {
-      "command": "/Users/home/bin/sqlite-mcp",
+      "command": "/bin/sh",
       "args": [
+        "-c",
+        "exec \"$HOME/bin/sqlite-mcp\" \"$@\"",
+        "sqlite-mcp",
         "catalog.sqlite"
       ]
     }
