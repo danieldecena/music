@@ -119,6 +119,7 @@ while true; do
     row T "Tempo lock"         "settle BPM by ear (click A/B)"
     row M "Bass stem -> MIDI"
     row R "Re-voice a melody"  "as another instrument"
+    row K "Logic chords"       "second opinion from Logic Pro, sent to the phone"
     row P "Build Logic project"
     row W "Paste a chord chart" "write a chart you paste into a song's Music lyrics"
     row 9 "Download + chop"    "URL straight to vocal clips"
@@ -264,6 +265,15 @@ GUIDE
         echo "Chord analysis failed."
       fi
       rm -f "$tmp"
+      ;;
+    K|k)
+      if [[ -f "$CUR_SRC" ]]; then
+        INPUT="$CUR_SRC"
+      else
+        read "raw?Song title (typos OK) or drag its audio file> "
+        INPUT=$(resolve_target "$raw") || continue
+      fi
+      logic_chords "$INPUT"
       ;;
     X|x)
       read "ly?Match lyric themes too? (slower, needs network) [y/N]> "

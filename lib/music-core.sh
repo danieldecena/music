@@ -275,6 +275,26 @@ chord_progression() {
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
 }
 
+logic_chords() {
+  # $1 = a song's audio file with its "<name> chords.txt" beside it (from Guitar chords).
+  # Rewrites that chart from Logic Pro's Chord ID (Scripts/logic_chords.py: Logic stays in the
+  # background, the old chart is kept as "<name> chords (script).txt"), then sends the song to
+  # Chordbook's iCloud folder when that project is on this Mac.
+  local f="$1" pub="$HOME/developer/chordbook/scripts/songs_to_icloud.sh" out rc
+  if [[ ! -f "$f" ]]; then
+    echo "Logic chords needs the song's audio file, and ${f:t} is not one (a stems folder?). Drag the .m4a." >&2
+    return 1
+  fi
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/logic_chords.py" "$f" || return 1
+  if [[ ! -x "$pub" ]]; then
+    echo "Chordbook is not on this Mac, so nothing was sent to the phone."
+    return 0
+  fi
+  out="$("$pub" 2>&1)"; rc=$?
+  print -rl -- "${(@M)${(f)out}:#*(${f:t:r}|FAILED|added, )*}"
+  return $rc
+}
+
 chords_lyrics_text() {
   # $1 = audio file or Stems folder. Prints the chords as timed lyric-style lines.
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords_to_lyrics.py" "$1"

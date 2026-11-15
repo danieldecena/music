@@ -1,9 +1,9 @@
 #!/opt/homebrew/bin/python3
 """Chords for a song from Logic Pro's Chord ID, written as the song's chords.txt.
 
-Opens the song in Logic in the background, runs Chords > Analyze Chords on it, copies the result
-to the Chord Track and reads every chord with its position from the accessibility tree. The
-chords are laid on the grid of the chart already beside the song (its tempo and bar count, so
+Opens the song in Logic in the background, runs Chords > Apply Region Chords to Chord Track
+on it (Chord ID analyzes the song as it goes) and reads every chord with its position from
+the accessibility tree. The chords are laid on the grid of the chart already beside the song (its tempo and bar count, so
 nudges made against it still hold), one chord per bar: the one that sounds longest in it.
 The old chart is kept as "<name> chords (script).txt" the first time.
 
@@ -181,15 +181,15 @@ on run argv
       end repeat
       return "no such button"
     else if act is "move" then
-      set position of (first window whose subrole is "AXStandardWindow") to {(item 2 of argv) as integer, (item 3 of argv) as integer}
+      set position of (first window whose name ends with "- Tracks") to {(item 2 of argv) as integer, (item 3 of argv) as integer}
       return "moved"
     else if act is "control" then
-      set w to first window whose subrole is "AXStandardWindow"
+      set w to first window whose name ends with "- Tracks"
       set c to my findEl(toolbar 1 of w, item 2 of argv, item 3 of argv, 0)
       if c is missing value then return ""
       return value of c as string
     else if act is "chords-menu" then
-      set w to first window whose subrole is "AXStandardWindow"
+      set w to first window whose name ends with "- Tracks"
       set reg to my findEl(w, "AXLayoutItem", item 2 of argv, 0)
       if reg is missing value then return "no region"
       perform action "AXShowMenu" of reg
@@ -197,22 +197,21 @@ on run argv
       set m to my findEl(w, "AXMenu", "Logic Pro", 0)
       if m is missing value then return "no menu"
       set mi to menu item (item 3 of argv) of menu 1 of menu item "Chords" of m
-      if item 4 of argv is "click" then
-        click mi
-        return "clicked"
-      end if
-      set e to enabled of mi
-      perform action "AXCancel" of m
-      return e as string
+      click mi
+      return "clicked"
     else if act is "show-chord-track" then
-      set w to first window whose subrole is "AXStandardWindow"
-      if my findEl(w, "AXLayoutArea", "chord track", 0) is missing value then
-        click menu item "Chord Track" of menu 1 of menu item "Global Tracks" of menu 1 of menu bar item "Track" of menu bar 1
-        return "shown"
-      end if
-      return "already"
+      set w to first window whose name ends with "- Tracks"
+      if my findEl(w, "AXLayoutArea", "chord track", 0) is not missing value then return "already"
+      set mi to menu item "Chord Track" of menu 1 of menu item "Global Tracks" of menu 1 of menu bar item "Track" of menu bar 1
+      set mark to missing value
+      try
+        set mark to value of attribute "AXMenuItemMarkChar" of mi
+      end try
+      if mark is not missing value and mark is not "" then return "on, not drawn yet"
+      click mi
+      return "shown"
     else if act is "chord-items" then
-      set w to first window whose subrole is "AXStandardWindow"
+      set w to first window whose name ends with "- Tracks"
       set c to my findEl(w, "AXLayoutArea", "chord container", 0)
       if c is missing value then return ""
       set out to ""
@@ -258,20 +257,42 @@ def logic_running() -> bool:
     )
 
 
+# Logic's questions on the way in and out, and the answer each gets. Any other dialog is left
+# open, so the wait times out and names it rather than the script guessing.
+_ANSWERS = (
+    (
+        "[Change Project]",
+        "Change Project",
+    ),  # the song's sample rate differs from the project's
+    (
+        "[Don’t Import]",
+        "Don’t Import",
+    ),  # tempo found in the file: keep Logic's steady tempo
+)
+
+
+def answer_dialog(windows: str, quitting: bool = False) -> bool:
+    """Answers the one dialog Logic is showing, when it is a known one. True when answered."""
+    if "AXDialog" not in windows:
+        return False
+    answers = _ANSWERS + ((("[Don’t Save]", "Don’t Save"),) if quitting else ())
+    if "audio interface" in windows.lower():
+        answers += (("[OK]", "OK"),)
+    for shown, button in answers:
+        if shown in windows:
+            ax("press", button)
+            return True
+    return False
+
+
 def open_song(audio: Path) -> None:
     subprocess.run(["open", "-g", "-a", APP_PATH, str(audio)], check=True)
 
     def project_ready():
         windows = ax("windows")
-        if (
-            "[Change Project]" in windows
-        ):  # the song's sample rate differs from the project's
-            ax("press", "Change Project")
+        if answer_dialog(windows):
             return False
-        if "audio interface" in windows.lower() and "[OK]" in windows:
-            ax("press", "OK")
-            return False
-        return "AXStandardWindow" in windows and "AXDialog" not in windows
+        return "- Tracks\t" in windows and "AXDialog" not in windows
 
     wait(
         "Logic's project window (an unexpected dialog may be open)", project_ready, 120
@@ -300,52 +321,47 @@ def read_chords(region: str) -> tuple[list[str], float]:
         raise RuntimeError(
             f"Logic's project is in {signature}; this script reads 4/4 only"
         )
-    if ax("chords-menu", region, "Analyze Chords", "click") != "clicked":
+    # Apply analyzes the region as it goes. The menu is only ever opened to click an item: one
+    # opened just to be read cannot be closed through accessibility, and it blocks Logic's quit.
+    if ax("chords-menu", region, "Apply Region Chords to Chord Track") != "clicked":
         raise RuntimeError(
             f"could not open the right-click menu of the region {region!r}"
         )
-    wait(
-        "Chord ID to finish",
-        lambda: ax("chords-menu", region, "Copy Region Chords", "read") == "true",
-        300,
-        5,
-    )
-    ax("chords-menu", region, "Apply Region Chords to Chord Track", "click")
-    ax("show-chord-track")
     seen: list[str] = []
 
     def settled():
+        # Asked each time: while Chord ID is still busy, Logic ignores the menu click.
+        ax("show-chord-track")
         items = [l for l in ax("chord-items").splitlines() if l.strip()]
         if items and items == seen:
             return items
         seen[:] = items
         return None
 
-    return wait("the Chord Track's chords", settled, 120, 3), bpm
+    return wait("the Chord Track's chords", settled, 300, 5), bpm
 
 
 def quit_logic() -> None:
-    """Quits Logic and throws the scratch project away."""
-    subprocess.run(
-        [
-            "osascript",
-            "-e",
-            f'ignoring application responses\ntell application "{APP}" to quit\nend ignoring',
-        ],
-        capture_output=True,
-        check=False,
-    )
+    """Quits Logic and throws the scratch project away. The quit is asked again until Logic is
+    gone: one sent while another dialog is up is dropped."""
 
     def gone():
         if not logic_running():
             return True
-        if "[Don’t Save]" in ax("windows"):
-            ax("press", "Don’t Save")
-        elif "[Don't Save]" in ax("windows"):
-            ax("press", "Don't Save")
+        windows = ax("windows")
+        if not answer_dialog(windows, quitting=True) and "AXDialog" not in windows:
+            subprocess.run(
+                [
+                    "osascript",
+                    "-e",
+                    f'ignoring application responses\ntell application "{APP}" to quit\nend ignoring',
+                ],
+                capture_output=True,
+                check=False,
+            )
         return False
 
-    wait("Logic to quit", gone, 60)
+    wait("Logic to quit", gone, 90)
 
 
 def main(argv: list[str]) -> int:
@@ -369,6 +385,7 @@ def main(argv: list[str]) -> int:
         )
         return 1
     grid = read_grid(chart.read_text())
+    print("Running Logic's Chord ID in the background (a minute or two)...", flush=True)
     try:
         open_song(audio)
         park()

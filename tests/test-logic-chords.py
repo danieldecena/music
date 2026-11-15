@@ -143,6 +143,43 @@ def main() -> int:
     )
     check(text.splitlines()[3:] == ["1\tG#", "2\tA#", "3\tCm7"], "one row per bar")
 
+    # Logic's dialogs: a known one gets its answer, anything else is left for the wait to name.
+    pressed: list[str] = []
+    real_ax = lc.ax
+    lc.ax = lambda *args: pressed.append(args[1]) or "pressed"
+    try:
+        tempo = "AXDialog\t\tThe added audio file contains tempo information. [Don’t Import][Import]"
+        check(
+            lc.answer_dialog(tempo) and pressed == ["Don’t Import"],
+            "tempo question: Don't Import",
+        )
+        pressed.clear()
+        rate = "AXDialog\t\tChange Project Sample Rate? [Change Project][Convert File][Cancel]"
+        check(
+            lc.answer_dialog(rate) and pressed == ["Change Project"],
+            "sample rate: Change Project",
+        )
+        pressed.clear()
+        save = "AXDialog\t\tDo you want to save? [Save][Don’t Save][Cancel]"
+        check(
+            not lc.answer_dialog(save) and pressed == [],
+            "save question left alone while opening",
+        )
+        check(
+            lc.answer_dialog(save, quitting=True) and pressed == ["Don’t Save"],
+            "save question: Don't Save on quit",
+        )
+        pressed.clear()
+        odd = "AXDialog\t\tSomething new happened. [OK]"
+        check(
+            not lc.answer_dialog(odd) and pressed == [],
+            "an unknown dialog is not answered",
+        )
+        window = "AXStandardWindow\tUntitled - Tracks\t[Save]"
+        check(not lc.answer_dialog(window) and pressed == [], "no dialog, no press")
+    finally:
+        lc.ax = real_ax
+
     print(f"\n{_passed} passed, {_failed} failed")
     return 1 if _failed else 0
 

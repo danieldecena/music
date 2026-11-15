@@ -129,4 +129,21 @@ HOME="$real_home"
 unset MUSIC_ICLOUD_DIR
 rm -rf "$MUSIC_DIR" "$cloud" 
 
+
+# logic_chords refuses before Logic is opened: a folder is not a song, and a song with no chart
+# has no bar grid to put Logic's chords on. Neither may reach the publish step.
+MUSIC_DIR="${0:A:h:h}"
+tmp=$(mktemp -d)
+mkdir "$tmp/09 Nights"
+msg=$(logic_chords "$tmp/09 Nights" 2>&1); rc=$?
+assert_eq "$rc" "1" "logic_chords refuses a folder"
+assert_eq "${msg:0:28}" "Logic chords needs the song'" "logic_chords says why it refused a folder"
+touch "$tmp/song.m4a"
+msg=$(logic_chords "$tmp/song.m4a" 2>&1); rc=$?
+assert_eq "$rc" "1" "logic_chords refuses a song with no chart"
+assert_eq "${msg:0:12}" "No chart at " "logic_chords says the chart is missing"
+assert_eq "$(ls "$tmp")" "09 Nights
+song.m4a" "a refused run writes nothing beside the song"
+rm -rf "$tmp"
+
 exit $fail
