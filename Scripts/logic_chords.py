@@ -416,6 +416,11 @@ def main(argv: list[str]) -> int:
     try:
         open_song(audio)
         park()
+        if os.environ.get(
+            "LOGIC_CHORDS_DRYRUN"
+        ):  # open and quit only, for testing the run
+            print("dry run: opened the song, quitting")
+            return 0
         items, logic_bpm = read_chords(audio.stem)
     finally:
         quit_logic()
