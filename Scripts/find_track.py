@@ -100,18 +100,21 @@ def find(
     min_score: float,
     gap: float = 0.25,
     library: Path | None = None,
+    all_kinds: bool = False,
 ):
     """Ranked, deduped matches: list of (score, kind, label, path).
 
     Drops the weak tail: once a strong top match exists, rows more than `gap`
     below it are cut so a picker shows a handful, not the whole library.
+    `all_kinds` keeps one row per kind instead of collapsing a title to its best
+    kind, for callers that need the source file even when stems exist.
     """
     best: dict[str, tuple] = {}  # normalized label -> best row
     for kind, label, path in candidates(root, library):
         sc = score(query, label)
         if sc < min_score:
             continue
-        key = _norm(label)
+        key = (_norm(label), kind) if all_kinds else _norm(label)
         row = (sc, kind, label, str(path))
         prev = best.get(key)
         if prev is None or (sc, KIND_RANK[kind]) > (prev[0], KIND_RANK[prev[1]]):
@@ -134,6 +137,11 @@ def main(argv=None) -> int:
         "--tsv", action="store_true", help="score<TAB>kind<TAB>label<TAB>path"
     )
     out.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--all-kinds",
+        action="store_true",
+        help="one row per kind (source, stems, locked) instead of the best kind",
+    )
     ns = ap.parse_args(argv)
 
     # An explicit --root is a self-contained search, so the real library stays out.
@@ -141,7 +149,9 @@ def main(argv=None) -> int:
         root, library = Path(ns.root).expanduser(), None
     else:
         root, library = Path(__file__).resolve().parent.parent, LIBRARY
-    rows = find(ns.query, root, ns.limit, ns.min_score, library=library)
+    rows = find(
+        ns.query, root, ns.limit, ns.min_score, library=library, all_kinds=ns.all_kinds
+    )
     if not rows:
         return 1
     if ns.json:

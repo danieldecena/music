@@ -88,6 +88,19 @@ def find() -> None:
             len(rambo) == 1 and rambo[0][1] == "stems", "stems outranks source on tie"
         )
 
+        # all_kinds keeps one row per kind, so a caller that needs the audio file
+        # (Chordbook's song requests) still sees it beside the stems.
+        rows = ft.find("rambo", root, limit=10, min_score=0.34, all_kinds=True)
+        rambo = sorted((r[1], r[3]) for r in rows if r[2] == "09 Rambo")
+        check(
+            [k for k, _ in rambo] == ["source", "stems"],
+            "all_kinds keeps the source row beside the stems row",
+        )
+        check(
+            any(p.endswith("09 Rambo.m4a") for k, p in rambo if k == "source"),
+            "the kept source row is the audio file",
+        )
+
         # garbage clears nothing.
         check(
             ft.find("zzzq", root, limit=10, min_score=0.34) == [], "no match -> empty"
@@ -153,6 +166,16 @@ def cli() -> None:
         check(
             "\t" in r.stdout and "stems" in r.stdout,
             "tsv output carries score/kind columns",
+        )
+
+        r = subprocess.run(
+            [sys.executable, script, "rambo", "--root", str(root), "--json", "--all-kinds"],
+            capture_output=True,
+            text=True,
+        )
+        check(
+            r.returncode == 0 and '"source"' in r.stdout and '"stems"' in r.stdout,
+            "cli --all-kinds lists the source beside the stems",
         )
 
 
