@@ -163,14 +163,17 @@ on run argv
     if act is "windows" then
       set out to ""
       repeat with w in every window
-        set out to out & (subrole of w) & tab & (name of w as string) & tab
-        repeat with e in (every UI element of w)
-          try
-            if role of e is "AXButton" then set out to out & "[" & (name of e as string) & "]"
-            if role of e is "AXStaticText" then set out to out & (value of e as string) & " "
-          end try
-        end repeat
-        set out to out & linefeed
+        -- A window can close mid-list (a dialog answered, a quit); skip it rather than fail.
+        try
+          set winText to (subrole of w) & tab & (name of w as string) & tab
+          repeat with e in (every UI element of w)
+            try
+              if role of e is "AXButton" then set winText to winText & "[" & (name of e as string) & "]"
+              if role of e is "AXStaticText" then set winText to winText & (value of e as string) & " "
+            end try
+          end repeat
+          set out to out & winText & linefeed
+        end try
       end repeat
       return out
     else if act is "press" then
@@ -362,7 +365,14 @@ def quit_logic() -> None:
             )
         return False
 
-    wait("Logic to quit", gone, 90)
+    try:
+        wait("Logic to quit", gone, 90)
+    except RuntimeError:
+        # Only reached for a Logic this script opened (main refuses to run when one was
+        # already open), so it holds nothing but the scratch project.
+        print("Logic would not quit (a dialog it cannot answer?); ending its process.")
+        subprocess.run(["pkill", "-TERM", "-x", APP], capture_output=True, check=False)
+        wait("Logic to end", lambda: not logic_running(), 30, 1)
 
 
 def main(argv: list[str]) -> int:
