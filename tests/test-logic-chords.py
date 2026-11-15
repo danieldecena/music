@@ -90,6 +90,7 @@ def main() -> int:
         "b flat major/d": "A#/D",
         "f sharp major": "F#",
         "e major major 7": "Emaj7",
+        "c 7 sus4": "C7sus4",
         "No Chord": "-",
     }
     for spoken, want in names.items():

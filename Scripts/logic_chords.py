@@ -38,6 +38,7 @@ _QUALITIES = {
     "minor 7": "m7",
     "major 6": "6",
     "minor 6": "m6",
+    "7 sus4": "7sus4",
 }
 _POSITION = re.compile(
     r"(\d+) bars?(?: (\d+) beats?)?(?: (\d+) divisions?)?(?: (\d+) ticks?)?"
@@ -392,10 +393,19 @@ def main(argv: list[str]) -> int:
         items, logic_bpm = read_chords(audio.stem)
     finally:
         quit_logic()
-    changes = []
+    changes, unknown = [], set()
     for item in items:
         spoken, position = split_item(item)
-        changes.append((item_seconds(position, logic_bpm), chord_name(spoken)))
+        try:
+            changes.append((item_seconds(position, logic_bpm), chord_name(spoken)))
+        except ValueError:
+            unknown.add(spoken)
+    if unknown:
+        # All of them at once, so one more run does not stop on the next new name.
+        print(
+            f"Nothing written: Logic named chords this script cannot spell yet: {sorted(unknown)}"
+        )
+        return 1
     labels = bar_labels(changes, grid[2], grid[3])
     old = chart.read_text()
     if not backup.exists() and SOURCE_NOTE not in old:
