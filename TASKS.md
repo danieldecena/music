@@ -12,6 +12,9 @@
 - [ ] Guitar tuner: detector passes accuracy tests incl. known-bad control
 - [ ] Guitar tuner: capture, tone and UI built and run in simulator
 - [ ] (you) Guitar tuner: check phone readout against a known tone
+- [ ] Guitar tuner: Chords tab logic in TunerCore, tested
+- [ ] Guitar tuner: install the Chords tab once the phone is reachable
+- [ ] (you) Guitar tuner: check Chords tab on phone with DAISIES
 
 ## Roadmap — song database
 
@@ -120,7 +123,7 @@ C = changes behavior. Evidence and SHAs live in STATUS's decision log.
 
 <!-- resume-footer -->
 ---
-Plan approved 2026-10-31 17:05.
+Plan approved 2026-10-31 22:57.
 Plan file: docs/superpowers/plans/look-at-the-best-frolicking-dove.md
 
 Sessions start in "default" mode (permissions.defaultMode in
