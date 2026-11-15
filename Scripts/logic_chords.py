@@ -25,6 +25,9 @@ from pathlib import Path
 APP = "Logic Pro Creator Studio"
 APP_PATH = f"/Applications/{APP}.app"
 VDISPLAY = Path.home() / "Bin/vdisplay.sh"
+SCRIPTS = Path(__file__).resolve().parent
+VENV_PYTHON = SCRIPTS.parent / ".venv/bin/python"
+ALIGN = SCRIPTS / "align_chart.py"
 SOURCE_NOTE = "# chords from Logic Pro Chord ID"
 TICKS_PER_BEAT = 960
 
@@ -96,27 +99,29 @@ def chord_name(spoken: str) -> str:
     return name
 
 
-def bar_labels(changes: list[tuple[float, str]], bpm: float, bars: int) -> list[str]:
-    """One chord per bar on a steady 4/4 grid from 0 s: the one sounding longest in the bar."""
+def bar_labels(
+    changes: list[tuple[float, str]], bpm: float, bars: int, start: float = 0.0
+) -> list[str]:
+    """One chord per bar on a steady 4/4 grid from `start` seconds: the one sounding longest in it."""
     bar_len = 4 * 60 / bpm
     spans = [
-        (start, changes[i + 1][0] if i + 1 < len(changes) else float("inf"), name)
-        for i, (start, name) in enumerate(changes)
+        (at, changes[i + 1][0] if i + 1 < len(changes) else float("inf"), name)
+        for i, (at, name) in enumerate(changes)
     ]
     labels = []
     for b in range(bars):
-        lo, hi = b * bar_len, (b + 1) * bar_len
+        lo, hi = start + b * bar_len, start + (b + 1) * bar_len
         best, best_len = "-", 0.0
-        for start, end, name in spans:
-            overlap = min(hi, end) - max(lo, start)
+        for begin, end, name in spans:
+            overlap = min(hi, end) - max(lo, begin)
             if overlap > best_len:
                 best, best_len = name, overlap
         labels.append(best)
     return labels
 
 
-def read_grid(chart: str) -> tuple[str, str, float, int]:
-    """Title line, key, tempo and bar count of an existing chords.txt."""
+def read_grid(chart: str) -> tuple[str, str, float, int, float]:
+    """Title line, key, tempo, bar count and bar 1's start (seconds) of an existing chords.txt."""
     title = next(
         (l for l in chart.splitlines() if "Chords --" in l), "# Chords -- untitled"
     )
@@ -126,14 +131,34 @@ def read_grid(chart: str) -> tuple[str, str, float, int]:
     ]
     if not m or not rows:
         raise ValueError("the chart has no tempo line or no bars")
-    return title, m.group(1), float(m.group(2)), max(rows)
+    started = re.search(r"start\s+([0-9.]+)\s*s\b", chart)
+    return (
+        title,
+        m.group(1),
+        float(m.group(2)),
+        max(rows),
+        float(started.group(1)) if started else 0.0,
+    )
 
 
-def chart_text(grid: tuple[str, str, float, int], labels: list[str]) -> str:
-    title, key, bpm, bars = grid
-    lines = [title, f"# key {key}  {bpm} BPM  {bars} bars", SOURCE_NOTE]
+def chart_text(grid: tuple[str, str, float, int, float], labels: list[str]) -> str:
+    title, key, bpm, bars, start = grid
+    tempo = f"# key {key}  {bpm} BPM  {bars} bars" + (
+        f"  start {start:.3f} s" if start else ""
+    )
+    lines = [title, tempo, SOURCE_NOTE]
     lines += [f"{i}\t{c}" for i, c in enumerate(labels, 1)]
     return "\n".join(lines) + "\n"
+
+
+def save_changes(path: Path, changes: list[tuple[float, str]]) -> None:
+    """Logic's chord changes as seconds<TAB>chord, so the chart can be laid again without Logic."""
+    path.write_text("".join(f"{t:.3f}\t{c}\n" for t, c in changes))
+
+
+def load_changes(path: Path) -> list[tuple[float, str]]:
+    rows = [line.split("\t") for line in path.read_text().splitlines() if line.strip()]
+    return [(float(t), c) for t, c in rows]
 
 
 # --- Driving Logic -------------------------------------------------------------------------
@@ -437,7 +462,8 @@ def main(argv: list[str]) -> int:
             f"Nothing written: Logic named chords this script cannot spell yet: {sorted(unknown)}"
         )
         return 1
-    labels = bar_labels(changes, grid[2], grid[3])
+    save_changes(audio.with_name(f"{audio.stem} logic.tsv"), changes)
+    labels = bar_labels(changes, grid[2], grid[3], start=grid[4])
     old = chart.read_text()
     if not backup.exists() and SOURCE_NOTE not in old:
         backup.write_text(old)
@@ -448,6 +474,20 @@ def main(argv: list[str]) -> int:
         f"Logic found {len(changes)} chord changes; {changed} of {len(labels)} bars differ from the old chart."
     )
     print(f"Wrote {chart.name}; the old chart is {backup.name}.")
+    # Then line it up with the record's beat and downbeat (numpy, so the venv's python).
+    aligned = subprocess.run(
+        [str(VENV_PYTHON), str(ALIGN), str(audio)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    print(aligned.stdout.strip())
+    if aligned.returncode != 0:
+        why = (aligned.stdout + aligned.stderr).strip()[-300:]
+        print(
+            f"Lining the chart up with the record failed, so it keeps its old grid: {why}"
+        )
+        return 1
     return 0
 
 

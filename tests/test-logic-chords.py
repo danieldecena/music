@@ -8,6 +8,7 @@ running the script on a real song. Hand-rolled assertions, stdlib only:
 """
 
 import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -126,7 +127,8 @@ def main() -> int:
     )
     grid = lc.read_grid(old)
     check(
-        grid == ("# Chords -- 09 Nights.m4a", "A#", 80.2, 3), f"grid read (got {grid})"
+        grid == ("# Chords -- 09 Nights.m4a", "A#", 80.2, 3, 0.0),
+        f"grid read (got {grid})",
     )
     raises(
         lambda: lc.read_grid("# Chords -- x\n1\tC\n"),
@@ -143,6 +145,41 @@ def main() -> int:
         "header kept, source noted",
     )
     check(text.splitlines()[3:] == ["1\tG#", "2\tA#", "3\tCm7"], "one row per bar")
+
+    # Bar 1 can start later than the top of the audio (the record's first downbeat).
+    check(
+        lc.bar_labels([(0.0, "C"), (1.5, "G")], 120, 1, start=1.0) == ["G"],
+        "with a start, bar 1 is the 2 s from the start",
+    )
+    check(
+        lc.bar_labels([(0.0, "C"), (1.5, "G")], 120, 1) == ["C"],
+        "control: without a start, bar 1 is the first 2 s",
+    )
+    started = (
+        "# Chords -- x.m4a\n# key Fm  110.2 BPM  2 bars  start 0.318 s\n1\tFm\n2\tC#\n"
+    )
+    check(
+        lc.read_grid(started)[4] == 0.318, f"start read (got {lc.read_grid(started)})"
+    )
+    text2 = lc.chart_text(("# Chords -- x.m4a", "Fm", 110.2, 2, 0.318), ["Fm", "C#"])
+    check(
+        "# key Fm  110.2 BPM  2 bars  start 0.318 s" in text2,
+        f"start written: {text2.splitlines()[1]!r}",
+    )
+    check(lc.read_grid(text2)[4] == 0.318, "the written start reads back")
+    check(
+        "start" not in lc.chart_text(("# Chords -- x", "C", 100.0, 1, 0.0), ["C"]),
+        "no start line for 0",
+    )
+
+    # Logic's chord times are kept beside the song, so the grid can be re-laid without Logic.
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = Path(tmp) / "song logic.tsv"
+        lc.save_changes(raw, [(0.0, "G#"), (3.012, "A#"), (300.5, "-")])
+        check(
+            lc.load_changes(raw) == [(0.0, "G#"), (3.012, "A#"), (300.5, "-")],
+            "chord times round-trip",
+        )
 
     # Logic's dialogs: a known one gets its answer, anything else is left for the wait to name.
     pressed: list[str] = []
