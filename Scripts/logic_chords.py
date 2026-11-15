@@ -15,6 +15,7 @@ Exit 1 when Logic is already open (the song would be added to your project), whe
 chart beside the song to take the grid from, or when any Logic step does not happen.
 """
 
+import os
 import re
 import subprocess
 import sys
@@ -197,8 +198,12 @@ on run argv
       set reg to my findEl(w, "AXLayoutItem", item 2 of argv, 0)
       if reg is missing value then return "no region"
       perform action "AXShowMenu" of reg
-      delay 1
-      set m to my findEl(w, "AXMenu", "Logic Pro", 0)
+      set m to missing value
+      repeat 10 times
+        delay 0.5
+        set m to my findEl(w, "AXMenu", "Logic Pro", 0)
+        if m is not missing value then exit repeat
+      end repeat
       if m is missing value then return "no menu"
       set mi to menu item (item 3 of argv) of menu 1 of menu item "Chords" of m
       click mi
@@ -237,6 +242,11 @@ def ax(*args: str) -> str:
         text=True,
         check=False,
     )
+    if os.environ.get("LOGIC_CHORDS_TRACE"):
+        print(
+            f"  ax {args} -> {done.returncode} {done.stdout.strip()[:160]!r} {done.stderr.strip()[:160]!r}",
+            flush=True,
+        )
     if done.returncode != 0:
         raise RuntimeError(f"Logic step {args[0]} failed: {done.stderr.strip()}")
     return done.stdout.strip()
@@ -327,10 +337,15 @@ def read_chords(region: str) -> tuple[list[str], float]:
         )
     # Apply analyzes the region as it goes. The menu is only ever opened to click an item: one
     # opened just to be read cannot be closed through accessibility, and it blocks Logic's quit.
-    if ax("chords-menu", region, "Apply Region Chords to Chord Track") != "clicked":
-        raise RuntimeError(
-            f"could not open the right-click menu of the region {region!r}"
-        )
+    # A Logic still settling after opening the song can be slow to show the menu.
+    wait(
+        f"the right-click menu of the region {region!r} (a full-screen app in front, such as a game, may keep Logic from showing it)",
+        lambda: (
+            ax("chords-menu", region, "Apply Region Chords to Chord Track") == "clicked"
+        ),
+        60,
+        3,
+    )
     seen: list[str] = []
 
     def settled():
@@ -358,7 +373,8 @@ def quit_logic() -> None:
                 [
                     "osascript",
                     "-e",
-                    f'ignoring application responses\ntell application "{APP}" to quit\nend ignoring',
+                    # "is running" first: telling an app that has just quit to quit launches it again.
+                    f'if application "{APP}" is running then\nignoring application responses\ntell application "{APP}" to quit\nend ignoring\nend if',
                 ],
                 capture_output=True,
                 check=False,
