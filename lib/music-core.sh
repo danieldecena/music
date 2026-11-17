@@ -272,7 +272,16 @@ analyze_track() {
 chord_progression() {
   # $1 = an audio file or a Stems/<model>/<track> folder. Prints a bar-by-bar
   # chord chart and writes chords.txt in a Stems folder, or "<song> chords.txt" beside a file (never re-encodes).
-  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1"
+  # Chords always come from Logic (Daniel, 2026-11-17: "always run logic on chords"): for an audio
+  # file the script chart only sets the bar grid, then logic_chords rewrites it with Logic's chords
+  # and publishes. A Stems folder has no audio file for Logic to read, so it says so.
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords.py" "$1" || return 1
+  if [[ -f "$1" ]]; then
+    logic_chords "$1"
+  else
+    echo "Script chords only: Logic reads the song's audio file, not a Stems folder. Run Chords on the .m4a to get Logic's chords." >&2
+    return 1
+  fi
 }
 
 logic_chords() {
