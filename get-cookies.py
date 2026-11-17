@@ -3,6 +3,7 @@
 
 import struct
 import sys
+import time
 from pathlib import Path
 
 _COOKIE_CANDIDATES = [
@@ -114,6 +115,35 @@ def main():
 
     out_path.write_text(to_netscape(apple_cookies))
     print(f"Extracted {len(apple_cookies)} cookies → {out_path}")
+
+    # The file read fine, so Full Disk Access is not the problem here; say which
+    # half of the sign-in is missing instead of sending the user to Settings.
+    tokens = [
+        c
+        for c in apple_cookies
+        if c["name"] == "media-user-token" and "music.apple.com" in c["domain"]
+    ]
+    if not tokens:
+        print(
+            f"ERROR: Safari has no Apple Music sign-in ({len(all_cookies)} cookies read, "
+            "none is music.apple.com's media-user-token).",
+            file=sys.stderr,
+        )
+        print(
+            "Sign in at music.apple.com in Safari (top right, Sign In), play a few "
+            "seconds of a song, quit Safari so it saves its cookies, then re-run.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    newest = max(c["expiry"] for c in tokens)
+    if newest <= time.time():
+        print(
+            "ERROR: Safari's Apple Music sign-in expired on "
+            f"{time.strftime('%Y-%m-%d', time.localtime(newest))}. Sign in again at "
+            "music.apple.com in Safari, quit Safari, then re-run.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

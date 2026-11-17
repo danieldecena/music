@@ -107,7 +107,7 @@ download_url() {
     command -v expect >/dev/null || { echo "expect not found on PATH — install it (brew install expect)." >&2; return 3; }
     if ! apple_login_current "$cookies"; then
       python3 "$MUSIC_DIR/get-cookies.py" "$cookies" && apple_login_current "$cookies" || {
-        echo "Could not get a current Apple Music sign-in. Sign into music.apple.com in Safari + grant Full Disk Access." >&2
+        echo "Could not get a current Apple Music sign-in (reason above)." >&2
         return 1
       }
     fi
