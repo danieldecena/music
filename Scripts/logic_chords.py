@@ -225,6 +225,16 @@ on findEl(el, r, d, depth)
   return missing value
 end findEl
 
+-- Logic can open an empty project of its own beside the song's, so every step works in the
+-- window main() found holding the song's region (LOGIC_CHORDS_WINDOW), not whichever is first.
+on trackWin()
+  set n to system attribute "LOGIC_CHORDS_WINDOW"
+  tell application "System Events" to tell process "__APP__"
+    if n is not "" then return first window whose name is n
+    return first window whose name ends with "- Tracks"
+  end tell
+end trackWin
+
 on run argv
   set act to item 1 of argv
   tell application "System Events" to tell process "__APP__"
@@ -253,15 +263,20 @@ on run argv
       end repeat
       return "no such button"
     else if act is "move" then
-      set position of (first window whose name ends with "- Tracks") to {(item 2 of argv) as integer, (item 3 of argv) as integer}
+      set position of (my trackWin()) to {(item 2 of argv) as integer, (item 3 of argv) as integer}
       return "moved"
+    else if act is "song-window" then
+      repeat with w in (every window whose name ends with "- Tracks")
+        if my findEl(w, "AXLayoutItem", item 2 of argv, 0) is not missing value then return name of w as string
+      end repeat
+      return ""
     else if act is "control" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       set c to my findEl(toolbar 1 of w, item 2 of argv, item 3 of argv, 0)
       if c is missing value then return ""
       return value of c as string
     else if act is "chords-menu" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       set reg to my findEl(w, "AXLayoutItem", item 2 of argv, 0)
       if reg is missing value then return "no region"
       perform action "AXShowMenu" of reg
@@ -276,7 +291,7 @@ on run argv
       click mi
       return "clicked"
     else if act is "show-chord-track" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       if my findEl(w, "AXLayoutArea", "chord track", 0) is not missing value then return "already"
       set mi to menu item "Chord Track" of menu 1 of menu item "Global Tracks" of menu 1 of menu bar item "Track" of menu bar 1
       set mark to missing value
@@ -287,7 +302,7 @@ on run argv
       click mi
       return "shown"
     else if act is "chord-items" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       set c to my findEl(w, "AXLayoutArea", "chord container", 0)
       if c is missing value then return ""
       set out to ""
@@ -301,6 +316,9 @@ end run
 """.replace("__APP__", APP)
 
 
+_WINDOW = {"name": ""}  # the song's project window, once main() has found it
+
+
 def ax(*args: str) -> str:
     done = subprocess.run(
         ["osascript", "-", *args],
@@ -308,6 +326,7 @@ def ax(*args: str) -> str:
         capture_output=True,
         text=True,
         check=False,
+        env={**os.environ, "LOGIC_CHORDS_WINDOW": _WINDOW["name"]},
     )
     if os.environ.get("LOGIC_CHORDS_TRACE"):
         print(
@@ -482,6 +501,11 @@ def main(argv: list[str]) -> int:
     print("Running Logic's Chord ID in the background (a minute or two)...", flush=True)
     try:
         open_song(audio)
+        _WINDOW["name"] = wait(
+            f"a project window holding the region {audio.stem!r}",
+            lambda: ax("song-window", audio.stem),
+            60,
+        )
         park()
         if os.environ.get(
             "LOGIC_CHORDS_DRYRUN"
