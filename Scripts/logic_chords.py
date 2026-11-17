@@ -120,6 +120,40 @@ def bar_labels(
     return labels
 
 
+def bar_halves(
+    changes: list[tuple[float, str]], bpm: float, bars: int, start: float = 0.0
+) -> tuple[list[str], dict[int, str]]:
+    """Like bar_labels, but a bar whose two halves play different chords (each for at least a
+    beat) keeps the first half's chord and gets the second half's as a change on beat 3, keyed
+    by bar index. DAISIES plays two chords a bar; one chord per bar dropped half of them."""
+    bar_len = 4 * 60 / bpm
+    beat = bar_len / 4
+    spans = [
+        (at, changes[i + 1][0] if i + 1 < len(changes) else float("inf"), name)
+        for i, (at, name) in enumerate(changes)
+    ]
+
+    def longest(lo: float, hi: float) -> tuple[str, float]:
+        best, best_len = "-", 0.0
+        for begin, end, name in spans:
+            overlap = min(hi, end) - max(lo, begin)
+            if overlap > best_len:
+                best, best_len = name, overlap
+        return best, best_len
+
+    labels, mids = [], {}
+    for b in range(bars):
+        lo = start + b * bar_len
+        first, first_len = longest(lo, lo + bar_len / 2)
+        second, second_len = longest(lo + bar_len / 2, lo + bar_len)
+        if first != second and first_len >= beat - 1e-9 and second_len >= beat - 1e-9:
+            labels.append(first)
+            mids[b] = second
+        else:
+            labels.append(longest(lo, lo + bar_len)[0])
+    return labels, mids
+
+
 def read_grid(chart: str) -> tuple[str, str, float, int, float]:
     """Title line, key, tempo, bar count and bar 1's start (seconds) of an existing chords.txt."""
     title = next(
@@ -141,13 +175,21 @@ def read_grid(chart: str) -> tuple[str, str, float, int, float]:
     )
 
 
-def chart_text(grid: tuple[str, str, float, int, float], labels: list[str]) -> str:
+def chart_text(
+    grid: tuple[str, str, float, int, float],
+    labels: list[str],
+    mids: dict[int, str] | None = None,
+) -> str:
     title, key, bpm, bars, start = grid
     tempo = f"# key {key}  {bpm} BPM  {bars} bars" + (
         f"  start {start:.3f} s" if start else ""
     )
     lines = [title, tempo, SOURCE_NOTE]
-    lines += [f"{i}\t{c}" for i, c in enumerate(labels, 1)]
+    for i, c in enumerate(labels, 1):
+        lines.append(f"{i}\t{c}")
+        # "5.3<TAB>Fm": the chord changes on beat 3 of bar 5. Older Chordbook builds skip the line.
+        if mids and i - 1 in mids:
+            lines.append(f"{i}.3\t{mids[i - 1]}")
     return "\n".join(lines) + "\n"
 
 
@@ -463,11 +505,11 @@ def main(argv: list[str]) -> int:
         )
         return 1
     save_changes(audio.with_name(f"{audio.stem} logic.tsv"), changes)
-    labels = bar_labels(changes, grid[2], grid[3], start=grid[4])
+    labels, mids = bar_halves(changes, grid[2], grid[3], start=grid[4])
     old = chart.read_text()
     if not backup.exists() and SOURCE_NOTE not in old:
         backup.write_text(old)
-    chart.write_text(chart_text(grid, labels))
+    chart.write_text(chart_text(grid, labels, mids))
     before = [l.split("\t")[1] for l in old.splitlines() if re.match(r"\d+\t", l)]
     changed = sum(1 for a, b in zip(before, labels) if a != b)
     print(

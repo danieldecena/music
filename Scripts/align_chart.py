@@ -85,8 +85,8 @@ def main(argv: list[str]) -> int:
     moments = [t for t, c in changes[1:] if c != "-"]
     start = round(downbeat(moments, first, bpm), 3)
     bars = int((len(samples) / at.SR - start) // (BEATS_PER_BAR * 60 / bpm))
-    labels = lc.bar_labels(changes, bpm, bars, start=start)
-    chart.write_text(lc.chart_text((title, key, bpm, bars, start), labels))
+    labels, mids = lc.bar_halves(changes, bpm, bars, start=start)
+    chart.write_text(lc.chart_text((title, key, bpm, bars, start), labels, mids))
     print(
         f"Lined up: {bpm} BPM (was {old_bpm}), first beat {first:.2f} s, bar 1 at {start:.2f} s, {bars} bars."
     )

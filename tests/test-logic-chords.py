@@ -172,6 +172,26 @@ def main() -> int:
         "no start line for 0",
     )
 
+    # Two chords a bar (DAISIES: Ab Fm | Db Eb) keep both: the second as a change on beat 3.
+    two = [(0.0, "G#"), (1.0, "Fm"), (2.0, "C#"), (3.0, "D#"), (4.0, "G#")]
+    labels, mids = lc.bar_halves(two, 120, 3)
+    check(labels == ["G#", "C#", "G#"], f"first half's chord per bar (got {labels})")
+    check(mids == {0: "Fm", 1: "D#"}, f"second half's chord on beat 3 (got {mids})")
+    check(
+        lc.bar_labels(two, 120, 2) == ["G#", "C#"],
+        "control: one chord per bar loses Fm and D#",
+    )
+    labels, mids = lc.bar_halves([(0.0, "C"), (1.8, "G"), (2.0, "C")], 120, 1)
+    check(mids == {} and labels == ["C"], "a passing chord under a beat is not a change")
+    labels, mids = lc.bar_halves([(0.0, "C")], 120, 2)
+    check(mids == {} and labels == ["C", "C"], "one chord a bar: no changes")
+    text3 = lc.chart_text(("# Chords -- x", "G#", 120.0, 2, 0.0), ["G#", "C#"], {0: "Fm"})
+    check(
+        text3.splitlines()[3:] == ["1\tG#", "1.3\tFm", "2\tC#"],
+        f"change written after its bar: {text3.splitlines()[3:]}",
+    )
+    check(lc.read_grid(text3)[3] == 2, "a change line is not read as a bar")
+
     # Logic's chord times are kept beside the song, so the grid can be re-laid without Logic.
     with tempfile.TemporaryDirectory() as tmp:
         raw = Path(tmp) / "song logic.tsv"
