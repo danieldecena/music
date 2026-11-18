@@ -294,7 +294,11 @@ logic_chords() {
     echo "Logic chords needs the song's audio file, and ${f:t} is not one (a stems folder?). Drag the .m4a." >&2
     return 1
   fi
-  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/logic_chords.py" "$f" || return 1
+  # The scripted shortcut press is unreliable (STATUS.md, 2026-11-18), so by default Logic opens on
+  # screen and waits for the user to press it; LOGIC_CHORDS_AUTO=1 tries the hands-free press.
+  local mode=(--manual)
+  [[ -n "$LOGIC_CHORDS_AUTO" ]] && mode=()
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/logic_chords.py" "${mode[@]}" "$f" || return 1
   if [[ ! -x "$pub" ]]; then
     echo "Chordbook is not on this Mac, so nothing was sent to the phone."
     return 0

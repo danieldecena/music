@@ -11,7 +11,9 @@ Logic stays in the background except for one second while its shortcut is sent: 
 menus and keys while inactive. Every other step is an accessibility action.
 With the BetterDisplay hidden screen connected, Logic's window is moved there.
 
-Usage: logic_chords.py "<song>.m4a"
+Usage: logic_chords.py [--manual] "<song>.m4a"
+--manual: Logic opens on the screen and waits while you click the region and press the shortcut
+(Ctrl-Opt-Shift-Cmd-C); the scripted press is unreliable (see STATUS.md).
 Exit 1 when Logic is already open (the song would be added to your project), when there is no
 chart beside the song to take the grid from, or when any Logic step does not happen.
 """
@@ -479,7 +481,7 @@ def apply_chords(region: str) -> None:
         raise RuntimeError(f"Logic shortcut not sent: {typed.stderr.strip()}")
 
 
-def read_chords(region: str) -> tuple[list[str], float]:
+def read_chords(region: str, manual: bool = False) -> tuple[list[str], float]:
     """Analyzes the song's region and returns Logic's chord items and the project tempo."""
     bpm = float(wait("Logic's tempo", lambda: ax("control", "AXSlider", "Tempo"), 30))
     signature = ax("control", "AXPopUpButton", "Time Signature")
@@ -487,7 +489,16 @@ def read_chords(region: str) -> tuple[list[str], float]:
         raise RuntimeError(
             f"Logic's project is in {signature}; this script reads 4/4 only"
         )
-    apply_chords(region)
+    if manual:
+        ax("move", "60", "80")
+        ax("activate")
+        print(
+            f"Logic is open on your screen. Click the region {region!r}, then press "
+            "Control-Option-Shift-Command-C. Waiting up to 10 minutes for the chords...",
+            flush=True,
+        )
+    else:
+        apply_chords(region)
     seen: list[str] = []
 
     def settled():
@@ -504,7 +515,7 @@ def read_chords(region: str) -> tuple[list[str], float]:
         seen[:] = items
         return None
 
-    return wait("the Chord Track's chords", settled, 300, 5), bpm
+    return wait("the Chord Track's chords", settled, 600 if manual else 300, 5), bpm
 
 
 def quit_logic() -> None:
@@ -539,6 +550,8 @@ def quit_logic() -> None:
 
 
 def main(argv: list[str]) -> int:
+    manual = "--manual" in argv
+    argv = [a for a in argv if a != "--manual"]
     if len(argv) != 1:
         print(__doc__)
         return 1
@@ -567,13 +580,14 @@ def main(argv: list[str]) -> int:
             lambda: ax("song-window", audio.stem),
             60,
         )
-        park()
+        if not manual:
+            park()
         if os.environ.get(
             "LOGIC_CHORDS_DRYRUN"
         ):  # open and quit only, for testing the run
             print("dry run: opened the song, quitting")
             return 0
-        items, logic_bpm = read_chords(audio.stem)
+        items, logic_bpm = read_chords(audio.stem, manual)
     finally:
         quit_logic()
     changes, unknown = [], set()
