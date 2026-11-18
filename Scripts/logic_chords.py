@@ -284,46 +284,27 @@ on run argv
       set c to my findEl(toolbar 1 of w, item 2 of argv, item 3 of argv, 0)
       if c is missing value then return ""
       return value of c as string
-    else if act is "apply-chords" then
-      -- Logic ignores pop-up menus and keys posted to it while it is in the background (found
-      -- 2026-11-18), so it is made active for the length of one keystroke, then focus goes back.
-      -- Logic must have "Apply Region Chords to Chord Track" assigned to Ctrl-Opt-Shift-Cmd-C.
+    else if act is "region-box" then
       set w to my trackWin()
       set reg to my findEl(w, "AXLayoutItem", item 2 of argv, 0)
-      if reg is missing value then return "no region"
-      set sel to false
-      try
-        set sel to value of attribute "AXSelected" of reg
-      end try
-      -- Setting AXSelected toggles it, so only set it when the region is not already selected.
-      if sel is not true then
-        set value of attribute "AXSelected" of reg to true
-      end if
+      if reg is missing value then return ""
+      set p to position of reg
+      set s to size of reg
+      return ((item 1 of p) as string) & " " & ((item 2 of p) as string) & " " & ((item 1 of s) as string) & " " & ((item 2 of s) as string)
+    else if act is "activate" then
+      -- Logic ignores clicks and keys while inactive (found 2026-11-18), so it is made active for
+      -- the length of one shortcut. Returns the app that was in front, for "refront".
       set prev to my frontName()
       set frontmost to true
-      -- The keys go to whatever is active, so they are only sent once Logic is.
       repeat 10 times
-        if my frontName() is "__APP__" then exit repeat
+        if my frontName() is "__APP__" then return prev
         delay 0.5
         set frontmost to true
       end repeat
-      if my frontName() is not "__APP__" then return "not active: " & my frontName()
-      -- Keys only reach the tracks area once it has focus, as after a click on the region.
-      try
-        perform action "AXRaise" of w
-      end try
-      try
-        set value of attribute "AXFocused" of reg to true
-      end try
-      delay 0.5
-      key code 8 using {control down, option down, shift down, command down}
-      delay 0.5
-      if prev is not "__APP__" then
-        try
-          my refront(prev)
-        end try
-      end if
-      return "sent"
+      return "FAILED " & my frontName()
+    else if act is "refront" then
+      if item 2 of argv is not "__APP__" then my refront(item 2 of argv)
+      return "done"
     else if act is "show-chord-track" then
       set w to my trackWin()
       if my findEl(w, "AXLayoutArea", "chord track", 0) is not missing value then return "already"
@@ -447,6 +428,39 @@ def park() -> None:
     ax("move", str(int(m.group(1)) + 20), str(int(m.group(2)) + 20))
 
 
+KEYS_SRC = SCRIPTS / "logic_keys.swift"
+KEYS_BIN = SCRIPTS / "logic_keys"
+
+
+def apply_chords(region: str) -> None:
+    """Runs Apply Region Chords to Chord Track on the region. Logic needs a real click on the
+    region and real key presses for its Key Command (Ctrl-Opt-Shift-Cmd-C, assigned by hand in
+    Logic > Key Commands), and only acts while it is the active app, so it is made active for
+    a second and focus is handed back. Chord ID analyzes as it goes; ask once."""
+    if not KEYS_BIN.exists() or KEYS_BIN.stat().st_mtime < KEYS_SRC.stat().st_mtime:
+        subprocess.run(
+            ["swiftc", "-O", str(KEYS_SRC), "-o", str(KEYS_BIN)], check=True
+        )
+    box = ax("region-box", region)
+    if not box:
+        raise RuntimeError(f"Logic has no region {region!r} to analyze")
+    x, y, w, h = (float(v) for v in box.split())
+    prev = ax("activate")
+    if prev.startswith("FAILED"):
+        raise RuntimeError(f"Logic would not become the active app ({prev})")
+    try:
+        typed = subprocess.run(
+            [str(KEYS_BIN), str(x + w / 2), str(y + h / 2)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        ax("refront", prev)
+    if typed.stdout.strip() != "typed":
+        raise RuntimeError(f"Logic shortcut not sent: {typed.stderr.strip()}")
+
+
 def read_chords(region: str) -> tuple[list[str], float]:
     """Analyzes the song's region and returns Logic's chord items and the project tempo."""
     bpm = float(wait("Logic's tempo", lambda: ax("control", "AXSlider", "Tempo"), 30))
@@ -455,10 +469,7 @@ def read_chords(region: str) -> tuple[list[str], float]:
         raise RuntimeError(
             f"Logic's project is in {signature}; this script reads 4/4 only"
         )
-    # Apply analyzes the region as it goes. It is asked for once: a second press would only
-    # re-run Chord ID on a song it is already working through.
-    if ax("apply-chords", region) != "sent":
-        raise RuntimeError(f"Logic has no region {region!r} to analyze")
+    apply_chords(region)
     seen: list[str] = []
 
     def settled():
