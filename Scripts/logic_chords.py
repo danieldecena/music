@@ -302,6 +302,8 @@ on run argv
         set frontmost to true
       end repeat
       return "FAILED " & my frontName()
+    else if act is "front-name" then
+      return my frontName()
     else if act is "refront" then
       if item 2 of argv is not "__APP__" then my refront(item 2 of argv)
       return "done"
@@ -457,6 +459,14 @@ def apply_chords(region: str) -> None:
         ["osascript", "-e", f'tell application "{APP}" to activate'], check=False
     )
     time.sleep(2)
+    # A full-screen game takes the keyboard back from Logic (found 2026-11-18, World of Warcraft
+    # open: the keys did nothing, and went to the game). Never type unless Logic is in front.
+    front = ax("front-name")
+    if front != APP:
+        ax("refront", prev)
+        raise RuntimeError(
+            f"{front} took the keyboard back from Logic; close it (a full-screen game?) and run again"
+        )
     try:
         typed = subprocess.run(
             [str(KEYS_BIN), str(x + w / 2), str(y + h / 2)],
