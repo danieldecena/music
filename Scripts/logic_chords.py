@@ -308,6 +308,13 @@ on run argv
         set frontmost to true
       end repeat
       if my frontName() is not "__APP__" then return "not active: " & my frontName()
+      -- Keys only reach the tracks area once it has focus, as after a click on the region.
+      try
+        perform action "AXRaise" of w
+      end try
+      try
+        set value of attribute "AXFocused" of reg to true
+      end try
       delay 0.5
       key code 8 using {control down, option down, shift down, command down}
       delay 0.5
