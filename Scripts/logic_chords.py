@@ -448,7 +448,12 @@ def read_chords(region: str) -> tuple[list[str], float]:
     seen: list[str] = []
 
     def settled():
-        # Asked each time: while Chord ID is still busy, Logic ignores the menu click.
+        # Logic renames or re-lists its window while it analyzes (seen after the focus flip), so
+        # the project window is looked up again on every poll; none yet means ask again later.
+        name = ax("song-window", region)
+        if not name:
+            return None
+        _WINDOW["name"] = name
         ax("show-chord-track")
         items = [l for l in ax("chord-items").splitlines() if l.strip()]
         if items and items == seen:
