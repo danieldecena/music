@@ -46,6 +46,8 @@ _QUALITIES = {
     "major 6": "6",
     "minor 6": "m6",
     "7 sus4": "7sus4",
+    # A power chord (root and fifth) is shown as its plain name: Chordbook has no power-chord shape.
+    "5": "",
 }
 _POSITION = re.compile(
     r"(\d+) bars?(?: (\d+) beats?)?(?: (\d+) divisions?)?(?: (\d+) ticks?)?"
