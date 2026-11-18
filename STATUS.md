@@ -152,6 +152,8 @@
   18/18 `tests/test-find-track.py` pass.
 
 ## Known broken / unverified
+
+- **Logic's chord step stopped working on 2026-11-17 afternoon, for every song.** It worked on DAISIES and YUKON that morning; from ~14:50 every run times out on "the right-click menu of the region". A scratch copy of DAISIES fails the same way, so it is the Mac, not the song. Ruled out: Logic or macOS updates (none since Nov 10/13), Hearthstone or any game in front (fails with it quit), the hidden screen (fails on it too), a second empty project (window is now chosen by its region). Seen in probes: Logic's window drops in and out of System Events' window list; the region is visible as an AXLayoutItem described "02 DAISIES" with name missing value, yet `song-window` sometimes cannot find it for 90 s. Next: photograph the menu on the hidden screen right after AXShowMenu (probe in the 11-17 session scratchpad), and compare Logic's right-click preference. WALKING AWAY went to the phone with script chords meanwhile.
 - **The tempo octave fix shipped (685a489) on best-available evidence, not
   proof.** Against 10 trusted fixture labels it moves exact 5 -> 6 and octave
   errors 2 -> 1, but trades those for 3:2 errors 1 -> 3 — Exchange and Don't
