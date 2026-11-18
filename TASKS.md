@@ -1,5 +1,6 @@
 ## Tasks
 
+- [ ] Probe why Logic's region menu fails since 11-17, rerun WALKING AWAY
 - [ ] Prove it against a clean clone, then confirm PR #2's check goes green
 - [ ] (you) Amend silent-failure rule 10 in place, vs the byte budget
 - [ ] Tempo lock by ear on Nikes and Rambo (optional confirm now)
