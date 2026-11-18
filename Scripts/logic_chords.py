@@ -452,6 +452,11 @@ def apply_chords(region: str) -> None:
     prev = ax("activate")
     if prev.startswith("FAILED"):
         raise RuntimeError(f"Logic would not become the active app ({prev})")
+    # The app's own activate, then a pause: setting frontmost alone left the keys unanswered.
+    subprocess.run(
+        ["osascript", "-e", f'tell application "{APP}" to activate'], check=False
+    )
+    time.sleep(2)
     try:
         typed = subprocess.run(
             [str(KEYS_BIN), str(x + w / 2), str(y + h / 2)],
