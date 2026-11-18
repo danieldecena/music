@@ -301,7 +301,14 @@ on run argv
       end if
       set prev to my frontName()
       set frontmost to true
-      delay 0.8
+      -- The keys go to whatever is active, so they are only sent once Logic is.
+      repeat 10 times
+        if my frontName() is "__APP__" then exit repeat
+        delay 0.5
+        set frontmost to true
+      end repeat
+      if my frontName() is not "__APP__" then return "not active: " & my frontName()
+      delay 0.5
       key code 8 using {control down, option down, shift down, command down}
       delay 0.5
       if prev is not "__APP__" then
