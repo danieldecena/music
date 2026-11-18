@@ -236,6 +236,14 @@ on trackWin()
   end tell
 end trackWin
 
+on frontName()
+  tell application "System Events" to return name of first process whose frontmost is true
+end frontName
+
+on refront(n)
+  tell application "System Events" to set frontmost of process n to true
+end refront
+
 on run argv
   set act to item 1 of argv
   tell application "System Events" to tell process "__APP__"
@@ -291,14 +299,14 @@ on run argv
       if sel is not true then
         set value of attribute "AXSelected" of reg to true
       end if
-      set prev to name of first application process whose frontmost is true
+      set prev to my frontName()
       set frontmost to true
       delay 0.8
       key code 8 using {control down, option down, shift down, command down}
       delay 0.5
       if prev is not "__APP__" then
         try
-          set frontmost of application process prev to true
+          my refront(prev)
         end try
       end if
       return "sent"
