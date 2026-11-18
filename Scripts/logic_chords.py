@@ -455,9 +455,12 @@ def apply_chords(region: str) -> None:
     if prev.startswith("FAILED"):
         raise RuntimeError(f"Logic would not become the active app ({prev})")
     # The app's own activate, then a pause: setting frontmost alone left the keys unanswered.
+    # macOS may ignore a background script's activate when another app is in front, so ask
+    # through Launch Services too, which it honors.
     subprocess.run(
         ["osascript", "-e", f'tell application "{APP}" to activate'], check=False
     )
+    subprocess.run(["open", "-a", str(APP_PATH)], check=False)
     time.sleep(2)
     # A full-screen game takes the keyboard back from Logic (found 2026-11-18, World of Warcraft
     # open: the keys did nothing, and went to the game). Never type unless Logic is in front.
