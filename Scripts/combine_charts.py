@@ -1,0 +1,89 @@
+#!/opt/homebrew/bin/python3
+"""Merge a guitar-only chart into a song's full-mix chart.
+
+Logic's Chord ID on the guitar stem names what the guitar plays (WALKING AWAY: plain D#, F, A#)
+where the full mix adds colour the guitar does not play (D#maj7). The guitar chart is used for
+every bar the guitar plays; bars where it rests ("-") take the full-mix chord, spelled the way
+the guitar spells that root elsewhere. The tempo line stays the full-mix chart's.
+
+Usage: combine_charts.py "<name> guitar chords.txt" "<name> chords.txt"
+The song's chart is kept as "<name> chords (mix).txt" the first time, then rewritten.
+"""
+
+import re
+import sys
+from collections import Counter
+from pathlib import Path
+
+GUITAR_NOTE = "# chords from Logic Pro Chord ID: the guitar part, the full mix where the guitar rests"
+_BAR = re.compile(r"(\d+)\t(\S+)")
+_MID = re.compile(r"(\d+)\.3\t(\S+)")
+
+
+def root(chord: str) -> str:
+    m = re.match(r"[A-G]#?", chord)
+    return m.group(0) if m else ""
+
+
+def _parse(text: str) -> tuple[list[str], dict[int, str], dict[int, str]]:
+    header, bars, mids = [], {}, {}
+    for line in text.splitlines():
+        if line.startswith("#"):
+            header.append(line)
+        elif m := _BAR.fullmatch(line):
+            bars[int(m.group(1))] = m.group(2)
+        elif m := _MID.fullmatch(line):
+            mids[int(m.group(1))] = m.group(2)
+    return header, bars, mids
+
+
+def combine(guitar: str, mix: str) -> str:
+    _, g_bars, g_mids = _parse(guitar)
+    header, m_bars, m_mids = _parse(mix)
+    played = [c for c in list(g_bars.values()) + list(g_mids.values()) if c != "-"]
+    by_root = {}
+    for chord, _ in Counter(played).most_common():
+        by_root.setdefault(root(chord), chord)
+
+    def fallback(chord: str) -> str:
+        return by_root.get(root(chord), chord) if chord != "-" else chord
+
+    lines = [GUITAR_NOTE if h.startswith("# chords from") else h for h in header]
+    for bar in sorted(m_bars):
+        if g_bars.get(bar, "-") != "-":
+            lines.append(f"{bar}\t{g_bars[bar]}")
+            if g_mids.get(bar, "-") != "-":
+                lines.append(f"{bar}.3\t{g_mids[bar]}")
+        else:
+            lines.append(f"{bar}\t{fallback(m_bars[bar])}")
+            if bar in m_mids:
+                lines.append(f"{bar}.3\t{fallback(m_mids[bar])}")
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print(__doc__)
+        return 1
+    guitar, song = (Path(a) for a in argv)
+    for p in (guitar, song):
+        if not p.is_file():
+            print(f"No chart at {p}")
+            return 1
+    g_text, s_text = guitar.read_text(), song.read_text()
+    g_n, s_n = len(_parse(g_text)[1]), len(_parse(s_text)[1])
+    if g_n != s_n:
+        print(
+            f"The guitar chart has {g_n} bars and the song chart {s_n} bars; nothing written."
+        )
+        return 1
+    backup = song.with_name(song.name.replace(" chords.txt", " chords (mix).txt"))
+    if not backup.exists():
+        backup.write_text(s_text)
+    song.write_text(combine(g_text, s_text))
+    print(f"Wrote {song.name} (guitar first); the full-mix chart is {backup.name}.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
