@@ -17,7 +17,7 @@ for t in [CGEventType.leftMouseDown, .leftMouseUp] {
     usleep(60_000)
 }
 CGWarpMouseCursorPosition(back)
-usleep(1_000_000)
+usleep(300_000)
 
 func post(_ key: CGKeyCode, _ down: Bool, _ flags: CGEventFlags) {
     let e = CGEvent(keyboardEventSource: src, virtualKey: key, keyDown: down)!

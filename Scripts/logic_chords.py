@@ -451,34 +451,24 @@ def apply_chords(region: str) -> None:
     if not box:
         raise RuntimeError(f"Logic has no region {region!r} to analyze")
     x, y, w, h = (float(v) for v in box.split())
-    # macOS lets an app hand focus on only while it is itself in front: with the user in some
-    # other app (TextEdit, Notes), Logic's activate was ignored (found 2026-11-18). So Claude
-    # comes forward first; it is the app this runs under, and focus goes back afterwards.
+    # The click goes on the region's left end: a long song's region runs far past the window,
+    # and its middle can be off the screen.
     was = ax("front-name")
-    subprocess.run(["open", "-a", "Claude"], check=False)
-    time.sleep(1)
+    # Only Logic's own System Events activation took focus every time; activate and open -a
+    # from outside were ignored or undone while the user worked in another app (2026-11-18).
     prev = ax("activate")
     if prev.startswith("FAILED"):
         raise RuntimeError(f"Logic would not become the active app ({prev})")
-    # The app's own activate, then a pause: setting frontmost alone left the keys unanswered.
-    # macOS may ignore a background script's activate when another app is in front, so ask
-    # through Launch Services too, which it honors.
-    subprocess.run(
-        ["osascript", "-e", f'tell application "{APP}" to activate'], check=False
-    )
-    subprocess.run(["open", "-a", str(APP_PATH)], check=False)
-    time.sleep(2)
-    # A full-screen game takes the keyboard back from Logic (found 2026-11-18, World of Warcraft
-    # open: the keys did nothing, and went to the game). Never type unless Logic is in front.
+    # The keys go to whatever is active, so they are only sent while Logic is in front.
     front = ax("front-name")
     if front != APP:
         ax("refront", was)
         raise RuntimeError(
-            f"{front} took the keyboard back from Logic; close it (a full-screen game?) and run again"
+            f"{front} took the keyboard back from Logic; leave the Mac alone for a minute and run again"
         )
     try:
         typed = subprocess.run(
-            [str(KEYS_BIN), str(x + w / 2), str(y + h / 2)],
+            [str(KEYS_BIN), str(x + 30), str(y + h / 2)],
             capture_output=True,
             text=True,
             check=False,
