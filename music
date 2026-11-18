@@ -120,6 +120,7 @@ while true; do
     row M "Bass stem -> MIDI"
     row R "Re-voice a melody"  "as another instrument"
     row K "Logic chords"       "second opinion from Logic Pro, sent to the phone"
+    row J "Guitar-first chords" "Logic on the guitar stem, mix where it rests"
     row P "Build Logic project"
     row W "Paste a chord chart" "write a chart you paste into a song's Music lyrics"
     row 9 "Download + chop"    "URL straight to vocal clips"
@@ -274,6 +275,15 @@ GUIDE
         INPUT=$(resolve_target "$raw") || continue
       fi
       logic_chords "$INPUT"
+      ;;
+    J|j)
+      if [[ -f "$CUR_SRC" ]]; then
+        INPUT="$CUR_SRC"
+      else
+        read "raw?Song title (typos OK) or drag its audio file> "
+        INPUT=$(resolve_target "$raw") || continue
+      fi
+      guitar_chords "$INPUT"
       ;;
     X|x)
       read "ly?Match lyric themes too? (slower, needs network) [y/N]> "
