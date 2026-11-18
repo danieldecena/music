@@ -335,14 +335,18 @@ _WINDOW = {"name": ""}  # the song's project window, once main() has found it
 
 
 def ax(*args: str) -> str:
-    done = subprocess.run(
-        ["osascript", "-", *args],
-        input=_AX,
-        capture_output=True,
-        text=True,
-        check=False,
-        env={**os.environ, "LOGIC_CHORDS_WINDOW": _WINDOW["name"]},
-    )
+    try:
+        done = subprocess.run(
+            ["osascript", "-", *args],
+            input=_AX,
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "LOGIC_CHORDS_WINDOW": _WINDOW["name"]},
+            timeout=90,  # Logic busy analyzing can leave a step waiting forever
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"Logic step {args[0]} did not answer in 90 s") from None
     if os.environ.get("LOGIC_CHORDS_TRACE"):
         print(
             f"  ax {args} -> {done.returncode} {done.stdout.strip()[:160]!r} {done.stderr.strip()[:160]!r}",
