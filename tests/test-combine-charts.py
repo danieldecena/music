@@ -113,5 +113,42 @@ with tempfile.TemporaryDirectory() as tmp:
     check(r.returncode == 1, "CLI refuses charts with different bar counts")
     check("bars" in r.stdout + r.stderr, "and says it is the bar count")
 
+    # Re-run after a first merge: the input is (mix), never the merged chart.
+    guitar.write_text(GUITAR)
+    mixfile = t / "10 WALKING AWAY chords (mix).txt"
+    song.write_text(MIX)
+    mixfile.unlink()
+    subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    guitar2 = GUITAR.replace("1\tD#\n1.3\tF\n2\t-\n3\t-\n4\tD#\n", "1\t-\n2\t-\n3\t-\n4\tF\n")
+    guitar.write_text(guitar2)
+    r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    check(r.returncode == 0, f"a re-run with a changed guitar chart succeeds ({r.stdout.strip()!r})")
+    check(song.read_text() == cc.combine(guitar2, MIX), "a re-run merges against (mix), not the merged chart")
+    check(mixfile.read_text() == MIX, "and leaves (mix) as it was")
+
+    # A new full-mix chart dropped over a merged one refreshes (mix).
+    guitar.write_text(GUITAR)
+    mix2 = MIX.replace("Gm7", "Cm7")
+    song.write_text(mix2)
+    r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    check(r.returncode == 0, "a fresh full-mix chart over a merged one is merged")
+    check(mixfile.read_text() == mix2, "and replaces (mix) with the new full-mix chart")
+    check(song.read_text() == cc.combine(GUITAR, mix2), "and merges against the new chart")
+
+    # A merged chart with no (mix) backup is refused.
+    mixfile.unlink()
+    before = song.read_text()
+    r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    check(r.returncode == 1 and song.read_text() == before, "a merged chart with no (mix) is refused, unchanged")
+    check("missing" in r.stdout + r.stderr, "and says (mix) is missing")
+
+    # A song chart not named "* chords.txt" is refused before anything is written.
+    odd = t / "10 WALKING AWAY chart.txt"
+    odd.write_text(MIX)
+    r = subprocess.run([sys.executable, script, str(guitar), str(odd)], capture_output=True, text=True)
+    check(r.returncode == 1, "a song chart not named '* chords.txt' is refused")
+    check(odd.read_text() == MIX, "and is left unchanged")
+    check("chords.txt" in r.stdout + r.stderr, "and the reason names the expected file name")
+
 print(f"\n{_passed} passed, {_failed} failed")
 sys.exit(1 if _failed else 0)

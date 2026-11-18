@@ -7,7 +7,9 @@ every bar the guitar plays; bars where it rests ("-") take the full-mix chord, s
 the guitar spells that root elsewhere. The tempo line stays the full-mix chart's.
 
 Usage: combine_charts.py "<name> guitar chords.txt" "<name> chords.txt"
-The song's chart is kept as "<name> chords (mix).txt" the first time, then rewritten.
+"<name> chords (mix).txt" always holds the latest full-mix chart: a fresh full-mix song chart is
+copied there before the song chart is rewritten, and a song chart that is already merged is
+left alone as the input (the merge re-reads "(mix)" instead).
 """
 
 import re
@@ -70,17 +72,28 @@ def main(argv: list[str]) -> int:
         if not p.is_file():
             print(f"No chart at {p}")
             return 1
+    if not song.name.endswith(" chords.txt"):
+        print(f"The song chart must be named '<name> chords.txt', not {song.name}; nothing written.")
+        return 1
+    backup = song.with_name(song.name[: -len(" chords.txt")] + " chords (mix).txt")
     g_text, s_text = guitar.read_text(), song.read_text()
-    g_n, s_n = len(_parse(g_text)[1]), len(_parse(s_text)[1])
-    if g_n != s_n:
+    merged = GUITAR_NOTE in s_text.splitlines()
+    if merged:
+        if not backup.is_file():
+            print(f"{song.name} is already merged but {backup.name} is missing; nothing written.")
+            return 1
+        mix_text = backup.read_text()
+    else:
+        mix_text = s_text
+    g_n, m_n = len(_parse(g_text)[1]), len(_parse(mix_text)[1])
+    if g_n != m_n:
         print(
-            f"The guitar chart has {g_n} bars and the song chart {s_n} bars; nothing written."
+            f"The guitar chart has {g_n} bars and the full-mix chart {m_n} bars; nothing written."
         )
         return 1
-    backup = song.with_name(song.name.replace(" chords.txt", " chords (mix).txt"))
-    if not backup.exists():
-        backup.write_text(s_text)
-    song.write_text(combine(g_text, s_text))
+    if not merged:
+        backup.write_text(mix_text)
+    song.write_text(combine(g_text, mix_text))
     print(f"Wrote {song.name} (guitar first); the full-mix chart is {backup.name}.")
     return 0
 
