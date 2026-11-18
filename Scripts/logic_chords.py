@@ -1,13 +1,14 @@
 #!/opt/homebrew/bin/python3
 """Chords for a song from Logic Pro's Chord ID, written as the song's chords.txt.
 
-Opens the song in Logic in the background, runs Chords > Apply Region Chords to Chord Track
-on it (Chord ID analyzes the song as it goes) and reads every chord with its position from
+Opens the song in Logic (on the hidden screen), runs Apply Region Chords to Chord Track
+(Ctrl-Opt-Shift-Cmd-C in Logic's Key Commands) on it (Chord ID analyzes the song as it goes) and reads every chord with its position from
 the accessibility tree. The chords are laid on the grid of the chart already beside the song (its tempo and bar count, so
 nudges made against it still hold), one chord per bar: the one that sounds longest in it.
 The old chart is kept as "<name> chords (script).txt" the first time.
 
-Logic never comes to the front: every step is an accessibility action on a background app.
+Logic stays in the background except for one second while its shortcut is sent: it ignores
+menus and keys while inactive. Every other step is an accessibility action.
 With the BetterDisplay hidden screen connected, Logic's window is moved there.
 
 Usage: logic_chords.py "<song>.m4a"
@@ -275,21 +276,32 @@ on run argv
       set c to my findEl(toolbar 1 of w, item 2 of argv, item 3 of argv, 0)
       if c is missing value then return ""
       return value of c as string
-    else if act is "chords-menu" then
+    else if act is "apply-chords" then
+      -- Logic ignores pop-up menus and keys posted to it while it is in the background (found
+      -- 2026-11-18), so it is made active for the length of one keystroke, then focus goes back.
+      -- Logic must have "Apply Region Chords to Chord Track" assigned to Ctrl-Opt-Shift-Cmd-C.
       set w to my trackWin()
       set reg to my findEl(w, "AXLayoutItem", item 2 of argv, 0)
       if reg is missing value then return "no region"
-      perform action "AXShowMenu" of reg
-      set m to missing value
-      repeat 10 times
-        delay 0.5
-        set m to my findEl(w, "AXMenu", "Logic Pro", 0)
-        if m is not missing value then exit repeat
-      end repeat
-      if m is missing value then return "no menu"
-      set mi to menu item (item 3 of argv) of menu 1 of menu item "Chords" of m
-      click mi
-      return "clicked"
+      set sel to false
+      try
+        set sel to value of attribute "AXSelected" of reg
+      end try
+      -- Setting AXSelected toggles it, so only set it when the region is not already selected.
+      if sel is not true then
+        set value of attribute "AXSelected" of reg to true
+      end if
+      set prev to name of first application process whose frontmost is true
+      set frontmost to true
+      delay 0.8
+      key code 8 using {control down, option down, shift down, command down}
+      delay 0.5
+      if prev is not "__APP__" then
+        try
+          set frontmost of application process prev to true
+        end try
+      end if
+      return "sent"
     else if act is "show-chord-track" then
       set w to my trackWin()
       if my findEl(w, "AXLayoutArea", "chord track", 0) is not missing value then return "already"
@@ -421,17 +433,10 @@ def read_chords(region: str) -> tuple[list[str], float]:
         raise RuntimeError(
             f"Logic's project is in {signature}; this script reads 4/4 only"
         )
-    # Apply analyzes the region as it goes. The menu is only ever opened to click an item: one
-    # opened just to be read cannot be closed through accessibility, and it blocks Logic's quit.
-    # A Logic still settling after opening the song can be slow to show the menu.
-    wait(
-        f"the right-click menu of the region {region!r} (a full-screen app in front, such as a game, may keep Logic from showing it)",
-        lambda: (
-            ax("chords-menu", region, "Apply Region Chords to Chord Track") == "clicked"
-        ),
-        60,
-        3,
-    )
+    # Apply analyzes the region as it goes. It is asked for once: a second press would only
+    # re-run Chord ID on a song it is already working through.
+    if ax("apply-chords", region) != "sent":
+        raise RuntimeError(f"Logic has no region {region!r} to analyze")
     seen: list[str] = []
 
     def settled():
