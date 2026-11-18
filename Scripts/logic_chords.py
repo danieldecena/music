@@ -451,6 +451,12 @@ def apply_chords(region: str) -> None:
     if not box:
         raise RuntimeError(f"Logic has no region {region!r} to analyze")
     x, y, w, h = (float(v) for v in box.split())
+    # macOS lets an app hand focus on only while it is itself in front: with the user in some
+    # other app (TextEdit, Notes), Logic's activate was ignored (found 2026-11-18). So Claude
+    # comes forward first; it is the app this runs under, and focus goes back afterwards.
+    was = ax("front-name")
+    subprocess.run(["open", "-a", "Claude"], check=False)
+    time.sleep(1)
     prev = ax("activate")
     if prev.startswith("FAILED"):
         raise RuntimeError(f"Logic would not become the active app ({prev})")
@@ -466,7 +472,7 @@ def apply_chords(region: str) -> None:
     # open: the keys did nothing, and went to the game). Never type unless Logic is in front.
     front = ax("front-name")
     if front != APP:
-        ax("refront", prev)
+        ax("refront", was)
         raise RuntimeError(
             f"{front} took the keyboard back from Logic; close it (a full-screen game?) and run again"
         )
@@ -478,7 +484,7 @@ def apply_chords(region: str) -> None:
             check=False,
         )
     finally:
-        ax("refront", prev)
+        ax("refront", was)
     if typed.stdout.strip() != "typed":
         raise RuntimeError(f"Logic shortcut not sent: {typed.stderr.strip()}")
 
