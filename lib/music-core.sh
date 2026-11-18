@@ -308,6 +308,48 @@ logic_chords() {
   return $rc
 }
 
+guitar_chords() {
+  # $1 = a song's audio file with its "<name> chords.txt" beside it. Builds the chart from Logic's
+  # Chord ID on the guitar stem, with the full mix filling bars where the guitar rests
+  # (Scripts/combine_charts.py), then publishes it like logic_chords. Logic opens on screen twice
+  # at most (full mix if that chart is not Logic's yet, then the guitar): click the region and
+  # press Ctrl-Opt-Shift-Cmd-C each time.
+  local f="$1" pub="$HOME/developer/chordbook/scripts/songs_to_icloud.sh" out rc
+  if [[ ! -f "$f" ]]; then
+    echo "Guitar chords needs the song's audio file, and ${f:t} is not one (a stems folder?). Drag the .m4a." >&2
+    return 1
+  fi
+  local name="${f:t:r}" chart="${f:h}/${f:t:r} chords.txt"
+  if [[ ! -f "$chart" ]]; then
+    echo "No chart at $chart: run the Guitar chords step first, which sets the bar grid." >&2
+    return 1
+  fi
+  if ! grep -q "^# chords from Logic Pro Chord ID" "$chart"; then
+    echo "First, Logic's chords for the full mix:"
+    logic_chords "$f" || return 1
+  fi
+  local stem="$MUSIC_DIR/Stems/htdemucs_6s/$name/guitar.wav"
+  if [[ ! -f "$stem" ]]; then
+    echo "Splitting out the guitar (a few minutes)..."
+    separate_stems "$f" 6stem "$MUSIC_DIR/Stems" >/dev/null || return 1
+  fi
+  local work="$MUSIC_DIR/Stems/guitar-check/$name" grid="${f:h}/$name chords (script).txt"
+  [[ -f "$grid" ]] || grid="$chart"
+  mkdir -p "$work"
+  cp "$stem" "$work/$name guitar.wav" || return 1
+  cp "$grid" "$work/$name guitar chords.txt" || return 1
+  echo "Now Logic's chords for the guitar alone:"
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/logic_chords.py" --manual "$work/$name guitar.wav" || return 1
+  "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/combine_charts.py" "$work/$name guitar chords.txt" "$chart" || return 1
+  if [[ ! -x "$pub" ]]; then
+    echo "Chordbook is not on this Mac, so nothing was sent to the phone."
+    return 0
+  fi
+  out="$("$pub" 2>&1)"; rc=$?
+  print -rl -- "${(@M)${(f)out}:#*($name|FAILED|added, )*}"
+  return $rc
+}
+
 chords_lyrics_text() {
   # $1 = audio file or Stems folder. Prints the chords as timed lyric-style lines.
   "$MUSIC_DIR/.venv/bin/python" "$MUSIC_DIR/Scripts/chords_to_lyrics.py" "$1"

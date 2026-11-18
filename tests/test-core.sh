@@ -146,4 +146,21 @@ assert_eq "$(ls "$tmp")" "09 Nights
 song.m4a" "a refused run writes nothing beside the song"
 rm -rf "$tmp"
 
+# guitar_chords refuses before Logic or Demucs runs: a folder is not a song, and a song with no
+# chart has no bar grid. Neither may write anything or reach the publish step.
+MUSIC_DIR="${0:A:h:h}"
+tmp=$(mktemp -d)
+mkdir "$tmp/09 Nights"
+msg=$(guitar_chords "$tmp/09 Nights" 2>&1); rc=$?
+assert_eq "$rc" "1" "guitar_chords refuses a folder"
+assert_eq "${msg:0:29}" "Guitar chords needs the song'" "guitar_chords says why it refused a folder"
+touch "$tmp/song.m4a"
+msg=$(guitar_chords "$tmp/song.m4a" 2>&1); rc=$?
+assert_eq "$rc" "1" "guitar_chords refuses a song with no chart"
+assert_eq "${msg:0:12}" "No chart at " "guitar_chords says the chart is missing"
+assert_eq "$(ls "$tmp")" "09 Nights
+song.m4a" "a refused guitar_chords run writes nothing beside the song"
+assert_eq "$(ls "$MUSIC_DIR/Stems/guitar-check" 2>/dev/null | grep -c '^song$')" "0" "a refused run makes no working folder"
+rm -rf "$tmp"
+
 exit $fail
