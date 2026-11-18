@@ -120,6 +120,40 @@ def bar_labels(
     return labels
 
 
+def bar_halves(
+    changes: list[tuple[float, str]], bpm: float, bars: int, start: float = 0.0
+) -> tuple[list[str], dict[int, str]]:
+    """Like bar_labels, but a bar whose two halves play different chords (each for at least a
+    beat) keeps the first half's chord and gets the second half's as a change on beat 3, keyed
+    by bar index. DAISIES plays two chords a bar; one chord per bar dropped half of them."""
+    bar_len = 4 * 60 / bpm
+    beat = bar_len / 4
+    spans = [
+        (at, changes[i + 1][0] if i + 1 < len(changes) else float("inf"), name)
+        for i, (at, name) in enumerate(changes)
+    ]
+
+    def longest(lo: float, hi: float) -> tuple[str, float]:
+        best, best_len = "-", 0.0
+        for begin, end, name in spans:
+            overlap = min(hi, end) - max(lo, begin)
+            if overlap > best_len:
+                best, best_len = name, overlap
+        return best, best_len
+
+    labels, mids = [], {}
+    for b in range(bars):
+        lo = start + b * bar_len
+        first, first_len = longest(lo, lo + bar_len / 2)
+        second, second_len = longest(lo + bar_len / 2, lo + bar_len)
+        if first != second and first_len >= beat - 1e-9 and second_len >= beat - 1e-9:
+            labels.append(first)
+            mids[b] = second
+        else:
+            labels.append(longest(lo, lo + bar_len)[0])
+    return labels, mids
+
+
 def read_grid(chart: str) -> tuple[str, str, float, int, float]:
     """Title line, key, tempo, bar count and bar 1's start (seconds) of an existing chords.txt."""
     title = next(
@@ -141,13 +175,21 @@ def read_grid(chart: str) -> tuple[str, str, float, int, float]:
     )
 
 
-def chart_text(grid: tuple[str, str, float, int, float], labels: list[str]) -> str:
+def chart_text(
+    grid: tuple[str, str, float, int, float],
+    labels: list[str],
+    mids: dict[int, str] | None = None,
+) -> str:
     title, key, bpm, bars, start = grid
     tempo = f"# key {key}  {bpm} BPM  {bars} bars" + (
         f"  start {start:.3f} s" if start else ""
     )
     lines = [title, tempo, SOURCE_NOTE]
-    lines += [f"{i}\t{c}" for i, c in enumerate(labels, 1)]
+    for i, c in enumerate(labels, 1):
+        lines.append(f"{i}\t{c}")
+        # "5.3<TAB>Fm": the chord changes on beat 3 of bar 5. Older Chordbook builds skip the line.
+        if mids and i - 1 in mids:
+            lines.append(f"{i}.3\t{mids[i - 1]}")
     return "\n".join(lines) + "\n"
 
 
@@ -183,6 +225,16 @@ on findEl(el, r, d, depth)
   return missing value
 end findEl
 
+-- Logic can open an empty project of its own beside the song's, so every step works in the
+-- window main() found holding the song's region (LOGIC_CHORDS_WINDOW), not whichever is first.
+on trackWin()
+  set n to system attribute "LOGIC_CHORDS_WINDOW"
+  tell application "System Events" to tell process "__APP__"
+    if n is not "" then return first window whose name is n
+    return first window whose name ends with "- Tracks"
+  end tell
+end trackWin
+
 on run argv
   set act to item 1 of argv
   tell application "System Events" to tell process "__APP__"
@@ -211,15 +263,20 @@ on run argv
       end repeat
       return "no such button"
     else if act is "move" then
-      set position of (first window whose name ends with "- Tracks") to {(item 2 of argv) as integer, (item 3 of argv) as integer}
+      set position of (my trackWin()) to {(item 2 of argv) as integer, (item 3 of argv) as integer}
       return "moved"
+    else if act is "song-window" then
+      repeat with w in (every window whose name ends with "- Tracks")
+        if my findEl(w, "AXLayoutItem", item 2 of argv, 0) is not missing value then return name of w as string
+      end repeat
+      return ""
     else if act is "control" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       set c to my findEl(toolbar 1 of w, item 2 of argv, item 3 of argv, 0)
       if c is missing value then return ""
       return value of c as string
     else if act is "chords-menu" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       set reg to my findEl(w, "AXLayoutItem", item 2 of argv, 0)
       if reg is missing value then return "no region"
       perform action "AXShowMenu" of reg
@@ -234,7 +291,7 @@ on run argv
       click mi
       return "clicked"
     else if act is "show-chord-track" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       if my findEl(w, "AXLayoutArea", "chord track", 0) is not missing value then return "already"
       set mi to menu item "Chord Track" of menu 1 of menu item "Global Tracks" of menu 1 of menu bar item "Track" of menu bar 1
       set mark to missing value
@@ -245,7 +302,7 @@ on run argv
       click mi
       return "shown"
     else if act is "chord-items" then
-      set w to first window whose name ends with "- Tracks"
+      set w to my trackWin()
       set c to my findEl(w, "AXLayoutArea", "chord container", 0)
       if c is missing value then return ""
       set out to ""
@@ -259,6 +316,9 @@ end run
 """.replace("__APP__", APP)
 
 
+_WINDOW = {"name": ""}  # the song's project window, once main() has found it
+
+
 def ax(*args: str) -> str:
     done = subprocess.run(
         ["osascript", "-", *args],
@@ -266,6 +326,7 @@ def ax(*args: str) -> str:
         capture_output=True,
         text=True,
         check=False,
+        env={**os.environ, "LOGIC_CHORDS_WINDOW": _WINDOW["name"]},
     )
     if os.environ.get("LOGIC_CHORDS_TRACE"):
         print(
@@ -440,6 +501,11 @@ def main(argv: list[str]) -> int:
     print("Running Logic's Chord ID in the background (a minute or two)...", flush=True)
     try:
         open_song(audio)
+        _WINDOW["name"] = wait(
+            f"a project window holding the region {audio.stem!r}",
+            lambda: ax("song-window", audio.stem),
+            60,
+        )
         park()
         if os.environ.get(
             "LOGIC_CHORDS_DRYRUN"
@@ -463,11 +529,11 @@ def main(argv: list[str]) -> int:
         )
         return 1
     save_changes(audio.with_name(f"{audio.stem} logic.tsv"), changes)
-    labels = bar_labels(changes, grid[2], grid[3], start=grid[4])
+    labels, mids = bar_halves(changes, grid[2], grid[3], start=grid[4])
     old = chart.read_text()
     if not backup.exists() and SOURCE_NOTE not in old:
         backup.write_text(old)
-    chart.write_text(chart_text(grid, labels))
+    chart.write_text(chart_text(grid, labels, mids))
     before = [l.split("\t")[1] for l in old.splitlines() if re.match(r"\d+\t", l)]
     changed = sum(1 for a, b in zip(before, labels) if a != b)
     print(
