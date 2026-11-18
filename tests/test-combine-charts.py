@@ -80,6 +80,12 @@ check(cc.root("D#maj7") == "D#", "root of D#maj7")
 check(cc.root("Gm7/D") == "G", "root of a slash chord")
 check(cc.root("-") == "", "no-chord has no root")
 
+check(cc.tempo(MIX) == (87.99, 0.313), "tempo() reads bpm and start")
+check(
+    cc.tempo("# Chords -- x\n# key F  90 BPM  4 bars\n") == (90.0, 0.0),
+    "tempo() reads a line with no start as start 0.0",
+)
+
 # The CLI keeps the old chart once and refuses charts of different lengths.
 with tempfile.TemporaryDirectory() as tmp:
     t = Path(tmp)
@@ -141,6 +147,25 @@ with tempfile.TemporaryDirectory() as tmp:
     r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
     check(r.returncode == 1 and song.read_text() == before, "a merged chart with no (mix) is refused, unchanged")
     check("missing" in r.stdout + r.stderr, "and says (mix) is missing")
+
+    # Charts on different time grids are refused: bars are paired by number.
+    song.write_text(mix2)
+    mixfile.write_text(mix2)
+    far = GUITAR.replace("start 0.114 s", "start 0.900 s")
+    guitar.write_text(far)
+    r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    out_text = r.stdout + r.stderr
+    check(r.returncode == 1, "CLI refuses a guitar chart whose start is over half a beat off")
+    check(song.read_text() == mix2, "and leaves the song chart unchanged")
+    check("0.900" in out_text and "0.313" in out_text, "and names both starts")
+    fast = GUITAR.replace("88.04 BPM", "90.63 BPM")
+    guitar.write_text(fast)
+    r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    check(r.returncode == 1 and song.read_text() == mix2, "CLI refuses a 3% BPM difference, song chart unchanged")
+    check("90.63" in r.stdout + r.stderr and "87.99" in r.stdout + r.stderr, "and names both tempos")
+    guitar.write_text(GUITAR)
+    r = subprocess.run([sys.executable, script, str(guitar), str(song)], capture_output=True, text=True)
+    check(r.returncode == 0, "the fixtures' small tempo and start differences still merge")
 
     # A song chart not named "* chords.txt" is refused before anything is written.
     odd = t / "10 WALKING AWAY chart.txt"
