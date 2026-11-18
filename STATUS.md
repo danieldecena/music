@@ -1,6 +1,7 @@
 # STATUS — music toolkit
 
 ## Confirmed working
+- **Guitar-first chords (menu Tools `J`, `guitar_chords`), 2026-11-18.** Logic's Chord ID on the Demucs guitar stem, the full mix where the guitar rests (`Scripts/combine_charts.py`). Proved on a WALKING AWAY copy: one shortcut press, the result matched the chart Daniel accepted line for line, headers included. Both Logic runs are semi-manual (click the region, press Ctrl-Opt-Shift-Cmd-C).
 - **`Tools/mu-analyze`** (gitignored binary, source `Tools/mu-analyze.swift`) — a
   macOS CLI over Apple's `MusicUnderstanding` framework. Dumps rhythm, key,
   structure, loudness, pace and instrument activity for one audio file as JSON.
